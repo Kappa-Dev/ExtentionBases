@@ -520,7 +520,8 @@ module Make (Node:Node.NodeType) =
               else
                 let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
                 in
-                let emb_list = flatten (extension_class (embed g1 h)) in
+                let emb_list = try flatten (extension_class (embed g1 h)) with Undefined -> []
+		in
                 let cont =
                   List.fold_left
                     (fun cont emb ->

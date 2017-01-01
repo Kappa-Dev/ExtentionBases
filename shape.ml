@@ -51,14 +51,15 @@ module Make (Node:Node.NodeType) =
 
       if db() then Printexc.record_backtrace true ;
       let one = graph_of_library "one" in
+      let house = graph_of_library "house" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") then
+		     if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") then
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty
       in
-      let nw,pw = Model.witnesses_of_rule (Graph.empty,one) model in
+      let nw,pw = Model.witnesses_of_rule (one,house) model in
       let get_seed = function
           (id_obs,tile)::_ -> Cat.left_of_tile tile
         | [] -> Graph.empty
@@ -70,7 +71,9 @@ module Make (Node:Node.NodeType) =
              None -> failwith "no witness"
            | Some (to_w,from_o) ->
               if db() then
-                Printf.printf "Inserting witness of observable \"%s\": %s\n" (Lib.Dict.to_name id_obs model.Model.dict) (Cat.string_of_co_span (to_w,from_o)) ;
+                Printf.printf "Inserting witness of observable \"%s\": %s\n" 
+			      (Lib.Dict.to_name id_obs model.Model.dict) 
+			      (Cat.string_of_co_span (to_w,from_o)) ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw
       in
@@ -81,7 +84,9 @@ module Make (Node:Node.NodeType) =
              None -> failwith "no witness"
            | Some (to_w,from_o) ->
               if db() then
-                Printf.printf "Inserting witness of observable '%s': %s\n" (Lib.Dict.to_name id_obs model.Model.dict) (Cat.string_of_co_span (to_w,from_o)) ;
+                Printf.printf "Inserting witness of observable '%s': %s\n"
+			      (Lib.Dict.to_name id_obs model.Model.dict)
+			      (Cat.string_of_co_span (to_w,from_o)) ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed pw)) pw
       in

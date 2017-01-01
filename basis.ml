@@ -190,17 +190,7 @@ module Make (Node:Node.NodeType) =
 
     let compare inf_to_i inf_to_w ext_base =
       if db() then
-        begin
-          try Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w))
-          with _ ->
-            Printf.printf "\t Sharing (Not a span!!!) %s<-%s-%s, %s-%s->%s\n"
-                          (Graph.to_string inf_to_i.Cat.trg)
-                          (Cat.string_of_embeddings inf_to_i)
-                          (Graph.to_string inf_to_i.Cat.src)
-                          (Graph.to_string inf_to_w.Cat.src)
-                          (Cat.string_of_embeddings inf_to_w)
-                          (Graph.to_string inf_to_w.Cat.trg)
-        end;
+        Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ;
       match Cat.share inf_to_i inf_to_w with
         None -> Conflicting
       | Some (inf_to_sh,sharing_tile) ->
@@ -232,6 +222,7 @@ module Make (Node:Node.NodeType) =
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
     let rec progress fresh_id ext_base actions visited next_layer todo =
+      (************* DEBUGING INFO ***************)
       let _ = if db() then
                 begin
                   Printf.printf "stack: {%s}\n"
@@ -242,19 +233,31 @@ module Make (Node:Node.NodeType) =
                                 (String.concat
                                    ","
                                    (List.map (fun (inf,_,i,_) -> "("^(string_of_int inf)^","^(string_of_int i)^")") next_layer)) ;
-                  Printf.printf "0 |--> {%s}\n" (String.concat "," (List.map string_of_int (Lib.IntMap.fold (fun i _ cont -> i::cont) (find 0 ext_base).next [])))
+                  Printf.printf "0 |--> {%s}\n" 
+				(String.concat "," 
+					       (List.map string_of_int 
+							 (Lib.IntMap.fold (fun i _ cont -> i::cont) (find 0 ext_base).next []))
+				)
                 end
       in
+      (************* DEBUGING INFO ***************)
+      
       match todo with
-        [] -> if next_layer = [] then actions else progress fresh_id ext_base actions visited [] next_layer
+        [] -> if next_layer = [] then actions
+	      else
+		progress fresh_id ext_base actions visited [] next_layer
       | (inf,ext_inf_i,i,ext_inf_w)::todo ->
+
+	 (*When there are cycles in the extension base, a point may already have been compared with w*)
          if Lib.IntSet.mem i visited then
            progress fresh_id ext_base actions visited next_layer todo
          else
+
            let _ = if db() then Printf.printf "Visiting (%d,%d)\n" inf i in
            begin
              assert (mem i ext_base) ;
              match compare ext_inf_i ext_inf_w ext_base with
+
                Conflicting ->
                if db() then print_string (red "Conflicting points\n");
                let next_layer',stop =
@@ -271,10 +274,18 @@ module Make (Node:Node.NodeType) =
                    (fun w ext_base -> add_conflict i w ext_base)::actions
                in
                progress fresh_id ext_base actions' (Lib.IntSet.add i visited) next_layer' todo
-               | Below ext_w_i ->
+
+               | Below ext_w_i -> (* w --ext_w_i--> i *)
                   if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
-                  progress fresh_id ext_base ((fun w ext_base -> add_step w i ext_w_i ext_base)::actions) (Lib.IntSet.add i visited) next_layer todo
-               | Above ext_i_w ->
+                  progress 
+		    fresh_id
+		    ext_base
+		    ((fun w ext_base -> add_step w i ext_w_i ext_base)::actions)
+		    (Lib.IntSet.add i visited)
+		    next_layer
+		    todo
+
+               | Above ext_i_w -> (* i --ext_i_w--> w *)
                   if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
                   let todo',stop =
                     Lib.IntMap.fold
@@ -294,17 +305,18 @@ module Make (Node:Node.NodeType) =
                            (Lib.IntSet.add i visited)
                            next_layer
                            todo'
+
                | Iso iso_w_i ->
                   if db() then print_string (red "iso\n");
                   raise (Found_iso (iso_w_i,i))
+
                | Incomp sh_info ->
-                  if db() then print_string (green (Printf.sprintf "I found a midpoint %s (%d)!\n" (Graph.to_string sh_info.to_midpoint.Cat.trg) fresh_id));
-                  let actions' =
-                    if sh_info.has_sup then
-                      actions
-                    else
-                      (fun w ext_base -> add_conflict i w ext_base)::actions
-                  in
+                  if db() then print_string 
+				 (green (Printf.sprintf "I found a midpoint %s (%d)!\n" 
+							(Graph.to_string sh_info.to_midpoint.Cat.trg) 
+							fresh_id)
+				 );
+		  (*No better comparison with w exists*)
                   if Cat.is_iso sh_info.to_midpoint then
                     let next_layer',stop =
                       if db() then print_string (green (Printf.sprintf "...that is not worth adding\n")) ;
@@ -315,11 +327,22 @@ module Make (Node:Node.NodeType) =
                     in
                     let actions' =
                       if stop then
-                        (fun w ext_base -> add_step inf w ext_inf_w ext_base)::actions'
+                        (fun w ext_base -> 
+			 if sh_info.has_sup then add_step inf w ext_inf_w ext_base
+			 else
+			    add_conflict i w (add_step inf w ext_inf_w ext_base)
+			)::actions
                       else
-                        actions'
+                        if sh_info.has_sup then actions
+			else
+			  (fun w ext_base -> add_conflict i w ext_base)::actions
                     in
-                    progress fresh_id ext_base actions' (Lib.IntSet.add i visited) next_layer' todo
+                    progress
+		      fresh_id
+		      ext_base actions'
+		      (Lib.IntSet.add i visited)
+		      next_layer'
+		      todo
                   else
                     (*Not a trivial midpoint*)
                     let next_layer',stop =
@@ -338,10 +361,17 @@ module Make (Node:Node.NodeType) =
                        in
                        let ext_base = add_step inf fresh_id sh_info.to_midpoint ext_base in
                        let ext_base = add_step fresh_id i sh_info.to_base ext_base in
+		       let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
                        remove_step inf i (remove_step inf w ext_base) (*will remove steps only if they exists and they are direct*)
-                      )::actions'
+                      )::actions
                     in
-                    progress (fresh_id+1) ext_base actions' (Lib.IntSet.add i visited) next_layer' todo
+                    progress 
+		      (fresh_id+1)
+		      ext_base 
+		      actions' 
+		      (Lib.IntSet.add i visited)
+		      next_layer'
+		      todo
            end
 
     let insert ext_w obs_emb obs_id ext_base =
@@ -349,7 +379,8 @@ module Make (Node:Node.NodeType) =
       let id_0 = Cat.identity p0.value p0.value in
       try
         let w = Lib.IntMap.cardinal ext_base.points in
-        let actions = progress (w+1) ext_base [] Lib.IntSet.empty [] [(0,id_0,0,ext_w)] in
+	let next_midpoint = w+1 in
+        let actions = progress next_midpoint ext_base [] Lib.IntSet.empty [] [(0,id_0,0,ext_w)] in
         let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) in
         let ext_base = add w (point ext_w.Cat.trg) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
