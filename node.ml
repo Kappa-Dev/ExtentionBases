@@ -13,7 +13,6 @@ module type NodeType =
     val to_string : t -> string
     val coh : (t*t) list -> (t*t) -> bool
     val rename : int -> t -> t
-    exception Incoherent
   end
 
 
@@ -41,8 +40,7 @@ module SimpleNode =
 	  [i] -> i
 	| _ -> failwith "Cannot parse node"
 			
-      exception Incoherent
-		  
+      			
       let to_string = string_of_int
 			
       let coh _ _ = true
@@ -73,8 +71,7 @@ module KappaNode =
 	  [i;p;l] -> {ag_id = i ; port_id = p ; label = l}
 	| _ -> failwith "Cannot parse node"
 			
-      exception Incoherent
-		  
+      			
       let to_string u =
 	"["^(string_of_int u.ag_id)^";"^(string_of_int (u.port_id))^";"^(string_of_int (u.label))^"]"
 
@@ -87,5 +84,43 @@ module KappaNode =
 	  (fun (u,v) ->
 	   ok u x && ok v x && ok u w && ok v w && ok w x
 	  ) edges
+	  
+    end:NodeType)
+
+module DegreeNode =
+  (struct
+      type t = {id : int ; max_degree : int}
+      
+      let arity = 0
+      let prop = [||]
+		   
+      let id u = u.id
+		   
+      let rename i u = {u with id = i}
+		    
+      let get_prop _ = raise Not_found
+
+      let fold_prop _ _ cont = cont
+			    
+      let compare u v = Pervasives.compare u.id v.id
+					   
+      let create l = 
+	match l with 
+	  [i;d] -> {id = i ; max_degree = d}
+	| _ -> failwith "Cannot parse node"
+			
+      let to_string u =
+	"["^(string_of_int u.id)^";"^(string_of_int (u.max_degree))^"]"
+
+      let coh edges (w,x) =
+	let dw,dx =
+	List.fold_left
+	  (fun (dw,dx) (u,v) ->
+	   let dw = if (u = w) || (v=w) then dw+1 else dw in
+	   let dx = if (u = x) || (v=x) then dx+1 else dx in
+	   (dw,dx)
+	  ) (1,1) edges
+	in
+	(dw <= w.max_degree) && (dx <= x.max_degree)  
 	  
     end:NodeType)

@@ -4,7 +4,8 @@ module Make (Node:Node.NodeType) =
   struct
     
     type node =  Node.t
-		   
+    exception Incoherent
+
     module NodeSet = Set.Make(struct type t = node let compare = Node.compare end)
     module NodeMap = Map.Make(struct type t = node let compare = Node.compare end)
 
@@ -70,7 +71,7 @@ module Make (Node:Node.NodeType) =
 	  let edges' = NodeMap.add u (v::bu) (NodeMap.add v (u::bv) g.edges) in
 	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1}
 	else
-	  raise Node.Incoherent
+	  raise Incoherent
 		
     let meet g h =
       try
@@ -87,7 +88,7 @@ module Make (Node:Node.NodeType) =
 			Not_found -> meet
 		     ) g.edges empty
       with
-	Node.Incoherent -> failwith "Invariant violation: meet operation is undefined"
+	Incoherent -> failwith "Invariant violation: meet operation is undefined"
 				    
     let join g h =
       NodeMap.fold

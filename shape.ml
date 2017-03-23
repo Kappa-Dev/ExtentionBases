@@ -18,7 +18,7 @@ module Make (Node:Node.NodeType) =
       match line_list with
 	[] -> Some g
       | (p_u,p_v)::tl ->
-	   let opt = try Some (draw_line p_u p_v g) with Node.Incoherent -> None
+	   let opt = try Some (draw_line p_u p_v g) with Graph.Incoherent -> None
 	   in
 	   match opt with
 	     Some g' -> draw tl g'
@@ -45,8 +45,21 @@ module Make (Node:Node.NodeType) =
 
 module SimpleShape = Make (Node.SimpleNode)
 module KappaShape = Make (Node.KappaNode) 
-  
+module DegreeShape = Make (Node.DegreeNode)  
+
 let test =
+  match
+    DegreeShape.draw 
+      [
+	([0;2],[1;1]) ;
+	([0;2],[2;1])
+      ]
+      DegreeShape.Graph.empty
+  with
+    None -> print_string "Graph is incoherent\n" 
+  | Some g -> print_string (DegreeShape.Graph.to_string g) ; print_newline ()
+
+let test2 () =
   print_string "Starting test...\n" ;
   let kl =
     KappaShape.draw 

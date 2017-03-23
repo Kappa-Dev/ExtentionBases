@@ -172,9 +172,11 @@ module Make (Node:Node.NodeType) =
 	       try
 		 Graph.add_edge u' v' homg'
 	       with
-		 Node.Incoherent ->
-		 Printf.printf "Cannot add (%s,%s)\n" (Node.to_string u') (Node.to_string v') ;
-		 failwith "Invariant violation"
+		 Graph.Incoherent ->
+		 (
+		   Printf.printf "Cannot add (%s,%s)\n" (Node.to_string u') (Node.to_string v') ;
+		   failwith "Invariant violation"
+		 )
 	     in
 	     (homg'',hom'',fresh'')
 	  ) g (Graph.empty,hom,fresh)
@@ -191,7 +193,7 @@ module Make (Node:Node.NodeType) =
 	   in
 	   (Some gh_sup,hom')
 	 with
-	   Node.Incoherent -> (None,hom')
+	   Graph.Incoherent -> (None,hom')
 	 | Hom.Not_injective | Hom.Not_structure_preserving -> failwith "Invariant violation"
 	) maps
 	
@@ -235,7 +237,7 @@ module Make (Node:Node.NodeType) =
 	     (Graph.add_edge u v subg)::subgraphs
 	    ) g []
 	with
-	  Node.Incoherent -> failwith "Invariant violation"
+	  Graph.Incoherent -> failwith "Invariant violation"
       in
       let one_gluings = 
 	List.fold_left
