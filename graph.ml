@@ -17,7 +17,23 @@ module Make (Node:Node.NodeType) =
 
     let size_node g = NodeSet.cardinal g.nodes
     let size_edge g = g.size
-			
+
+    let fold_edges f g cont =
+      NodeMap.fold
+	(fun u bu cont ->
+	 List.fold_left
+	   (fun cont v ->
+	    if Node.compare u v < 0 then (f u v cont)
+	    else cont
+	   ) cont bu
+	) g.edges cont
+
+	
+    let fold_nodes f g cont =
+      NodeSet.fold
+	(fun u cont ->
+	 f u cont
+	) g.nodes cont
     let bound_to u g =
       try NodeMap.find u g.edges with Not_found -> []
 
@@ -41,15 +57,14 @@ module Make (Node:Node.NodeType) =
       else
 	let bu = bound_to u g in
 	let bv = bound_to v g in
-	let e = (u,v) in
 	let is_coherent =
-	  NodeMap.fold
-	    (fun u' bu' b ->
-	     List.fold_left (fun b v' ->
-			     let e' = (u',v') in
-			     (Node.coh e e') && b
-			    ) b bu'
-	    ) g.edges true
+	  let edges =
+	    fold_edges
+	      (fun u v cont ->
+	       (u,v)::cont
+	      ) g []
+	  in
+	  Node.coh edges (u,v)
 	in
 	if is_coherent then
 	  let edges' = NodeMap.add u (v::bu) (NodeMap.add v (u::bv) g.edges) in
@@ -85,22 +100,7 @@ module Make (Node:Node.NodeType) =
 	   ) join buG 
 	) g.edges h
 
-    let fold_edges f g cont =
-      NodeMap.fold
-	(fun u bu cont ->
-	 List.fold_left
-	   (fun cont v ->
-	    if Node.compare u v < 0 then (f u v cont)
-	    else cont
-	   ) cont bu
-	) g.edges cont
-
-	
-    let fold_nodes f g cont =
-      NodeSet.fold
-	(fun u cont ->
-	 f u cont
-	) g.nodes cont
+   
 	
     let max_id g =
       fold_nodes (fun u max -> if Node.id u > max then Node.id u else max) g 0

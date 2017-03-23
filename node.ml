@@ -11,17 +11,18 @@ module type NodeType =
     val compare : t -> t -> int
     val create : int list -> t
     val to_string : t -> string
-    val coh : (t * t) -> (t * t) -> bool
+    val coh : (t*t) list -> (t*t) -> bool
     val rename : int -> t -> t
     exception Incoherent
   end
-    
+
+
 module SimpleNode =
   (struct
       type t = int 
       let arity = 0
       let rename i u = i
-      
+			 
       let id u = u
       let prop = [||]
 		      
@@ -57,7 +58,7 @@ module KappaNode =
       let id u = u.ag_id
 		   
       let rename i u = {u with ag_id = i}
-			 
+		    
       let get_prop u = function
 	| 0 -> u.port_id
 	| 1 -> u.label
@@ -74,10 +75,17 @@ module KappaNode =
 			
       exception Incoherent
 		  
-      let to_string u = "["^(string_of_int u.ag_id)^";"^(string_of_int (u.port_id))^";"^(string_of_int (u.label))^"]"
+      let to_string u =
+	"["^(string_of_int u.ag_id)^";"^(string_of_int (u.port_id))^";"^(string_of_int (u.label))^"]"
 
-      let coh (u,v) (w,x) =
-	let ok u v = if u.ag_id = v.ag_id then (u.port_id != v.port_id) && (u.label = v.label) else true in
-	ok u v && ok u x && ok v w && ok v x && ok u v && ok w x
-				       			     
+      let coh edges (w,x) =
+	let ok u v =
+	  if u.ag_id = v.ag_id then ((u.port_id != v.port_id) && (u.label = v.label))
+	  else true
+	in
+	List.for_all
+	  (fun (u,v) ->
+	   ok u x && ok v x && ok u w && ok v w && ok w x
+	  ) edges
+	  
     end:NodeType)

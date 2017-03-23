@@ -46,7 +46,7 @@ module Make (Node:Node.NodeType) =
 module SimpleShape = Make (Node.SimpleNode)
 module KappaShape = Make (Node.KappaNode) 
   
-let test() =
+let test =
   print_string "Starting test...\n" ;
   let kl =
     KappaShape.draw 
@@ -92,7 +92,7 @@ let test() =
      print_newline ()
 	   
 
-let test =
+let test() =
   let two =
     match
       SimpleShape.draw [([0],[1]);([1],[2])] SimpleShape.Graph.empty
