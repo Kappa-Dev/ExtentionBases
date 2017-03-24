@@ -1,5 +1,4 @@
-open IntStruct
-       
+
 module Make (Node:Node.NodeType) =
   struct
     
@@ -9,12 +8,16 @@ module Make (Node:Node.NodeType) =
     module NodeSet = Set.Make(struct type t = node let compare = Node.compare end)
     module NodeMap = Map.Make(struct type t = node let compare = Node.compare end)
 
-    type t = {nodes : NodeSet.t ; edges : (node list) NodeMap.t ; idmap : (node list) IntMap.t ; size : int }
+    type t =
+      {nodes : NodeSet.t ;
+       edges : (node list) NodeMap.t ;
+       idmap : (node list) Lib.IntMap.t ;
+       size : int }
 	       
-    let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = IntMap.empty ; size = 0}
+    let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
 
     		  
-    let nodes_of_id i g = try IntMap.find i g.idmap with Not_found -> []		 
+    let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []		 
 
     let size_node g = NodeSet.cardinal g.nodes
     let size_edge g = g.size
@@ -49,7 +52,7 @@ module Make (Node:Node.NodeType) =
       else
 	let idmap' = 
 	  let l = nodes_of_id (Node.id u) g in
-	  IntMap.add (Node.id u) (u::l) g.idmap
+	  Lib.IntMap.add (Node.id u) (u::l) g.idmap
 	in
 	{g with nodes = NodeSet.add u g.nodes ; idmap = idmap'}
 	  

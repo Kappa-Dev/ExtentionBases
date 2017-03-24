@@ -1,8 +1,7 @@
-open IntStruct
-       
+  
 module Make (Node:Node.NodeType) =
   struct
-    module Hom = Morphism.Make_structure_preserving (Node)
+    module Hom = Homomorphism.Make (Node)
     module Graph = Graph.Make (Node)
 
     module NodeSet = Set.Make (Node)
@@ -56,7 +55,8 @@ module Make (Node:Node.NodeType) =
 	List.fold_left (fun hom_list hom ->
 			let fold_candidates_u =
 			  match Hom.id_image u hom with
-			    None -> (fun f -> Graph.fold_nodes f h) (*if [Node.id u] is not yet constrained by [hom]*)
+			    None -> (*if [Node.id u] is not yet constrained by [hom]*)
+			    (fun f -> Graph.fold_nodes f h) 
 			  | Some i -> (*Looking for a candidate among those having [hom (Node.id u)] as id*)
 			     (fun f -> List.fold_right f (Graph.nodes_of_id i h)) 
 			in
@@ -85,6 +85,7 @@ module Make (Node:Node.NodeType) =
 	 hom_list_extended
 	) [Hom.empty] cc_roots
 
+    
     let extension_class arrows =
       let close_span hom hom' =
 	try
@@ -94,8 +95,7 @@ module Make (Node:Node.NodeType) =
 		    Hom.add v v' phi
 		   ) hom Hom.empty
 	with
-	  Hom.Not_structure_preserving -> failwith "Invariant violation"
-	| Hom.Not_injective -> failwith "Invariant violation 2"
+	  Hom.Not_structure_preserving | Hom.Not_injective -> failwith "Invariant violation"
       in
       let reduced_maps = 
 	List.fold_left
@@ -194,7 +194,8 @@ module Make (Node:Node.NodeType) =
 	   (Some gh_sup,hom')
 	 with
 	   Graph.Incoherent -> (None,hom')
-	 | Hom.Not_injective | Hom.Not_structure_preserving -> failwith "Invariant violation"
+	 | Hom.Not_injective | Hom.Not_structure_preserving ->
+				failwith "Invariant violation: cannot build homomorphism"
 	) maps
 	
     	
@@ -223,7 +224,8 @@ module Make (Node:Node.NodeType) =
 		      let complete_gluings' = succ_n_arrows::complete_gluings in
 		      (succ_n_arrows::succ_n_gluings,complete_gluings',succ_n_arrows.src::already_done)
 		with
-		  Hom.Not_structure_preserving -> failwith "Invariant violation"
+		  Hom.Not_structure_preserving ->
+		  failwith "Invariant violation: not structure preserving"
 		| Hom.Not_injective -> (succ_n_gluings,complete_gluings,already_done)
 	       ) ([],complete_gluings,already_done) one_gluings
 	   in
@@ -237,7 +239,7 @@ module Make (Node:Node.NodeType) =
 	     (Graph.add_edge u v subg)::subgraphs
 	    ) g []
 	with
-	  Graph.Incoherent -> failwith "Invariant violation"
+	  Graph.Incoherent -> failwith "Invariant violation: graph is incoherent"
       in
       let one_gluings = 
 	List.fold_left

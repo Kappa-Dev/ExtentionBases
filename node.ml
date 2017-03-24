@@ -1,8 +1,7 @@
-open IntStruct
-       
+
 module type NodeType =
   sig
-    type t
+    type t 
     val id : t -> int
     val arity : int
     val prop : (int -> int list) array
@@ -13,12 +12,13 @@ module type NodeType =
     val to_string : t -> string
     val coh : (t*t) list -> (t*t) -> bool
     val rename : int -> t -> t
+    val library : (t*t) list Lib.StringMap.t
   end
 
 
 module SimpleNode =
   (struct
-      type t = int 
+      type t = int
       let arity = 0
       let rename i u = i
 			 
@@ -44,6 +44,38 @@ module SimpleNode =
       let to_string = string_of_int
 			
       let coh _ _ = true
+
+      let library =
+	let house =
+	  [
+	    ([0],[1]) ;
+	    ([1],[2]) ;
+	    ([2],[3]) ;
+	    ([3],[0]) ;
+	    ([3],[4]) ;
+	    ([2],[4])
+	  ]
+	in
+	let square =
+	  [
+	    ([0],[1]) ;
+	    ([1],[2]) ;
+	    ([2],[3]) ;
+	    ([3],[0]) ;
+	  ]
+	in
+	let triangle =
+	  [
+	    ([0],[1]) ;
+	    ([1],[2]) ;
+	    ([0],[2])
+	  ]
+	in
+	let tn = List.map (fun (l,l') -> (create l,create l')) in 
+	Lib.StringMap.add "house" (tn house)
+		      (Lib.StringMap.add "square" (tn square)
+				     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
+	  
     end:NodeType)
     
 module KappaNode =
@@ -84,15 +116,46 @@ module KappaNode =
 	  (fun (u,v) ->
 	   ok u x && ok v x && ok u w && ok v w && ok w x
 	  ) edges
-	  
+
+      let library =
+	let house =
+	  [
+	    ([0;0;0],[1;0;0]) ;
+	    ([1;1;0],[2;1;0]) ;
+	    ([2;0;0],[3;0;0]) ;
+	    ([3;1;0],[0;1;0]) ;
+	    ([3;2;0],[4;0;0]) ;
+	    ([4;1;0]),[2;2;0]
+	  ]
+	in
+	let square =
+	  [
+	    ([0;0;0],[1;0;0]) ;
+	    ([1;1;0],[2;1;0]) ;
+	    ([2;0;0],[3;0;0]) ;
+	    ([3;1;0],[0;1;0])
+	  ]
+	in
+	let triangle =
+	  [
+	    ([0;0;0],[1;0;0]) ;
+	    ([0;2;0],[2;0;0]) ;
+	    ([2;1;0],[1;2;0])
+	  ]
+	in
+	let tn = List.map (fun (l,l') -> (create l,create l')) in 
+	Lib.StringMap.add "house" (tn house)
+		      (Lib.StringMap.add "square" (tn square)
+				     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
+	
     end:NodeType)
 
 module DegreeNode =
   (struct
       type t = {id : int ; max_degree : int}
       
-      let arity = 0
-      let prop = [||]
+      let arity = 1
+      let prop = [|fun i -> [i]|]
 		   
       let id u = u.id
 		   
@@ -100,7 +163,7 @@ module DegreeNode =
 		    
       let get_prop _ = raise Not_found
 
-      let fold_prop _ _ cont = cont
+      let fold_prop f u cont = f 0 u.max_degree cont
 			    
       let compare u v = Pervasives.compare u.id v.id
 					   
@@ -116,11 +179,42 @@ module DegreeNode =
 	let dw,dx =
 	List.fold_left
 	  (fun (dw,dx) (u,v) ->
-	   let dw = if (u = w) || (v=w) then dw+1 else dw in
-	   let dx = if (u = x) || (v=x) then dx+1 else dx in
+	   let dw = if (u.id = w.id) || (v.id=w.id) then dw+1 else dw in
+	   let dx = if (u.id = x.id) || (v.id=x.id) then dx+1 else dx in
 	   (dw,dx)
 	  ) (1,1) edges
 	in
-	(dw <= w.max_degree) && (dx <= x.max_degree)  
+	(dw <= w.max_degree) && (dx <= x.max_degree)
+
+      let library =
+	let house =
+	  [
+	    ([0;2],[1;2]) ;
+	    ([1;2],[2;3]) ;
+	    ([2;3],[3;3]) ;
+	    ([3;3],[0;2]) ;
+	    ([3;3],[4;2]) ;
+	    ([2;3],[4;2])
+	  ]
+	in
+	let square =
+	  [
+	    ([0;2],[1;2]) ;
+	    ([1;2],[2;2]) ;
+	    ([2;3],[3;3]) ;
+	    ([3;3],[0;2]) ;
+	  ]
+	in
+	let triangle =
+	  [
+	    ([0;3],[1;3]) ;
+	    ([1;3],[2;2]) ;
+	    ([0;3],[2;2])
+	  ]
+	in
+	let tn = List.map (fun (l,l') -> (create l,create l')) in 
+	Lib.StringMap.add "house" (tn house)
+		      (Lib.StringMap.add "square" (tn square)
+				     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
 	  
     end:NodeType)
