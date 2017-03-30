@@ -1,19 +1,17 @@
-  
+
 module Make (Node:Node.NodeType) =
   struct
     module Hom = Homomorphism.Make (Node)
     module Graph = Graph.Make (Node)
 
     module NodeSet = Set.Make (Node)
-			      
-    type arrows = {src : Graph.t ; auto_src : Hom.t list ; maps : Hom.t list ; trg : Graph.t; auto_trg : Hom.t list}
-    type graph = Graph.t
 
-		   
-    let to_string cat =
-      String.concat "," (List.map Hom.to_string cat.maps)
+    type arrows = {src : Graph.t ; auto_src : Hom.t list ; maps : Hom.t list ; trg : Graph.t; auto_trg : Hom.t list}	       
 		    
-		    
+    exception Undefined
+		
+    let rec to_string arrows = String.concat "," (List.map Hom.to_string arrows.maps)
+					     
     let (=>) g h =
       let rec extend hom_list iG jG acc =
 	match hom_list with
@@ -85,6 +83,56 @@ module Make (Node:Node.NodeType) =
 	 hom_list_extended
 	) [Hom.empty] cc_roots
 
+    let horizontal_compose arrows arrows' =
+      let maps =
+	List.fold_left
+	  (fun maps hom ->
+	   let hom_added =
+	     List.fold_left
+	       (fun hom_added hom' ->
+		try
+		  (Hom.sum hom hom')::hom_added
+		with
+		  Hom.Not_structure_preserving | Hom.Not_injective -> hom_added
+	       ) [] arrows'.maps
+	   in
+	   hom_added@maps
+	  ) [] arrows.maps
+      in
+      if maps = [] then raise Undefined
+      else
+	let src = Graph.join arrows.src arrows'.src in
+	let trg = Graph.join arrows.trg arrows'.trg in
+	let auto_src = src => src in
+	let auto_trg = trg => trg in
+	{src = src ; trg = trg ; auto_src = auto_src ; auto_trg = auto_trg ; maps = maps}	
+	  
+    let vertical_compose arrows arrows' =
+      let maps =
+	List.fold_left
+	  (fun maps hom ->
+	   let hom_ext_list = 
+	     List.fold_left 
+	       (fun maps hom' ->
+		try
+		  (Hom.compose hom hom')::maps
+		with
+		  Hom.Not_injective -> maps
+	       ) maps arrows'.maps
+	   in
+	   hom_ext_list@maps
+	  ) [] arrows.maps
+      in
+      if maps = [] then raise Undefined
+      else
+	{src = arrows.src ; 
+	 trg = arrows'.trg ; 
+	 auto_src = arrows.auto_src ; 
+	 auto_trg = arrows'.auto_trg ; 
+	 maps = maps}
+      	  
+
+
     let eq_class arrows dmem dfind dauto =
       let close_diagram hom hom' =
 	try
@@ -115,14 +163,15 @@ module Make (Node:Node.NodeType) =
 	     ) arrows.maps
 	  )
       in
+      assert (reduced_maps <> []) ;
       {arrows with maps = reduced_maps}
-	
+	  
     let extension_class arrows =
       let dmem = Hom.mem in
       let dfind = Hom.find in
       let dauto = arrows.auto_trg in
       eq_class arrows dmem dfind dauto
-
+	       
     let matching_class arrows =
       let dmem = Hom.comem in
       let dfind = Hom.cofind in
@@ -130,34 +179,16 @@ module Make (Node:Node.NodeType) =
       eq_class arrows dmem dfind dauto
 
     let create g h =
-      {src = g ;
-       auto_src = (g => g) ;
-       maps = (g => h) ;
-       trg = h ;
-       auto_trg = (h => h)}
-      
-    let tensor arrows arrows' =
-      let src = Graph.join arrows.src arrows'.src in
-      let trg = Graph.join arrows.trg arrows'.trg in
-      let auto_src = src => src in
-      let auto_trg = trg => trg in
-      let maps =
-	List.fold_left
-	  (fun maps hom ->
-	   let hom_added =
-	     List.fold_left
-	       (fun hom_added hom' ->
-		try
-		  (Hom.sum hom hom')::hom_added
-		with
-		  Hom.Not_structure_preserving | Hom.Not_injective -> hom_added
-	       ) [] arrows'.maps
-	   in
-	   hom_added@maps
-	  ) [] arrows.maps
-      in
-      {src = src ; trg = trg ; auto_src = auto_src ; auto_trg = auto_trg ; maps = maps}
+      let maps = g => h in
+      if maps = [] then raise Undefined
+      else
+	{src = g ;
+	 auto_src = (g => g) ;
+	 maps = (g => h) ;
+	 trg = h ;
+	 auto_trg = (h => h)}
 
+	  
     let multi_pushout maps g h =
       let extend_partial hom g fresh =
 	let apply_ext_hom u hom fresh =
@@ -190,7 +221,7 @@ module Make (Node:Node.NodeType) =
 		 )
 	     in
 	     (homg'',hom'',fresh'')
-	  ) g (Graph.empty,hom,fresh)
+	    ) g (Graph.empty,hom,fresh)
 	in
 	(hom',g')
       in
@@ -223,20 +254,21 @@ module Make (Node:Node.NodeType) =
 		  let src_n = n_gluing.src in
 		  if Graph.is_included src_1 src_n then (succ_n_gluings,complete_gluings,already_done)
 		  else
-		    let succ_n_arrows = tensor one_gluing n_gluing
-		    in
-		    (*On verifie ici que succ_n_arrows n'est pas deja dans succ_n_gluings*)
-		    if List.exists
-			 (fun g ->
-			  Graph.is_equal g succ_n_arrows.src
-			 ) already_done
-		    then (succ_n_gluings,complete_gluings,already_done)
-		    else
-		      let complete_gluings' = succ_n_arrows::complete_gluings in
-		      (succ_n_arrows::succ_n_gluings,complete_gluings',succ_n_arrows.src::already_done)
+		    match try Some (horizontal_compose one_gluing n_gluing) with Undefined -> None
+		    with
+		      None -> (succ_n_gluings,complete_gluings,already_done)
+		    | Some succ_n_arrows ->
+		       (*On verifie ici que succ_n_arrows n'est pas deja dans succ_n_gluings*)
+		       if List.exists
+			    (fun g ->
+			     Graph.is_equal g succ_n_arrows.src
+			    ) already_done
+		       then (succ_n_gluings,complete_gluings,already_done)
+		       else
+			 let complete_gluings' = succ_n_arrows::complete_gluings in
+			 (succ_n_arrows::succ_n_gluings,complete_gluings',succ_n_arrows.src::already_done)
 		with
-		  Hom.Not_structure_preserving ->
-		  failwith "Invariant violation: not structure preserving"
+		  Hom.Not_structure_preserving -> failwith "Invariant violation: not structure preserving"
 		| Hom.Not_injective -> (succ_n_gluings,complete_gluings,already_done)
 	       ) ([],complete_gluings,already_done) one_gluings
 	   in
@@ -255,7 +287,10 @@ module Make (Node:Node.NodeType) =
       let one_gluings = 
 	List.fold_left
 	  (fun arr_list subg ->
-	   (create subg h)::arr_list
+	   match try Some (create subg h) with Undefined -> None
+	   with
+	     Some arrows -> arrows::arr_list
+	   | None -> arr_list
 	  ) [] (subgraphs_of_edges g)
       in
       let gluings = 
@@ -265,11 +300,11 @@ module Make (Node:Node.NodeType) =
 		      let is_max subG =
 			try
 			  (List.fold_left
-			    (fun _ arrows ->
-			     if (Graph.size_edge subG < Graph.size_edge arrows.src)
-				&& (Graph.is_included subG arrows.src)
-			     then raise Pervasives.Exit
-			    ) () gluings ; true)
+			     (fun _ arrows ->
+			      if (Graph.size_edge subG < Graph.size_edge arrows.src)
+				 && (Graph.is_included subG arrows.src)
+			      then raise Pervasives.Exit
+			     ) () gluings ; true)
 			with
 			  Pervasives.Exit -> false
 		      in
@@ -285,6 +320,6 @@ module Make (Node:Node.NodeType) =
 		      in
 		      gluings@cont
 		     ) [] gluings
-	
+		     
   end
     

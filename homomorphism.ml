@@ -70,6 +70,12 @@ module Make (Node:Node.NodeType) =
 
     let fold f hom = NodeBij.fold (fun u v cont -> f u v cont) hom.tot
 
+    let compose hom hom' = 
+      try
+	fold (fun u v hom'' -> add u (find v hom') hom'') hom empty
+      with 
+	Not_found -> raise Not_injective
+
     let sum hom hom' = fold (fun u v hom_sum -> add u v hom_sum) hom hom'
       			    
     let mem u hom = NodeBij.mem u hom.tot
