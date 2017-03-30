@@ -85,13 +85,12 @@ module Make (Node:Node.NodeType) =
 	 hom_list_extended
 	) [Hom.empty] cc_roots
 
-    
-    let extension_class arrows =
-      let close_span hom hom' =
+    let eq_class arrows dmem dfind dauto =
+      let close_diagram hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-		    assert (Hom.mem u hom') ; 
-		    let v' = Hom.find u hom' in
+		    assert (dmem u hom') ; 
+		    let v' = dfind u hom' in
 		    Hom.add v v' phi
 		   ) hom Hom.empty
 	with
@@ -102,8 +101,8 @@ module Make (Node:Node.NodeType) =
 	  (fun extensions hom ->
 	   if List.exists (fun hom' ->
 			   (Hom.is_equal hom hom') ||
-			     let phi = close_span hom hom' in
-			     List.exists (fun psi -> Hom.is_sub phi psi) arrows.auto_trg
+			     let phi = close_diagram hom hom' in
+			     List.exists (fun psi -> Hom.is_sub phi psi) dauto
 			  ) extensions
 	   then extensions
 	   else hom::extensions
@@ -118,6 +117,20 @@ module Make (Node:Node.NodeType) =
       in
       {arrows with maps = reduced_maps}
 	
+    let extension_class arrows =
+      let dmem = Hom.mem in
+      let dfind = Hom.find in
+      let dauto = arrows.auto_trg in
+      eq_class arrows dmem dfind dauto
+
+    let matching_class arrows =
+      let dmem = Hom.comem in
+      let dfind = Hom.cofind in
+      let dauto = arrows.auto_src in
+      eq_class arrows dmem dfind dauto
+
+
+
     let create g h =
       print_string "created \n" ;
       let arrows =

@@ -73,6 +73,7 @@ module Make (Node:Node.NodeType) =
     let sum hom hom' = fold (fun u v hom_sum -> add u v hom_sum) hom hom'
       			    
     let mem u hom = NodeBij.mem u hom.tot
+    let comem u hom = NodeBij.comem u hom.tot
 
     let to_string hom =
       if is_identity hom then
