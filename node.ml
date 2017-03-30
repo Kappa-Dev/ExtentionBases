@@ -24,15 +24,15 @@ module SimpleNode =
 			 
       let id u = u
       let prop = [||]
-		      
+		   
       let get_prop _ i = 
 	try
 	  prop.(i) 
 	with
 	  Invalid_argument _ -> raise Not_found
-		     
+				      
       let fold_prop _ _ cont = cont
-			    
+				 
       let compare = Pervasives.compare
 		      
       let create l = 
@@ -73,29 +73,29 @@ module SimpleNode =
 	in
 	let tn = List.map (fun (l,l') -> (create l,create l')) in 
 	Lib.StringMap.add "house" (tn house)
-		      (Lib.StringMap.add "square" (tn square)
-				     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
-	  
-    end:NodeType)
+			  (Lib.StringMap.add "square" (tn square)
+					     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
+			  
+			  end:NodeType)
     
 module KappaNode =
   (struct
       type t = {ag_id : int ; port_id : int ; label : int}
-      
+		 
       let arity = 2
       let prop = [| (fun port_id -> [port_id]) ; (fun label -> [label]) |]
 		   
       let id u = u.ag_id
 		   
       let rename i u = {u with ag_id = i}
-		    
+			 
       let get_prop u = function
 	| 0 -> u.port_id
 	| 1 -> u.label
 	| _ -> raise Not_found
 
       let fold_prop f u cont = f 1 u.label (f 0 u.port_id cont)
-			    
+				 
       let compare u v = Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)
 					   
       let create l = 
@@ -143,28 +143,47 @@ module KappaNode =
 	    ([2;1;0],[1;2;0])
 	  ]
 	in
-	let tn = List.map (fun (l,l') -> (create l,create l')) in 
-	Lib.StringMap.add "house" (tn house)
-		      (Lib.StringMap.add "square" (tn square)
-				     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
-	
+	let abc = 
+	  [
+	    ([0;0;0],[1;0;1]) ;
+	    ([1;1;1],[2;0;2]) ;
+	  ]
+	in
+	let abd = 
+	  [
+	    ([0;0;0],[1;0;1]) ;
+	    ([1;1;1],[2;0;3]) ;
+	  ]
+	in
+	let tn = List.map (fun (l,l') -> (create l,create l')) 
+	in 
+	let lib1 = Lib.StringMap.add "abc" (tn abc) Lib.StringMap.empty 
+	in
+	let lib2 = Lib.StringMap.add "abd" (tn abd) lib1 
+	in
+	let lib3 = Lib.StringMap.add "house" (tn house) lib2
+	in
+	let lib4 = Lib.StringMap.add "square" (tn square) lib3
+	in
+	Lib.StringMap.add "triangle" (tn triangle) lib4
+
     end:NodeType)
 
 module DegreeNode =
   (struct
       type t = {id : int ; max_degree : int}
-      
+		 
       let arity = 1
       let prop = [|fun i -> [i]|]
 		   
       let id u = u.id
 		   
       let rename i u = {u with id = i}
-		    
+			 
       let get_prop = fun u i -> if i = 0 then u.max_degree else raise Not_found
 
       let fold_prop f u cont = f 0 u.max_degree cont
-			    
+				 
       let compare u v = Pervasives.compare u.id v.id
 					   
       let create l = 
@@ -177,12 +196,12 @@ module DegreeNode =
 
       let coh edges (w,x) =
 	let dw,dx =
-	List.fold_left
-	  (fun (dw,dx) (u,v) ->
-	   let dw = if (u.id = w.id) || (v.id=w.id) then dw+1 else dw in
-	   let dx = if (u.id = x.id) || (v.id=x.id) then dx+1 else dx in
-	   (dw,dx)
-	  ) (1,1) edges
+	  List.fold_left
+	    (fun (dw,dx) (u,v) ->
+	     let dw = if (u.id = w.id) || (v.id=w.id) then dw+1 else dw in
+	     let dx = if (u.id = x.id) || (v.id=x.id) then dx+1 else dx in
+	     (dw,dx)
+	    ) (1,1) edges
 	in
 	(dw <= w.max_degree) && (dx <= x.max_degree)
 
@@ -214,7 +233,7 @@ module DegreeNode =
 	in
 	let tn = List.map (fun (l,l') -> (create l,create l')) in 
 	Lib.StringMap.add "house" (tn house)
-		      (Lib.StringMap.add "square" (tn square)
-				     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
-	  
-    end:NodeType)
+			  (Lib.StringMap.add "square" (tn square)
+					     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
+			  
+			  end:NodeType)

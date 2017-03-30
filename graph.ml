@@ -2,16 +2,15 @@
 module Make (Node:Node.NodeType) =
   struct
     
-    type node =  Node.t
     exception Incoherent
 
-    module NodeSet = Set.Make(struct type t = node let compare = Node.compare end)
-    module NodeMap = Map.Make(struct type t = node let compare = Node.compare end)
+    module NodeSet = Set.Make(struct type t = Node.t let compare = Node.compare end)
+    module NodeMap = Map.Make(struct type t = Node.t let compare = Node.compare end)
 
     type t =
       {nodes : NodeSet.t ;
-       edges : (node list) NodeMap.t ;
-       idmap : (node list) Lib.IntMap.t ;
+       edges : (Node.t list) NodeMap.t ;
+       idmap : (Node.t list) Lib.IntMap.t ;
        size : int }
 	       
     let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
@@ -161,7 +160,7 @@ module Make (Node:Node.NodeType) =
 	   in
 	   enum tl subs'
       in
-      let edges = fold_edges (fun (u:node) (v:node) cont -> (u,v)::cont) g []
+      let edges = fold_edges (fun u v cont -> (u,v)::cont) g []
       in
       enum edges [[]]
 
