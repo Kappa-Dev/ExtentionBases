@@ -47,33 +47,26 @@ module Make (Node:Node.NodeType) =
     let generate_tests () =
       let square = graph_of_library "square" in
       let house = graph_of_library "house" in
-      let triangle = graph_of_library "triangle" in
       
       let arrows = Cat.create square house in
       print_string "Embeddings...\n\n" ;
       print_string "Embeddings of square into house are: \n" ;
       print_string (Cat.to_string arrows) ;
       print_newline() ;
-      let arrows = Cat.create triangle house in
-      print_string "Embeddings of triangle into house are: \n" ;
+      print_string "Extensions of square into house are: \n" ;
+      print_string (Cat.to_string (Cat.extension_class arrows)) ;
+      print_newline() ;
+      print_string "Matches of square into house are: \n" ;
+      print_string (Cat.to_string (Cat.matching_class arrows)) ;
+      print_newline() ;
+      let arrows = Cat.create square square in
+      print_string "Auto morphisms of square are: \n" ;
       print_string (Cat.to_string arrows) ;
       print_newline() ;
+    
       let arrows = Cat.create house house in
       print_string "Auto morphisms of house are: \n" ;
       print_string (Cat.to_string arrows) ;
-      print_newline() ;
-      print_string "Gluings...\n\n" ;
-      let gluings = Cat.gluings square house in
-      print_string "Partial gluings of square into house are: \n" ;
-      print_string (string_of_gluings gluings) ;
-      print_newline() ;
-      let gluings = Cat.gluings triangle house in
-      print_string "Partial gluings of triangle into house are: \n" ;
-      print_string (string_of_gluings gluings) ;
-      print_newline() ;
-      print_string "Partial gluings of house into itself are: \n" ;
-      let gluings = Cat.gluings house house in
-      print_string (string_of_gluings gluings) ;
       print_newline() ;
     
   end

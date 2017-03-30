@@ -129,20 +129,13 @@ module Make (Node:Node.NodeType) =
       let dauto = arrows.auto_src in
       eq_class arrows dmem dfind dauto
 
-
-
     let create g h =
-      print_string "created \n" ;
-      let arrows =
-	{src = g ;
-	 auto_src = (g => g) ;
-	 maps = (g => h) ;
-	 trg = h ;
-	 auto_trg = (h => h)}
-      in
-      print_string (to_string arrows) ; print_newline() ;
-      arrows
-
+      {src = g ;
+       auto_src = (g => g) ;
+       maps = (g => h) ;
+       trg = h ;
+       auto_trg = (h => h)}
+      
     let tensor arrows arrows' =
       let src = Graph.join arrows.src arrows'.src in
       let trg = Graph.join arrows.trg arrows'.trg in
