@@ -70,6 +70,7 @@ module Make (Node:Node.NodeType) =
 				 Hom.Not_structure_preserving | Hom.Not_injective -> cont
 			     else
 			       cont
+				 
 			    ) []
 			in
 			hom_extended_with_candidates_u@hom_list
@@ -77,7 +78,6 @@ module Make (Node:Node.NodeType) =
       in
       
       let cc_roots = Graph.connected_components g in
-      
       List.fold_left
 	(fun hom_list u ->
 	 let hom_list_u = extend_next_root u hom_list g h in
@@ -119,11 +119,16 @@ module Make (Node:Node.NodeType) =
       {arrows with maps = reduced_maps}
 	
     let create g h =
-      {src = g ;
-       auto_src = (g => g) ;
-       maps = (g => h) ;
-       trg = h ;
-       auto_trg = (h => h)}
+      print_string "created \n" ;
+      let arrows =
+	{src = g ;
+	 auto_src = (g => g) ;
+	 maps = (g => h) ;
+	 trg = h ;
+	 auto_trg = (h => h)}
+      in
+      print_string (to_string arrows) ; print_newline() ;
+      arrows
 
     let tensor arrows arrows' =
       let src = Graph.join arrows.src arrows'.src in

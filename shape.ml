@@ -83,9 +83,9 @@ module KappaShape = Make (Node.KappaNode)
 module DegreeShape = Make (Node.DegreeNode)  
 
 let test =
-  print_string "***** Simple nodes *****\n" ;
+ (* print_string "***** Simple nodes *****\n" ;
   SimpleShape.generate_tests() ;
   print_string "***** Kappa nodes ***** \n" ;
-  KappaShape.generate_tests() ;
+  KappaShape.generate_tests() ;*)
   print_string "***** Degree nodes ***** \n" ;
   DegreeShape.generate_tests()

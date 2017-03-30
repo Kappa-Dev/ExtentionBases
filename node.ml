@@ -161,7 +161,7 @@ module DegreeNode =
 		   
       let rename i u = {u with id = i}
 		    
-      let get_prop _ = raise Not_found
+      let get_prop = fun u i -> if i = 0 then u.max_degree else raise Not_found
 
       let fold_prop f u cont = f 0 u.max_degree cont
 			    
