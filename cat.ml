@@ -7,10 +7,15 @@ module Make (Node:Node.NodeType) =
     module NodeSet = Set.Make (Node)
 
     type arrows = {src : Graph.t ; auto_src : Hom.t list ; maps : Hom.t list ; trg : Graph.t; auto_trg : Hom.t list}	       
-		    
+    type gluings = 
+      {
+	span : arrows * arrows ;
+	co_span : (arrows * arrows) list 
+      }    
+
     exception Undefined
 		
-    let rec to_string arrows = String.concat "," (List.map Hom.to_string arrows.maps)
+    let rec string_of_arrows arrows = String.concat "," (List.map Hom.to_string arrows.maps)
 					     
     let (=>) g h =
       let rec extend hom_list iG jG acc =
@@ -293,7 +298,7 @@ module Make (Node:Node.NodeType) =
 	   | None -> arr_list
 	  ) [] (subgraphs_of_edges g)
       in
-      let gluings = 
+      let gluing_points = 
 	List.map extension_class (enumerate_gluings one_gluings one_gluings one_gluings [])
       in
       List.fold_left (fun cont arrows ->
@@ -304,7 +309,7 @@ module Make (Node:Node.NodeType) =
 			      if (Graph.size_edge subG < Graph.size_edge arrows.src)
 				 && (Graph.is_included subG arrows.src)
 			      then raise Pervasives.Exit
-			     ) () gluings ; true)
+			     ) () gluing_points ; true)
 			with
 			  Pervasives.Exit -> false
 		      in
@@ -319,7 +324,8 @@ module Make (Node:Node.NodeType) =
 			  ) [] mpo
 		      in
 		      gluings@cont
-		     ) [] gluings
+		     ) [] gluing_points
 		     
   end
     
+(*gluings: (arr*arr) ; (arr*arr) list*)

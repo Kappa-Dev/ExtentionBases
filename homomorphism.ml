@@ -7,7 +7,6 @@ module Make (Node:Node.NodeType) =
     exception Not_structure_preserving 
     exception Not_injective 
 
-    type node = Node.t
     type t = {tot : NodeBij.t ; sub : IntBij.t }
 
     let is_equal hom hom' = NodeBij.is_equal (fun u v -> Node.compare u v = 0) hom.tot hom'.tot
@@ -26,10 +25,15 @@ module Make (Node:Node.NodeType) =
       {tot = NodeBij.empty ;
        sub = IntBij.empty 
       }
-	
+
+    let identity nodes = 
+      {tot = NodeBij.identity nodes ; 
+       sub = IntBij.identity (List.map Node.id nodes)
+      }	
 	
     let is_empty hom = NodeBij.is_empty hom.tot
-    let is_identity hom = IntBij.is_identity hom.sub
+
+    let is_identity hom = NodeBij.is_identity hom.tot
 					     
     let add_sub u_i v_i hom =
       let bij = IntBij.add u_i v_i hom.sub in

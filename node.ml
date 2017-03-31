@@ -71,10 +71,15 @@ module SimpleNode =
 	    ([0],[2])
 	  ]
 	in
+	let one = [([0],[1])] in
+	let two = [([0],[1]);([1],[2])] 
+	in
 	let tn = List.map (fun (l,l') -> (create l,create l')) in 
+	let lib = Lib.StringMap.add "one" (tn one) Lib.StringMap.empty in
+	let lib = Lib.StringMap.add "two" (tn two) lib in
 	Lib.StringMap.add "house" (tn house)
 			  (Lib.StringMap.add "square" (tn square)
-					     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
+					     (Lib.StringMap.add "triangle" (tn triangle) lib))
 			  
 			  end:NodeType)
     

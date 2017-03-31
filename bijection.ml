@@ -9,6 +9,8 @@ module Make (Content:Lib.OrderedType) =
 												  
     let empty = I CSet.empty
 
+    let identity clist = I (List.fold_left (fun set c -> CSet.add c set) CSet.empty clist)
+
     let is_equal f bij bij' =
       match (bij,bij') with
 	(I s, I s') -> CSet.equal s s'

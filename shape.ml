@@ -50,17 +50,17 @@ module Make (Node:Node.NodeType) =
       let arrows = Cat.create square house in
       print_string "Embeddings...\n\n" ;
       print_string "Embeddings of square into house are: \n" ;
-      print_string (Cat.to_string arrows) ;
+      print_string (Cat.string_of_arrows arrows) ;
       print_newline() ;
       print_string "Extensions of square into house are: \n" ;
-      print_string (Cat.to_string (Cat.extension_class arrows)) ;
+      print_string (Cat.string_of_arrows (Cat.extension_class arrows)) ;
       print_newline() ;
       print_string "Matches of square into house are: \n" ;
-      print_string (Cat.to_string (Cat.matching_class arrows)) ;
+      print_string (Cat.string_of_arrows (Cat.matching_class arrows)) ;
       print_newline() ;    
       let arrows = Cat.create house house in
       print_string "Auto morphisms of house are: \n" ;
-      print_string (Cat.to_string arrows) ;
+      print_string (Cat.string_of_arrows arrows) ;
       print_newline() ;
       let gluings = Cat.gluings square house in
       print_string "Gluings of square into house are: \n" ;
@@ -76,6 +76,12 @@ module DegreeShape = Make (Node.DegreeNode)
 let test =
   print_string "***** Simple nodes *****\n" ;
   SimpleShape.generate_tests() ;
+  let one = SimpleShape.graph_of_library "one" in
+  let two = SimpleShape.graph_of_library "two" in
+  let gluings = SimpleShape.Cat.gluings one two in
+  print_string "Gluings of one into two are: \n" ;
+  print_string (SimpleShape.string_of_gluings gluings) ;
+  
   print_string "***** Kappa nodes ***** \n" ;
   KappaShape.generate_tests() ;
   let abc = KappaShape.graph_of_library "abc" in
