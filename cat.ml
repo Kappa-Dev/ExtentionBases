@@ -6,17 +6,12 @@ module Make (Node:Node.NodeType) =
 
     module NodeSet = Set.Make (Node)
 
-    type arrows = {src : Graph.t ; auto_src : Hom.t list ; maps : Hom.t list ; trg : Graph.t; auto_trg : Hom.t list}	       
-    type gluings = 
-      {
-	span : arrows * arrows ;
-	co_span : (arrows * arrows) list 
-      }    
+    exception Undefined		
+    type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
+   	
+    let string_of_embeddings emb = 
+      String.concat "," (List.map Hom.to_string emb.maps)
 
-    exception Undefined
-		
-    let rec string_of_arrows arrows = String.concat "," (List.map Hom.to_string arrows.maps)
-					     
     let (=>) g h =
       let rec extend hom_list iG jG acc =
 	match hom_list with
@@ -79,7 +74,6 @@ module Make (Node:Node.NodeType) =
 			hom_extended_with_candidates_u@hom_list
 		       ) [] hom_list
       in
-      
       let cc_roots = Graph.connected_components g in
       List.fold_left
 	(fun hom_list u ->
@@ -88,7 +82,13 @@ module Make (Node:Node.NodeType) =
 	 hom_list_extended
 	) [Hom.empty] cc_roots
 
-    let horizontal_compose arrows arrows' =
+    let embed g h = 
+      match g=>h with
+	[] -> raise Undefined
+       | maps -> {src = g ; trg = h ; maps = maps}
+
+
+    let horizontal_compose emb emb' = 
       let maps =
 	List.fold_left
 	  (fun maps hom ->
@@ -99,20 +99,18 @@ module Make (Node:Node.NodeType) =
 		  (Hom.sum hom hom')::hom_added
 		with
 		  Hom.Not_structure_preserving | Hom.Not_injective -> hom_added
-	       ) [] arrows'.maps
+	       ) [] emb'.maps
 	   in
 	   hom_added@maps
-	  ) [] arrows.maps
+	  ) [] emb.maps
       in
       if maps = [] then raise Undefined
       else
-	let src = Graph.join arrows.src arrows'.src in
-	let trg = Graph.join arrows.trg arrows'.trg in
-	let auto_src = src => src in
-	let auto_trg = trg => trg in
-	{src = src ; trg = trg ; auto_src = auto_src ; auto_trg = auto_trg ; maps = maps}	
-	  
-    let vertical_compose arrows arrows' =
+	let src = Graph.join emb.src emb'.src in
+	let trg = Graph.join emb.trg emb'.trg in
+	{src = src ; trg = trg ; maps = maps}	
+
+    let vertical_compose emb emb' =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
@@ -123,22 +121,19 @@ module Make (Node:Node.NodeType) =
 		  (Hom.compose hom hom')::maps
 		with
 		  Hom.Not_injective -> maps
-	       ) maps arrows'.maps
+	       ) maps emb'.maps
 	   in
 	   hom_ext_list@maps
-	  ) [] arrows.maps
+	  ) [] emb.maps
       in
       if maps = [] then raise Undefined
       else
-	{src = arrows.src ; 
-	 trg = arrows'.trg ; 
-	 auto_src = arrows.auto_src ; 
-	 auto_trg = arrows'.auto_trg ; 
+	{src = emb.src ; 
+	 trg = emb'.trg ; 
 	 maps = maps}
-      	  
+      	 
 
-
-    let eq_class arrows dmem dfind dauto =
+    let eq_class emb dmem dfind dauto =
       let close_diagram hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
@@ -165,36 +160,26 @@ module Make (Node:Node.NodeType) =
 	      if Hom.is_identity hom then -1 else
 		if Hom.is_identity hom' then 1
 		else 0
-	     ) arrows.maps
+	     ) emb.maps
 	  )
       in
       assert (reduced_maps <> []) ;
-      {arrows with maps = reduced_maps}
+      {emb with maps = reduced_maps}
 	  
-    let extension_class arrows =
+    let extension_class emb =
       let dmem = Hom.mem in
       let dfind = Hom.find in
-      let dauto = arrows.auto_trg in
-      eq_class arrows dmem dfind dauto
+      let dauto = (emb.trg => emb.trg) in
+      eq_class emb dmem dfind dauto
 	       
-    let matching_class arrows =
+    let matching_class emb =
       let dmem = Hom.comem in
       let dfind = Hom.cofind in
-      let dauto = arrows.auto_src in
-      eq_class arrows dmem dfind dauto
-
-    let create g h =
-      let maps = g => h in
-      if maps = [] then raise Undefined
-      else
-	{src = g ;
-	 auto_src = (g => g) ;
-	 maps = (g => h) ;
-	 trg = h ;
-	 auto_trg = (h => h)}
+      let dauto = (emb.src => emb.src) in
+      eq_class emb dmem dfind dauto
 
 	  
-    let multi_pushout maps g h =
+    let multi_pushout maps g h = (*maps: list of hom: (G <-id-) subGH -> H*)
       let extend_partial hom g fresh =
 	let apply_ext_hom u hom fresh =
 	  match Hom.id_image u hom with
@@ -234,7 +219,7 @@ module Make (Node:Node.NodeType) =
       in
       List.map
 	(fun hom ->
-	 let hom',g' = extend_partial hom g fresh in
+	 let hom',g' = extend_partial hom g fresh in (*hom: G __\ H into hom': G --> G' st. G'-id-> supG'H *)
 	 try
 	   let gh_sup = Graph.join g' h
 	   in
@@ -250,28 +235,26 @@ module Make (Node:Node.NodeType) =
       let rec enumerate_gluings one_gluings partial_gluings complete_gluings already_done =
 	match partial_gluings with
 	  [] -> complete_gluings
-	| n_gluing::tl ->
+	| (n_gluing)::tl ->
 	   let succ_n_gluings,complete_gluings',already_done' = 
 	     List.fold_left
-	       (fun (succ_n_gluings,complete_gluings,already_done) one_gluing ->
+	       (fun (succ_n_gluings,complete_gluings,already_done) (one_gluing) ->
 		try
-		  let src_1 = one_gluing.src in
-		  let src_n = n_gluing.src in
-		  if Graph.is_included src_1 src_n then (succ_n_gluings,complete_gluings,already_done)
+		  if Graph.is_included one_gluing.src n_gluing.src then (succ_n_gluings,complete_gluings,already_done)
 		  else
 		    match try Some (horizontal_compose one_gluing n_gluing) with Undefined -> None
 		    with
 		      None -> (succ_n_gluings,complete_gluings,already_done)
-		    | Some succ_n_arrows ->
-		       (*On verifie ici que succ_n_arrows n'est pas deja dans succ_n_gluings*)
+		    | Some succ_n_hset ->
+		       (*On verifie ici que succ_n_hset n'est pas deja dans succ_n_gluings*)
 		       if List.exists
 			    (fun g ->
-			     Graph.is_equal g succ_n_arrows.src
+			     Graph.is_equal g succ_n_hset.src
 			    ) already_done
 		       then (succ_n_gluings,complete_gluings,already_done)
 		       else
-			 let complete_gluings' = succ_n_arrows::complete_gluings in
-			 (succ_n_arrows::succ_n_gluings,complete_gluings',succ_n_arrows.src::already_done)
+			 let complete_gluings' = succ_n_hset::complete_gluings in
+			 (succ_n_hset::succ_n_gluings,complete_gluings',succ_n_hset.src::already_done)
 		with
 		  Hom.Not_structure_preserving -> failwith "Invariant violation: not structure preserving"
 		| Hom.Not_injective -> (succ_n_gluings,complete_gluings,already_done)
@@ -292,39 +275,41 @@ module Make (Node:Node.NodeType) =
       let one_gluings = 
 	List.fold_left
 	  (fun arr_list subg ->
-	   match try Some (create subg h) with Undefined -> None
+	   try 
+	     let embeddings = embed subg h 
+	     in
+	     embeddings::arr_list
 	   with
-	     Some arrows -> arrows::arr_list
-	   | None -> arr_list
+	     Undefined -> arr_list
 	  ) [] (subgraphs_of_edges g)
       in
       let gluing_points = 
 	List.map extension_class (enumerate_gluings one_gluings one_gluings one_gluings [])
       in
-      List.fold_left (fun cont arrows ->
-		      let is_max subG =
+      List.fold_left (fun cont embeddings -> (*embeddings:   [(G <-id-) infGH => H] *)
+		      let is_max infGH =
 			try
 			  (List.fold_left
-			     (fun _ arrows ->
-			      if (Graph.size_edge subG < Graph.size_edge arrows.src)
-				 && (Graph.is_included subG arrows.src)
+			     (fun _ emb ->
+			      if (Graph.size_edge infGH < Graph.size_edge emb.src)
+				 && (Graph.is_included infGH emb.src)
 			      then raise Pervasives.Exit
 			     ) () gluing_points ; true)
 			with
 			  Pervasives.Exit -> false
 		      in
-		      let mpo = multi_pushout arrows.maps g h in
-		      let subG = arrows.src in
+		      let mpo = multi_pushout embeddings.maps g h in (*turning [(G <-id-) infGH => H] into [(H -id->) supGH <=mpo= G] *)
+		      let infGH = embeddings.src in
 		      let gluings =
 			List.fold_left
-			  (fun maps (sup_opt,hom) ->
-			   match sup_opt with
-			     None -> if is_max subG then (subG,g,h,hom,sup_opt)::maps else maps
-			   | Some _ ->  (subG,g,h,hom,sup_opt)::maps
+			  (fun maps (supGH_opt,hom) ->
+			   match supGH_opt with
+			     None -> if is_max infGH then (infGH,g,h,hom,supGH_opt)::maps else maps
+			   | Some _ ->  (infGH,g,h,hom,supGH_opt)::maps
 			  ) [] mpo
 		      in
 		      gluings@cont
-		     ) [] gluing_points
+		     ) [] gluing_points (*gluings_points is a list of complete embeddings of subG into h*)
 		     
   end
     

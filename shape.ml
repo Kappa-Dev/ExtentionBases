@@ -47,20 +47,20 @@ module Make (Node:Node.NodeType) =
     let generate_tests () =
       let square = graph_of_library "square" in
       let house = graph_of_library "house" in
-      let arrows = Cat.create square house in
+      let embeddings = Cat.embed square house in
       print_string "Embeddings...\n\n" ;
       print_string "Embeddings of square into house are: \n" ;
-      print_string (Cat.string_of_arrows arrows) ;
+      print_string (Cat.string_of_embeddings embeddings) ;
       print_newline() ;
       print_string "Extensions of square into house are: \n" ;
-      print_string (Cat.string_of_arrows (Cat.extension_class arrows)) ;
+      print_string (Cat.string_of_embeddings (Cat.extension_class embeddings)) ;
       print_newline() ;
       print_string "Matches of square into house are: \n" ;
-      print_string (Cat.string_of_arrows (Cat.matching_class arrows)) ;
+      print_string (Cat.string_of_embeddings (Cat.matching_class embeddings)) ;
       print_newline() ;    
-      let arrows = Cat.create house house in
+      let embeddings = Cat.embed house house in
       print_string "Auto morphisms of house are: \n" ;
-      print_string (Cat.string_of_arrows arrows) ;
+      print_string (Cat.string_of_embeddings embeddings) ;
       print_newline() ;
       let gluings = Cat.gluings square house in
       print_string "Gluings of square into house are: \n" ;
