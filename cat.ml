@@ -12,6 +12,17 @@ module Make (Node:Node.NodeType) =
     let string_of_embeddings emb = 
       String.concat "," (List.map Hom.to_string emb.maps)
 
+    let string_of_span (emb,emb') =
+      assert (Graph.is_equal emb.src emb'.src) ;
+      let str = Printf.sprintf "SRC = %s \n" (Graph.to_string emb.src) in
+      str^(string_of_embeddings emb)^"\n"^(string_of_embeddings emb')
+
+    let string_of_co_span (emb,emb') =
+      assert (Graph.is_equal emb.trg emb'.trg) ;
+      let str = Printf.sprintf "\nTRG = %s" (Graph.to_string emb.trg) in
+      (string_of_embeddings emb)^"\n"^(string_of_embeddings emb')^str
+
+					    
     let (=>) g h =
       let rec extend hom_list iG jG acc =
 	match hom_list with
@@ -133,27 +144,40 @@ module Make (Node:Node.NodeType) =
 	 maps = maps}
       	 
 
-    let eq_class emb dmem dfind dauto =
-      let close_diagram hom hom' =
+    let eq_class matching emb auto =
+      let close_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-		    assert (dmem u hom') ; 
-		    let v' = dfind u hom' in
+		    assert (Hom.mem u hom') ; 
+		    let v' = Hom.find u hom' in
 		    Hom.add v v' phi
+		   ) hom Hom.empty
+	with
+	  Hom.Not_structure_preserving | Hom.Not_injective -> failwith "Invariant violation"
+      in
+      let close_co_span hom hom' =
+	try
+	  Hom.fold (fun u v phi ->
+		    assert (Hom.comem v hom') ; 
+		    let u' = Hom.cofind v hom' in
+		    Hom.add u u' phi
 		   ) hom Hom.empty
 	with
 	  Hom.Not_structure_preserving | Hom.Not_injective -> failwith "Invariant violation"
       in
       let reduced_maps = 
 	List.fold_left
-	  (fun extensions hom ->
+	  (fun quotient hom ->
 	   if List.exists (fun hom' ->
 			   (Hom.is_equal hom hom') ||
-			     let phi = close_diagram hom hom' in
-			     List.exists (fun psi -> Hom.is_sub phi psi) dauto
-			  ) extensions
-	   then extensions
-	   else hom::extensions
+			     let phi =
+			       if matching then close_co_span hom hom'
+			       else close_span hom hom'
+			     in
+			     List.exists (fun psi -> Hom.is_sub phi psi) auto
+			  ) quotient
+	   then quotient
+	   else hom::quotient
 	  ) []
 	  (List.fast_sort (*keeping identity morphisms if possible*)
 	     (fun hom hom' ->
@@ -167,20 +191,18 @@ module Make (Node:Node.NodeType) =
       {emb with maps = reduced_maps}
 	  
     let extension_class emb =
-      let dmem = Hom.mem in
-      let dfind = Hom.find in
-      let dauto = (emb.trg => emb.trg) in
-      eq_class emb dmem dfind dauto
+      let auto = (emb.trg => emb.trg) in
+      eq_class false emb auto
 	       
     let matching_class emb =
-      let dmem = Hom.comem in
-      let dfind = Hom.cofind in
-      let dauto = (emb.src => emb.src) in
-      eq_class emb dmem dfind dauto
+      let auto = (emb.src => emb.src) in
+      eq_class true emb auto
 
 	  
-    let multi_pushout maps g h = (*maps: list of hom: (G <-id-) subGH -> H*)
-      let extend_partial hom g fresh =
+    let multi_pushout maps g1 g2 = (*maps: infG1G2 -> G2*)
+      
+      let extend_partial hom graph fresh =
+	
 	let apply_ext_hom u hom fresh =
 	  match Hom.id_image u hom with
 	    None ->
@@ -192,17 +214,17 @@ module Make (Node:Node.NodeType) =
 	       let u' = Node.rename i u in
 	       (u',Hom.add u u' hom,fresh)
 	in
-	let g',hom',_ = 
+	let graph',hom',_ = 
 	  Graph.fold_edges
-	    (fun u v (homg,hom,fresh) ->
+	    (fun u v (graph',hom,fresh) ->
 	     let u',hom',fresh' = apply_ext_hom u hom fresh
 	     in
 	     let v',hom'',fresh'' = apply_ext_hom v hom' fresh'
 	     in
-	     let homg' = Graph.add_node u' (Graph.add_node v' homg) in
-	     let homg'' =
+	     let graph' = Graph.add_node u' (Graph.add_node v' graph') in
+	     let graph' =
 	       try
-		 Graph.add_edge u' v' homg'
+		 Graph.add_edge u' v' graph'
 	       with
 		 Graph.Incoherent ->
 		 (
@@ -210,18 +232,18 @@ module Make (Node:Node.NodeType) =
 		   failwith "Invariant violation"
 		 )
 	     in
-	     (homg'',hom'',fresh'')
-	    ) g (Graph.empty,hom,fresh)
+	     (graph',hom'',fresh'')
+	    ) graph (Graph.empty,hom,fresh)
 	in
-	(hom',g')
+	(hom',graph')
       in
-      let fresh = (max (Graph.max_id g) (Graph.max_id h))+1
+      let fresh = (max (Graph.max_id g1) (Graph.max_id g2))+1
       in
       List.map
 	(fun hom ->
-	 let hom',g' = extend_partial hom g fresh in (*hom: G __\ H into hom': G --> G' st. G'-id-> supG'H *)
+	 let hom',g1' = extend_partial hom g1 fresh in
 	 try
-	   let gh_sup = Graph.join g' h
+	   let gh_sup = Graph.join g2 g1'
 	   in
 	   (Some gh_sup,hom')
 	 with
@@ -262,31 +284,31 @@ module Make (Node:Node.NodeType) =
 	   in
 	   enumerate_gluings one_gluings (tl@succ_n_gluings) complete_gluings' already_done'
       in
-      let subgraphs_of_edges g =
+      let subgraphs_of_edges graph =
 	try
 	  Graph.fold_edges
 	    (fun u v subgraphs ->
 	     let subg = Graph.add_node u (Graph.add_node v Graph.empty) in
 	     (Graph.add_edge u v subg)::subgraphs
-	    ) g []
+	    ) graph []
 	with
 	  Graph.Incoherent -> failwith "Invariant violation: graph is incoherent"
       in
       let one_gluings = 
 	List.fold_left
-	  (fun arr_list subg ->
+	  (fun arr_list subh ->
 	   try 
-	     let embeddings = embed subg h 
+	     let embeddings = embed subh g 
 	     in
 	     embeddings::arr_list
 	   with
 	     Undefined -> arr_list
-	  ) [] (subgraphs_of_edges g)
+	  ) [] (subgraphs_of_edges h)
       in
       let gluing_points = 
 	List.map extension_class (enumerate_gluings one_gluings one_gluings one_gluings [])
       in
-      List.fold_left (fun cont embeddings -> (*embeddings:   [(G <-id-) infGH => H] *)
+      List.fold_left (fun cont embeddings -> 
 		      let is_max infGH =
 			try
 			  (List.fold_left
@@ -298,14 +320,36 @@ module Make (Node:Node.NodeType) =
 			with
 			  Pervasives.Exit -> false
 		      in
-		      let mpo = multi_pushout embeddings.maps g h in (*turning [(G <-id-) infGH => H] into [(H -id->) supGH <=mpo= G] *)
+		      let mpo = multi_pushout embeddings.maps h g in 
 		      let infGH = embeddings.src in
 		      let gluings =
 			List.fold_left
-			  (fun maps (supGH_opt,hom) ->
-			   match supGH_opt with
-			     None -> if is_max infGH then (infGH,g,h,hom,supGH_opt)::maps else maps
-			   | Some _ ->  (infGH,g,h,hom,supGH_opt)::maps
+			  (fun tiles (supGH_opt,hom) ->
+			   let infGH_to_H = Hom.identity (Graph.nodes infGH) in
+			   let infGH_to_G =
+			     Graph.fold_nodes
+			       (fun u hom' ->
+				try
+				  Hom.add u (Hom.find u hom) hom'
+				with
+				  Not_found -> hom'
+				| _ -> failwith "Invariant violation"
+			       ) infGH Hom.empty
+			   in
+			   let span =
+			     ({src = infGH ; trg = h ; maps = [infGH_to_H]},
+			      {src = infGH ; trg = g ; maps = [infGH_to_G]})
+			   in
+		  	   match supGH_opt with
+			     None -> if is_max infGH then
+				       (span,None)::tiles
+				     else tiles
+			   | Some supGH ->
+			      let co_span =
+				({src = h ; trg = supGH ; maps = [hom]},
+				 {src = g ; trg = supGH ; maps = [Hom.identity (Graph.nodes g)]})
+			      in
+			      (span,Some co_span)::tiles
 			  ) [] mpo
 		      in
 		      gluings@cont

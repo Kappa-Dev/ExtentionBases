@@ -29,11 +29,11 @@ module Make (Node:Node.NodeType) =
       String.concat
 	"\n"
 	(List.map
-	   (fun (inter,_,_,hom,sup_opt) ->
-	    match sup_opt with
-	      None -> (Graph.to_string inter^" using "^(Hom.to_string hom)^"[NO SUP]")
-	    | Some sup ->
-	       (Graph.to_string inter^" using "^(Hom.to_string hom)^" sup is "^(Graph.to_string sup)) 
+	   (fun (span,co_span_opt) ->
+	    match co_span_opt with
+	      None -> (Cat.string_of_span span)^"\n[NO_SUP]"
+	    | Some co_span ->
+	       (Cat.string_of_span span)^"\n"^(Cat.string_of_co_span co_span)
 	   ) gluings
 	)
 
@@ -74,14 +74,14 @@ module KappaShape = Make (Node.KappaNode)
 module DegreeShape = Make (Node.DegreeNode)  
 
 let test =
-  print_string "***** Simple nodes *****\n" ;
+  (*print_string "***** Simple nodes *****\n" ;
   SimpleShape.generate_tests() ;
   let one = SimpleShape.graph_of_library "one" in
   let two = SimpleShape.graph_of_library "two" in
   let gluings = SimpleShape.Cat.gluings one two in
   print_string "Gluings of one into two are: \n" ;
   print_string (SimpleShape.string_of_gluings gluings) ;
-  
+   *)
   print_string "***** Kappa nodes ***** \n" ;
   KappaShape.generate_tests() ;
   let abc = KappaShape.graph_of_library "abc" in
@@ -89,5 +89,7 @@ let test =
   let gluings = KappaShape.Cat.gluings abc abd in
   print_string "Gluings of abc into abd are: \n" ;
   print_string (KappaShape.string_of_gluings gluings) ;
+(*
   print_string "***** Degree nodes ***** \n" ;
   DegreeShape.generate_tests()
+ *)

@@ -17,7 +17,8 @@ module Make (Node:Node.NodeType) =
 
     		  
     let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []		 
-
+    let nodes g = NodeSet.elements g.nodes
+									    
     let size_node g = NodeSet.cardinal g.nodes
     let size_edge g = g.size
 
