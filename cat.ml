@@ -8,17 +8,23 @@ module Make (Node:Node.NodeType) =
 
     exception Undefined		
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
-   	
+
+    let is_span emb1 emb2 =
+      Graph.is_equal emb1.src emb2.src
+		     
+    let is_co_span emb1 emb2 =
+      Graph.is_equal emb1.trg emb2.trg
+		     
     let string_of_embeddings emb = 
       String.concat "," (List.map Hom.to_string emb.maps)
 
     let string_of_span (emb,emb') =
-      assert (Graph.is_equal emb.src emb'.src) ;
+      assert (is_span emb emb') ;
       let str = Printf.sprintf "SRC = %s \n" (Graph.to_string emb.src) in
       str^(string_of_embeddings emb)^"\n"^(string_of_embeddings emb')
 
     let string_of_co_span (emb,emb') =
-      assert (Graph.is_equal emb.trg emb'.trg) ;
+      assert (is_co_span emb emb') ;
       let str = Printf.sprintf "\nTRG = %s" (Graph.to_string emb.trg) in
       (string_of_embeddings emb)^"\n"^(string_of_embeddings emb')^str
 
@@ -353,8 +359,22 @@ module Make (Node:Node.NodeType) =
 			  ) [] mpo
 		      in
 		      gluings@cont
-		     ) [] gluing_points (*gluings_points is a list of complete embeddings of subG into h*)
+		     ) [] gluing_points
+
+    let add_sharing (emb,emb') min_opt =
+      assert (is_span emb emb') ;
+      let size_src = Graph.size_edge emb.src in
+      List.fold_left
+	(fun sharings ((emb0,emb1),cospan_opt) ->
+	 let size_src' = Graph.size_edge emb0.src in
+	 if
+	   match min_opt with
+	     None -> true
+	   | Some n ->  (size_src' - size_src) >= n
+	 then
+	   ({src = emb.src ; trg = emb0.src ; maps = [Hom.identity (Graph.nodes emb.src)]},(emb0,emb1),cospan_opt)::sharings
+	 else sharings
+	) [] (gluings emb.trg emb'.trg)
+           
 		     
   end
-    
-(*gluings: (arr*arr) ; (arr*arr) list*)
