@@ -8,7 +8,24 @@ module Make (Node:Node.NodeType) =
 
     exception Undefined		
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
+    type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
 
+    let inf_of_tile tile =
+      let (emb,_) = tile.span in emb.src
+	
+    let sup_of_tile tile =
+      match tile.cospan with
+	None -> None
+      | Some (emb,_) -> Some emb.trg
+
+    let left_of_tile tile = 
+      let (emb,_) = tile.span in
+      emb.trg
+	
+    let right_of_tile tile = 
+      let (_,emb') = tile.span in
+      emb'.trg
+			
     let is_span emb1 emb2 =
       Graph.is_equal emb1.src emb2.src
 		     
@@ -207,59 +224,72 @@ module Make (Node:Node.NodeType) =
 	  
     let multi_pushout maps g1 g2 = (*maps: infG1G2 -> G2*)
       
-      let extend_partial hom graph fresh =
-	
+      let extend_partial hom0 graph fresh =
 	let apply_ext_hom u hom fresh =
 	  match Hom.id_image u hom with
 	    None ->
 	    let u' = Node.rename fresh u in
 	    (u', Hom.add u u' hom, fresh+1)
 	  | Some i -> 
-	     try (Hom.find u hom,hom,fresh)
-	     with Not_found ->
-	       let u' = Node.rename i u in
-	       (u',Hom.add u u' hom,fresh)
+	     let u' = Node.rename i u in
+	     (u',Hom.add u u' hom,fresh)
 	in
-	let graph',hom',_ = 
+	let renamed_opt,hom,_ = 
 	  Graph.fold_edges
-	    (fun u v (graph',hom,fresh) ->
-	     let u',hom',fresh' = apply_ext_hom u hom fresh
-	     in
-	     let v',hom'',fresh'' = apply_ext_hom v hom' fresh'
-	     in
-	     let graph' = Graph.add_node u' (Graph.add_node v' graph') in
-	     let graph' =
+	    (fun u v (renamed_opt,hom,fresh) ->
+	     let subst_opt,hom =
 	       try
-		 Graph.add_edge u' v' graph'
+		 let u',hom,fresh = apply_ext_hom u hom fresh
+		 in
+		 let v',hom,fresh = apply_ext_hom v hom fresh
+		 in
+		 (Some (u',v',fresh),hom)
 	       with
-		 Graph.Incoherent ->
-		 (
-		   Printf.printf "Cannot add (%s,%s)\n" (Node.to_string u') (Node.to_string v') ;
-		   failwith "Invariant violation"
-		 )
+		 Hom.Not_injective -> (None,hom)
 	     in
-	     (graph',hom'',fresh'')
-	    ) graph (Graph.empty,hom,fresh)
+	     match (renamed_opt,subst_opt) with
+	       (None, Some (u',v',fresh)) -> (None,hom,fresh)
+	     | (_, None) -> (None,hom,fresh)
+	     | (Some renamed_graph, Some (u',v',fresh)) ->
+		begin
+		  let renamed_graph = Graph.add_node u' (Graph.add_node v' renamed_graph) in
+		  let renamed_graph =
+		    try
+		      Graph.add_edge u' v' renamed_graph
+		    with
+		      Graph.Incoherent ->
+		      (
+			Printf.printf "Cannot add (%s,%s)\n" (Node.to_string u') (Node.to_string v') ;
+			failwith "Invariant violation"
+		      )
+		  in
+		  (Some renamed_graph,hom,fresh)
+		end		
+	    ) graph (Some Graph.empty,hom0,fresh)
 	in
-	(hom',graph')
+	(hom,renamed_opt)
       in
+      
       let fresh = (max (Graph.max_id g1) (Graph.max_id g2))+1
       in
       List.map
 	(fun hom ->
-	 let hom',g1' = extend_partial hom g1 fresh in
-	 try
-	   let gh_sup = Graph.join g2 g1'
-	   in
-	   (Some gh_sup,hom')
-	 with
-	   Graph.Incoherent -> (None,hom')
-	 | Hom.Not_injective | Hom.Not_structure_preserving ->
-				failwith "Invariant violation: cannot build homomorphism"
+	 let hom,renamed_opt =
+	   extend_partial hom g1 fresh
+	 in
+	 match renamed_opt with
+	   None -> (None,hom)
+	 | Some renamed_g1 ->
+	    try
+	      let gh_sup = Graph.join g2 renamed_g1
+	      in
+	      (Some gh_sup,hom)
+	    with
+	      Graph.Incoherent -> (None,hom)
 	) maps
 	
     	
-    let gluings g h =
+    let (><) g h =
       let rec enumerate_gluings one_gluings partial_gluings complete_gluings already_done =
 	match partial_gluings with
 	  [] -> complete_gluings
@@ -330,7 +360,7 @@ module Make (Node:Node.NodeType) =
 		      let infGH = embeddings.src in
 		      let gluings =
 			List.fold_left
-			  (fun tiles (supGH_opt,hom) ->
+			  (fun tiles (supOpt,hom) ->
 			   let infGH_to_H = Hom.identity (Graph.nodes infGH) in
 			   let infGH_to_G =
 			     Graph.fold_nodes
@@ -346,35 +376,35 @@ module Make (Node:Node.NodeType) =
 			     ({src = infGH ; trg = h ; maps = [infGH_to_H]},
 			      {src = infGH ; trg = g ; maps = [infGH_to_G]})
 			   in
-		  	   match supGH_opt with
+			   match supOpt with
 			     None -> if is_max infGH then
-				       (span,None)::tiles
+				       {span = span ; cospan = None}::tiles
 				     else tiles
 			   | Some supGH ->
 			      let co_span =
 				({src = h ; trg = supGH ; maps = [hom]},
 				 {src = g ; trg = supGH ; maps = [Hom.identity (Graph.nodes g)]})
 			      in
-			      (span,Some co_span)::tiles
+			      {span = span ; cospan = Some co_span}::tiles
 			  ) [] mpo
 		      in
 		      gluings@cont
 		     ) [] gluing_points
 
-    let add_sharing (emb,emb') min_opt =
-      assert (is_span emb emb') ;
-      let size_src = Graph.size_edge emb.src in
+    let minimize_tile tile min_opt =
+      let size_src = Graph.size_edge (inf_of_tile tile) in
       List.fold_left
-	(fun sharings ((emb0,emb1),cospan_opt) ->
-	 let size_src' = Graph.size_edge emb0.src in
+	(fun sharings tile' ->
+	 let size_src' = Graph.size_edge (inf_of_tile tile') in
 	 if
 	   match min_opt with
 	     None -> true
 	   | Some n ->  (size_src' - size_src) >= n
 	 then
-	   ({src = emb.src ; trg = emb0.src ; maps = [Hom.identity (Graph.nodes emb.src)]},(emb0,emb1),cospan_opt)::sharings
+	   let sharing = Hom.identity (Graph.nodes (inf_of_tile tile)) in
+	   (sharing,tile')::sharings
 	 else sharings
-	) [] (gluings emb.trg emb'.trg)
+	) []  ((left_of_tile tile) >< (right_of_tile tile))
            
 		     
   end

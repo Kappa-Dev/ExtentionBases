@@ -25,16 +25,16 @@ module Make (Node:Node.NodeType) =
       | [(Some g',_)] -> g'
       | _ -> failwith "Invariant violation"
 			      
-    let string_of_gluings = fun gluings ->
+    let string_of_tiles = fun tiles ->
       String.concat
-	"\n"
+	"\n*********** \n"
 	(List.map
-	   (fun (span,co_span_opt) ->
-	    match co_span_opt with
-	      None -> (Cat.string_of_span span)^"\n[NO_SUP]"
+	   (fun tile ->
+	    match tile.Cat.cospan with
+	      None -> (Cat.string_of_span tile.Cat.span)^"\n[NO_SUP]"
 	    | Some co_span ->
-	       (Cat.string_of_span span)^"\n"^(Cat.string_of_co_span co_span)
-	   ) gluings
+	       (Cat.string_of_span tile.Cat.span)^"\n"^(Cat.string_of_co_span co_span)
+	   ) tiles
 	)
 
     let graph_of_library name =
@@ -45,6 +45,7 @@ module Make (Node:Node.NodeType) =
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
     let generate_tests () =
+      let (><) = Cat.(><) in
       let square = graph_of_library "square" in
       let house = graph_of_library "house" in
       let embeddings = Cat.embed square house in
@@ -62,9 +63,10 @@ module Make (Node:Node.NodeType) =
       print_string "Auto morphisms of house are: \n" ;
       print_string (Cat.string_of_embeddings embeddings) ;
       print_newline() ;
-      let gluings = Cat.gluings square house in
+      print_string "------- GLUINGS ---------\n" ;
+      let gluings =  square >< house in
       print_string "Gluings of square into house are: \n" ;
-      print_string (string_of_gluings gluings) ;
+      print_string (string_of_tiles gluings) ;
       print_newline() ;
     
   end
@@ -72,7 +74,7 @@ module Make (Node:Node.NodeType) =
 module SimpleShape = Make (Node.SimpleNode)
 module KappaShape = Make (Node.KappaNode) 
 module DegreeShape = Make (Node.DegreeNode)  
-
+			  
 let test =
   (*print_string "***** Simple nodes *****\n" ;
   SimpleShape.generate_tests() ;
@@ -84,11 +86,6 @@ let test =
    *)
   print_string "***** Kappa nodes ***** \n" ;
   KappaShape.generate_tests() ;
-  let abc = KappaShape.graph_of_library "abc" in
-  let abd = KappaShape.graph_of_library "abd" in
-  let gluings = KappaShape.Cat.gluings abc abd in
-  print_string "Gluings of abc into abd are: \n" ;
-  print_string (KappaShape.string_of_gluings gluings) ;
 (*
   print_string "***** Degree nodes ***** \n" ;
   DegreeShape.generate_tests()

@@ -110,7 +110,7 @@ module KappaNode =
 			
       			
       let to_string u =
-	"["^(string_of_int u.ag_id)^";"^(string_of_int (u.port_id))^";"^(string_of_int (u.label))^"]"
+	(string_of_int u.ag_id)^"."^(string_of_int (u.port_id))
 
       let coh edges (w,x) =
 	let ok u v =
