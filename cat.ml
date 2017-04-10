@@ -25,7 +25,7 @@ module Make (Node:Node.NodeType) =
     let right_of_tile tile = 
       let (_,emb') = tile.span in
       emb'.trg
-			
+			     
     let is_span emb1 emb2 =
       Graph.is_equal emb1.src emb2.src
 		     
@@ -121,6 +121,8 @@ module Make (Node:Node.NodeType) =
 	[] -> raise Undefined
        | maps -> {src = g ; trg = h ; maps = maps}
 
+    let identity g h =
+      {src = g ; trg = h ; maps = [Hom.identity (Graph.nodes g)]}
 
     let horizontal_compose emb emb' = 
       let maps =
@@ -414,9 +416,15 @@ module Make (Node:Node.NodeType) =
 	     None -> true
 	   | Some n ->  (size_src' - size_src) >= n
 	 then
-	   let sharing = Hom.identity (Graph.nodes (inf_of_tile tile)) in
+	   let sharing =
+	     {src = inf_of_tile tile ;
+	      trg = inf_of_tile tile' ;
+	      maps = [Hom.identity (Graph.nodes (inf_of_tile tile))]
+	     }
+	   in
 	   (sharing,tile')::sharings
-	 else sharings
+	 else
+	   sharings
 	) []  ((left_of_tile tile) >< (right_of_tile tile))
            
 		     

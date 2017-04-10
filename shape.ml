@@ -3,6 +3,7 @@ module Make (Node:Node.NodeType) =
     module Graph = Graph.Make (Node)
     module Cat = Cat.Make (Node)
     module Hom = Homomorphism.Make (Node)
+    module Model = Model.Make (Node)
 		    
     let draw_line u v g =
       let g =
@@ -44,11 +45,14 @@ module Make (Node:Node.NodeType) =
       with
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
+				     
     let generate_tests () =
       let (><) = Cat.(><) in
+      let void = graph_of_library "empty" in
       let square = graph_of_library "square" in
       let house = graph_of_library "house" in
       let triangle = graph_of_library "triangle" in
+      let one = graph_of_library "one" in
       let embeddings = Cat.embed square house in
       print_string "------- EQUIVALENCE CLASSES ---------\n" ;
       print_string "Embeddings...\n\n" ;
@@ -74,7 +78,18 @@ module Make (Node:Node.NodeType) =
       print_string "Gluings of triangles into itself are: \n" ;
       print_string (string_of_tiles gluings) ;
       print_newline() ;
-      
+      print_string "------- RULES ---------\n" ;
+      let model = Model.add_rule (one,square) Model.empty in
+      let model = Model.add_rule (void,one) model in
+      let model = Lib.StringMap.fold
+		    (fun name _ model ->
+		     Model.add_obs (graph_of_library name) model
+		    ) Node.library model
+      in
+      let witnesses = Model.witnesses_of_model model in
+      print_string "Negative witnesses of the model are: \n" ;
+      print_string (string_of_tiles ((fun (neg,pos) -> neg) witnesses)) ;
+      print_newline() ;
     
   end
 

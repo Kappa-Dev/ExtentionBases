@@ -119,8 +119,16 @@ module Make (Node:Node.NodeType) =
 	   ) join buG 
 	) g.edges h
 
-   
-	
+    let minus g h =
+	   fold_edges
+	     (fun u v diff ->
+	      if has_edge u v h then diff
+	      else
+		let diff = add_node u diff in
+		let diff = add_node v diff in
+		try add_edge u v diff with Incoherent -> failwith "Invariant violation"
+	     ) g empty
+	   
     let max_id g =
       fold_nodes (fun u max -> if Node.id u > max then Node.id u else max) g 0
 		 

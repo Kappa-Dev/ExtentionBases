@@ -46,6 +46,7 @@ module SimpleNode =
       let coh _ _ = true
 
       let library =
+	let void = [] in
 	let house =
 	  [
 	    ([0],[1]) ;
@@ -58,24 +59,25 @@ module SimpleNode =
 	in
 	let square =
 	  [
-	    ([0],[1]) ;
-	    ([1],[2]) ;
-	    ([2],[3]) ;
-	    ([3],[0]) ;
+	    ([10],[11]) ;
+	    ([11],[12]) ;
+	    ([12],[13]) ;
+	    ([13],[10]) ;
 	  ]
 	in
 	let triangle =
 	  [
-	    ([0],[1]) ;
-	    ([1],[2]) ;
-	    ([0],[2])
+	    ([20],[21]) ;
+	    ([21],[22]) ;
+	    ([20],[22])
 	  ]
 	in
-	let one = [([0],[1])] in
+	let one = [([100],[200])] in
 	let two = [([0],[1]);([1],[2])] 
 	in
-	let tn = List.map (fun (l,l') -> (create l,create l')) in 
-	let lib = Lib.StringMap.add "one" (tn one) Lib.StringMap.empty in
+	let tn = List.map (fun (l,l') -> (create l,create l')) in
+	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
+	let lib = Lib.StringMap.add "one" (tn one) lib in
 	let lib = Lib.StringMap.add "two" (tn two) lib in
 	Lib.StringMap.add "house" (tn house)
 			  (Lib.StringMap.add "square" (tn square)
@@ -123,6 +125,7 @@ module KappaNode =
 	  ) edges
 
       let library =
+	let void = [] in
 	let house =
 	  [
 	    ([0;0;0],[1;0;0]) ;
@@ -143,34 +146,21 @@ module KappaNode =
 	in
 	let triangle =
 	  [
-	    ([0;0;0],[1;0;0]) ;
-	    ([0;2;0],[2;0;0]) ;
-	    ([2;1;0],[1;2;0])
+	    ([20;0;0],[21;0;0]) ;
+	    ([20;2;0],[22;0;0]) ;
+	    ([22;1;0],[21;2;0])
 	  ]
 	in
-	let abc = 
-	  [
-	    ([0;0;0],[1;0;1]) ;
-	    ([1;1;1],[2;0;2]) ;
-	  ]
-	in
-	let abd = 
-	  [
-	    ([10;0;0],[11;0;1]) ;
-	    ([11;1;1],[12;0;3]) ;
-	  ]
-	in
+	let one = [([300;0;0],[301;0;0])] in 
 	let tn = List.map (fun (l,l') -> (create l,create l')) 
-	in 
-	let lib1 = Lib.StringMap.add "abc" (tn abc) Lib.StringMap.empty 
 	in
-	let lib2 = Lib.StringMap.add "abd" (tn abd) lib1 
+	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
+	let lib = Lib.StringMap.add "house" (tn house) lib
 	in
-	let lib3 = Lib.StringMap.add "house" (tn house) lib2
+	let lib = Lib.StringMap.add "square" (tn square) lib
 	in
-	let lib4 = Lib.StringMap.add "square" (tn square) lib3
-	in
-	Lib.StringMap.add "triangle" (tn triangle) lib4
+	let lib = Lib.StringMap.add "one" (tn one) lib in
+	Lib.StringMap.add "triangle" (tn triangle) lib
 
     end:NodeType)
 
@@ -211,6 +201,7 @@ module DegreeNode =
 	(dw <= w.max_degree) && (dx <= x.max_degree)
 
       let library =
+	let void = [] in
 	let house =
 	  [
 	    ([0;2],[1;2]) ;
@@ -223,22 +214,26 @@ module DegreeNode =
 	in
 	let square =
 	  [
-	    ([0;2],[1;2]) ;
-	    ([1;2],[2;3]) ;
-	    ([2;3],[3;3]) ;
-	    ([3;3],[0;2]) ;
+	    ([10;2],[11;2]) ;
+	    ([11;2],[12;3]) ;
+	    ([12;3],[13;3]) ;
+	    ([13;3],[10;2]) ;
 	  ]
 	in
 	let triangle =
 	  [
-	    ([0;3],[1;3]) ;
-	    ([1;3],[2;2]) ;
-	    ([0;3],[2;2])
+	    ([20;3],[21;3]) ;
+	    ([21;3],[22;2]) ;
+	    ([20;3],[22;2])
 	  ]
 	in
-	let tn = List.map (fun (l,l') -> (create l,create l')) in 
-	Lib.StringMap.add "house" (tn house)
-			  (Lib.StringMap.add "square" (tn square)
-					     (Lib.StringMap.add "triangle" (tn triangle) Lib.StringMap.empty))
+	let one = [([100;3],[200;3])]
+	in 
+	let tn = List.map (fun (l,l') -> (create l,create l')) in
+	let lib0 = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
+	Lib.StringMap.add "one" (tn one)
+			  (Lib.StringMap.add "house" (tn house)
+					     (Lib.StringMap.add "square" (tn square)
+								(Lib.StringMap.add "triangle" (tn triangle) lib0)))
 			  
-			  end:NodeType)
+end:NodeType)
