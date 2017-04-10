@@ -79,8 +79,8 @@ module Make (Node:Node.NodeType) =
       print_string (string_of_tiles gluings) ;
       print_newline() ;
       print_string "------- RULES ---------\n" ;
-      let model = Model.add_rule (one,square) Model.empty in
-      let model = Model.add_rule (void,one) model in
+      let model = Model.add_rule (void,one) Model.empty in
+      let model = Model.add_rule (one,void) model in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
 		     Model.add_obs (graph_of_library name) model
@@ -89,6 +89,9 @@ module Make (Node:Node.NodeType) =
       let witnesses = Model.witnesses_of_model model in
       print_string "Negative witnesses of the model are: \n" ;
       print_string (string_of_tiles ((fun (neg,pos) -> neg) witnesses)) ;
+      print_newline() ;
+      print_string "Positive witnesses of the model are: \n" ;
+      print_string (string_of_tiles ((fun (neg,pos) -> pos) witnesses)) ;
       print_newline() ;
     
   end

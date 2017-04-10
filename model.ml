@@ -30,10 +30,10 @@ module Make (Node:Node.NodeType) =
 	   | Some w ->
 	      let mpo = Cat.multi_pushout [Hom.identity (Graph.nodes h_eps)] w pi_eps in
 	      match mpo with
-		[] -> tiles (*witness not compatible with pi_eps*)
-	      | [(supOpt,hom)] -> if supOpt = None then tiles else gluing_tile::tiles
+		[(None,_)] -> tiles (*Gluing is incompatible with pi_eps*)
+	      | [(Some sup,hom)] -> gluing_tile::tiles (*should use [(sup,hom)] here to minimize exploration*)
 	      | _ -> failwith "Invariant violation: mpo should have at most one element"
-	  ) [] (id_emb.Cat.src >< obs) 
+	  ) [] (h_eps >< obs) 
       in
       let rec build_witnesses effects nw pw = function
 	  [] -> (nw,pw)
