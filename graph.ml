@@ -15,6 +15,21 @@ module Make (Node:Node.NodeType) =
 	       
     let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
 
+    let equal_support g h =
+      try
+	Lib.IntMap.fold
+	  (fun id _ _ ->
+	   if Lib.IntMap.mem id h.idmap then ()
+	   else raise Pervasives.Exit
+	  ) g.idmap () ;
+	Lib.IntMap.fold
+	  (fun id _ _ ->
+	   if Lib.IntMap.mem id g.idmap then ()
+	   else raise Pervasives.Exit
+	  ) h.idmap () ; true
+      with
+	Pervasives.Exit -> false
+      
     		  
     let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []		 
     let nodes g = NodeSet.elements g.nodes

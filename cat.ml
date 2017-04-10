@@ -303,7 +303,7 @@ module Make (Node:Node.NodeType) =
 		    match try Some (horizontal_compose one_gluing n_gluing) with Undefined -> None
 		    with
 		      None -> (succ_n_gluings,complete_gluings,already_done)
-		    | Some succ_n_hset ->
+		    | Some succ_n_hset -> (*defines an n+1 gluing*)
 		       (*On verifie ici que succ_n_hset n'est pas deja dans succ_n_gluings*)
 		       if List.exists
 			    (fun g ->
@@ -345,7 +345,7 @@ module Make (Node:Node.NodeType) =
 	List.map extension_class (enumerate_gluings one_gluings one_gluings one_gluings [])
       in
       List.fold_left (fun cont embeddings -> 
-		      let is_max infGH =
+		      let is_max infGH = (*checks whether infGH is not included in the inf of another tile*)
 			try
 			  (List.fold_left
 			     (fun _ emb ->
@@ -356,39 +356,52 @@ module Make (Node:Node.NodeType) =
 			with
 			  Pervasives.Exit -> false
 		      in
+		      let is_pullback infGH = (*checks whether the tile is a candidate idem pushout*)
+			try
+			  (List.fold_left
+			     (fun _ emb ->
+			      if (Graph.size_edge infGH < Graph.size_edge emb.src)
+				 && (Graph.equal_support infGH emb.src)
+			      then raise Pervasives.Exit
+			     ) () gluing_points ; true)
+			with
+			  Pervasives.Exit -> false
+		      in
 		      let mpo = multi_pushout embeddings.maps h g in 
 		      let infGH = embeddings.src in
-		      let gluings =
-			List.fold_left
-			  (fun tiles (supOpt,hom) ->
-			   let infGH_to_H = Hom.identity (Graph.nodes infGH) in
-			   let infGH_to_G =
-			     Graph.fold_nodes
-			       (fun u hom' ->
-				try
-				  Hom.add u (Hom.find u hom) hom'
-				with
-				  Not_found -> hom'
-				| _ -> failwith "Invariant violation"
-			       ) infGH Hom.empty
-			   in
-			   let span =
-			     ({src = infGH ; trg = h ; maps = [infGH_to_H]},
-			      {src = infGH ; trg = g ; maps = [infGH_to_G]})
-			   in
-			   match supOpt with
-			     None -> if is_max infGH then
-				       {span = span ; cospan = None}::tiles
-				     else tiles
-			   | Some supGH ->
-			      let co_span =
-				({src = h ; trg = supGH ; maps = [hom]},
-				 {src = g ; trg = supGH ; maps = [Hom.identity (Graph.nodes g)]})
-			      in
-			      {span = span ; cospan = Some co_span}::tiles
-			  ) [] mpo
-		      in
-		      gluings@cont
+		      if not (is_pullback infGH) then cont
+		      else
+			let gluings =
+			  List.fold_left
+			    (fun tiles (supOpt,hom) ->
+			     let infGH_to_H = Hom.identity (Graph.nodes infGH) in
+			     let infGH_to_G =
+			       Graph.fold_nodes
+				 (fun u hom' ->
+				  try
+				    Hom.add u (Hom.find u hom) hom'
+				  with
+				    Not_found -> hom'
+				  | _ -> failwith "Invariant violation"
+				 ) infGH Hom.empty
+			     in
+			     let span =
+			       ({src = infGH ; trg = h ; maps = [infGH_to_H]},
+				{src = infGH ; trg = g ; maps = [infGH_to_G]})
+			     in
+			     match supOpt with
+			       None -> if is_max infGH then
+					 {span = span ; cospan = None}::tiles
+				       else tiles
+			     | Some supGH ->
+				let co_span =
+				  ({src = h ; trg = supGH ; maps = [hom]},
+				   {src = g ; trg = supGH ; maps = [Hom.identity (Graph.nodes g)]})
+				in
+				{span = span ; cospan = Some co_span}::tiles
+			    ) [] mpo
+			in
+			gluings@cont
 		     ) [] gluing_points
 
     let minimize_tile tile min_opt =
