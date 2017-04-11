@@ -87,20 +87,21 @@ module Make (Node:Node.NodeType) =
     let comem u hom = NodeBij.comem u hom.tot
 
     let to_string hom =
+      let s = fun x -> string_of_int (Node.id x) in
       if is_identity hom then
 	let l = 
 	  fold (fun u _ cont ->
-		(Node.to_string u)::cont
+		(s u)::cont
 	       ) hom []
 	in
 	"Id_{"^(String.concat "," l)^"}"
       else
 	let l = 
 	  fold (fun u v cont ->
-		((Node.to_string u)^"->"^(Node.to_string v))::cont
+		("("^(s u)^":"^(s v)^")")::cont
 	       ) hom []
 	in
-	"["^(String.concat " + " l)^"]"
+	(String.concat "" l)
 
 				      
   end

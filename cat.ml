@@ -33,18 +33,23 @@ module Make (Node:Node.NodeType) =
       Graph.is_equal emb1.trg emb2.trg
 		     
     let string_of_embeddings emb = 
-      String.concat "," (List.map Hom.to_string emb.maps)
+      "\027[91m"^(String.concat " + " (List.map Hom.to_string emb.maps))^"\027[0m"
 
     let string_of_span (emb,emb') =
       assert (is_span emb emb') ;
-      let str = Printf.sprintf "SRC = %s \n" (Graph.to_string emb.src) in
-      str^(string_of_embeddings emb)^"\n"^(string_of_embeddings emb')
+      let str = Printf.sprintf " %s " (Graph.to_string emb.src) in
+      let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
+      let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
+      str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''^"\n"
+      
 
     let string_of_co_span (emb,emb') =
       assert (is_co_span emb emb') ;
-      let str = Printf.sprintf "\nTRG = %s" (Graph.to_string emb.trg) in
-      (string_of_embeddings emb)^"\n"^(string_of_embeddings emb')^str
-
+      let str = Printf.sprintf " %s " (Graph.to_string emb.trg) in
+      let str' = Printf.sprintf " %s " (Graph.to_string emb.src) in
+      let str'' = Printf.sprintf " %s " (Graph.to_string emb'.src) in
+      str'^"-"^(string_of_embeddings emb)^"->"^str^"<-"^(string_of_embeddings emb')^"-"^str''^"\n"
+      
 					    
     let (=>) g h =
       let rec extend hom_list iG jG acc =
@@ -298,23 +303,23 @@ module Make (Node:Node.NodeType) =
 	| (n_gluing)::tl ->
 	   let succ_n_gluings,complete_gluings',already_done' = 
 	     List.fold_left
-	       (fun (succ_n_gluings,complete_gluings,already_done) (one_gluing) ->
+	       (fun (succ_n_gluings,complete_gluings,already_done) one_gluing ->
 		try
 		  if Graph.is_included one_gluing.src n_gluing.src then (succ_n_gluings,complete_gluings,already_done)
 		  else
 		    match try Some (horizontal_compose one_gluing n_gluing) with Undefined -> None
 		    with
 		      None -> (succ_n_gluings,complete_gluings,already_done)
-		    | Some succ_n_hset -> (*defines an n+1 gluing*)
+		    | Some succ_n_emb -> (*defines an n+1 gluing*)
 		       (*On verifie ici que succ_n_hset n'est pas deja dans succ_n_gluings*)
 		       if List.exists
-			    (fun g ->
-			     Graph.is_equal g succ_n_hset.src
+			    (fun emb ->
+			     Graph.is_equal emb.src succ_n_emb.src
 			    ) already_done
 		       then (succ_n_gluings,complete_gluings,already_done)
 		       else
-			 let complete_gluings' = succ_n_hset::complete_gluings in
-			 (succ_n_hset::succ_n_gluings,complete_gluings',succ_n_hset.src::already_done)
+			 let complete_gluings' = succ_n_emb::complete_gluings in
+			 (succ_n_emb::succ_n_gluings,complete_gluings', succ_n_emb::already_done)
 		with
 		  Hom.Not_structure_preserving -> failwith "Invariant violation: not structure preserving"
 		| Hom.Not_injective -> (succ_n_gluings,complete_gluings,already_done)
