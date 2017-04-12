@@ -5,14 +5,15 @@ module Make (Node:Node.NodeType) =
     module Graph = Graph.Make (Node)
 
     module NodeSet = Set.Make (Node)
-
+			     			      
     exception Undefined		
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
 
-	 	  
+		  
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
+
 				   
     let sup_of_tile tile =
       match tile.cospan with
