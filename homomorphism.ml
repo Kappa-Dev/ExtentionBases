@@ -69,7 +69,10 @@ module Make (Node:Node.NodeType) =
 
     let find u hom = NodeBij.find u hom.tot
     let cofind u hom = NodeBij.cofind u hom.tot
-				  
+
+    let find_sub i hom = IntBij.find i hom.sub
+    let cofind_sub i hom = IntBij.cofind i hom.sub
+
     let id_image u hom =
       try Some (IntBij.find (Node.id u) hom.sub) with Not_found -> None 
 
@@ -84,25 +87,13 @@ module Make (Node:Node.NodeType) =
     let sum hom hom' = fold (fun u v hom_sum -> add u v hom_sum) hom hom'
       			    
     let mem u hom = NodeBij.mem u hom.tot
+    let mem_sub i hom = IntBij.mem i hom.sub
+				
     let comem u hom = NodeBij.comem u hom.tot
+    let comem_sub i hom = IntBij.comem i hom.sub
 
     let to_string hom =
-      let s = fun x -> string_of_int (Node.id x) in
-      if is_identity hom then
-	let l = 
-	  fold (fun u _ cont ->
-		(s u)::cont
-	       ) hom []
-	in
-	"Id_{"^(String.concat "," l)^"}"
-      else
-	let l = 
-	  fold (fun u v cont ->
-		("("^(s u)^":"^(s v)^")")::cont
-	       ) hom []
-	in
-	(String.concat "" l)
-
+      IntBij.to_string hom.sub
 				      
   end
     

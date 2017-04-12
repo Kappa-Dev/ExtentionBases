@@ -19,12 +19,6 @@ module Make (Node:Node.NodeType) =
       | (u,v)::tl ->
 	 let g' = draw_line u v g in
 	 draw tl g'
-	 	     
-    let copy g =
-      match Cat.multi_pushout [Hom.empty] Graph.empty g with
-	[] -> failwith "Invariant violation"
-      | [(Some g',_)] -> g'
-      | _ -> failwith "Invariant violation"
 			      
     let string_of_tiles = fun tiles ->
       String.concat

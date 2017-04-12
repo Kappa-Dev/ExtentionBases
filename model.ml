@@ -36,13 +36,13 @@ module Make (Node:Node.NodeType) =
 	let pi_eps = id_emb.Cat.trg in
 	List.fold_left
 	  (fun tiles gluing_tile ->
-	   match Cat.sup_of_tile gluing_tile with
+	   match gluing_tile.Cat.cospan with
 	     None -> tiles
-	   | Some w ->
-	      let mpo = Cat.multi_pushout [Hom.identity (Graph.nodes h_eps)] w pi_eps in
-	      match mpo with
-		[(None,_)] -> tiles (*Gluing is incompatible with pi_eps*)
-	      | [(Some sup,hom)] -> (name,gluing_tile)::tiles (*should use [(sup,hom)] here to minimize exploration*)
+	   | Some (_,g_to_w) ->
+	      let mpos = Cat.mpo (Cat.identity h_eps pi_eps,g_to_w) in
+	      match mpos with
+		[] -> tiles (*Gluing is incompatible with pi_eps*)
+	      | [tile] -> (name,gluing_tile)::tiles (*should use [(sup,hom)] here to minimize exploration*)
 	      | _ -> failwith "Invariant violation: mpo should have at most one element"
 	  ) [] (h_eps >< obs) 
       in

@@ -10,9 +10,10 @@ module Make (Node:Node.NodeType) =
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
 
+	 	  
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
-	
+				   
     let sup_of_tile tile =
       match tile.cospan with
 	None -> None
@@ -25,7 +26,7 @@ module Make (Node:Node.NodeType) =
     let right_of_tile tile = 
       let (_,emb') = tile.span in
       emb'.trg
-			     
+	
     let is_span emb1 emb2 =
       Graph.is_equal emb1.src emb2.src
 		     
@@ -41,7 +42,7 @@ module Make (Node:Node.NodeType) =
       let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
       str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''^"\n"
-      
+												
 
     let string_of_co_span (emb,emb') =
       assert (is_co_span emb emb') ;
@@ -49,8 +50,14 @@ module Make (Node:Node.NodeType) =
       let str' = Printf.sprintf " %s " (Graph.to_string emb.src) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.src) in
       str'^"-"^(string_of_embeddings emb)^"->"^str^"<-"^(string_of_embeddings emb')^"-"^str''^"\n"
-      
-					    
+
+    let string_of_tile tile = 
+      match tile.cospan with
+	None -> (string_of_span tile.span)^"\n[NO_SUP]"
+      | Some co_span ->
+	 (string_of_co_span co_span)^"\n"^(string_of_span tile.span)
+												
+												
     let (=>) g h =
       let rec extend hom_list iG jG acc =
 	match hom_list with
@@ -124,7 +131,7 @@ module Make (Node:Node.NodeType) =
     let embed g h = 
       match g=>h with
 	[] -> raise Undefined
-       | maps -> {src = g ; trg = h ; maps = maps}
+      | maps -> {src = g ; trg = h ; maps = maps}
 
     let identity g h =
       {src = g ; trg = h ; maps = [Hom.identity (Graph.nodes g)]}
@@ -172,7 +179,7 @@ module Make (Node:Node.NodeType) =
 	{src = emb.src ; 
 	 trg = emb'.trg ; 
 	 maps = maps}
-      	 
+      	  
 
     let eq_class matching emb auto =
       let close_span hom hom' =
@@ -219,7 +226,7 @@ module Make (Node:Node.NodeType) =
       in
       assert (reduced_maps <> []) ;
       {emb with maps = reduced_maps}
-	  
+	
     let extension_class emb =
       let auto = (emb.trg => emb.trg) in
       eq_class false emb auto
@@ -227,8 +234,68 @@ module Make (Node:Node.NodeType) =
     let matching_class emb =
       let auto = (emb.src => emb.src) in
       eq_class true emb auto
-
-	  
+	       
+    let flatten emb =
+      let src = emb.src in
+      let trg = emb.trg in
+      List.fold_left
+	(fun emb_list hom ->
+	 {src = src ; trg = trg ; maps = [hom]}::emb_list
+	) [] emb.maps
+	       
+    let mpo (emb_h,emb_g) =
+      assert (match emb_h.maps with [id] -> Hom.is_identity id | _ -> false) ;
+      let h,g = emb_h.trg,emb_g.trg in
+      let inf_gh = emb_h.src in
+      let to_h = List.hd emb_h.maps in
+      let fresh = (Graph.max_id g) + 1 in
+      List.fold_left
+	(fun tiles to_g ->
+	 try
+	   let h',h_to_h',_ =
+	     Graph.fold_edges
+	       (fun u v (h',h_to_h',fresh) ->
+		let map u h' h_to_h' fresh =
+		  if Graph.has_node u inf_gh then
+		    let u' = Hom.find u to_g in
+		    (u',Graph.add_node u' h',Hom.add u u' h_to_h',fresh)
+		  else
+		    if Hom.comem_sub (Node.id u) to_h then
+		      let j = Hom.find_sub (Node.id u) to_g in
+		      let u' = Node.rename j u in
+		      if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
+		      else
+			(u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		    else
+		      let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
+		      in
+		      let u' = Node.rename i u in
+		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		in
+		let (u',h',h_to_h',fresh) = map u h' h_to_h' fresh in
+		let (v',h',h_to_h',fresh) = map v h' h_to_h' fresh in
+		(Graph.add_edge u' v' h',h_to_h',fresh)
+	       ) h (Graph.empty,Hom.empty,fresh)
+	   in
+	   let sup_gh = Graph.join h' g in
+	   let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [h_to_h']} in
+	   let emb_g_to_sup = extension_class (embed g sup_gh)
+	   in
+	   let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
+	   let new_tiles =
+	     List.fold_left
+	       (fun tiles emb_g_to_sup ->
+		{span = (emb_h,emb_g) ; cospan = Some (emb_h_to_sup,emb_g_to_sup)}::tiles
+	       ) [] (flatten emb_g_to_sup)
+	   in
+	   new_tiles@tiles
+	 with
+	   Graph.Incoherent ->
+	   let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
+	   {span = (emb_h,emb_g) ; cospan = None}::tiles
+	) [] emb_g.maps
+	
+(*	
     let multi_pushout maps g1 g2 = (*maps: infG1G2 -> G2*)
       
       let extend_partial hom0 graph fresh =
@@ -294,9 +361,10 @@ module Make (Node:Node.NodeType) =
 	    with
 	      Graph.Incoherent -> (None,hom)
 	) maps
-	
+ *)	 
     	
     let (><) g h =
+      (*one_gluings: embeddings of one edge of h into g, partial_gluings: embeddings of n edges of h into g*)
       let rec enumerate_gluings one_gluings partial_gluings complete_gluings already_done =
 	match partial_gluings with
 	  [] -> complete_gluings
@@ -348,68 +416,47 @@ module Make (Node:Node.NodeType) =
 	     Undefined -> arr_list
 	  ) [] (subgraphs_of_edges h)
       in
-      let gluing_points = 
-	List.map extension_class (enumerate_gluings one_gluings one_gluings one_gluings [])
+      let gluing_points = enumerate_gluings one_gluings one_gluings one_gluings [] in
+      let spans =
+	List.fold_left
+	  (fun spans emb ->
+	   let to_h = identity emb.src h in 
+	   let to_g = extension_class emb in
+	   (to_h,to_g)::spans
+	  ) [] gluing_points
       in
-      List.fold_left (fun cont embeddings -> 
-		      let is_max infGH = (*checks whether infGH is not included in the inf of another tile*)
-			try
-			  (List.fold_left
-			     (fun _ emb ->
-			      if (Graph.size_edge infGH < Graph.size_edge emb.src)
-				 && (Graph.is_included infGH emb.src)
-			      then raise Pervasives.Exit
-			     ) () gluing_points ; true)
-			with
-			  Pervasives.Exit -> false
-		      in
-		      let is_pullback infGH = (*checks whether the tile is a candidate idem pushout*)
-			try
-			  (List.fold_left
-			     (fun _ emb ->
-			      if (Graph.size_edge infGH < Graph.size_edge emb.src)
-				 && (Graph.equal_support infGH emb.src)
-			      then raise Pervasives.Exit
-			     ) () gluing_points ; true)
-			with
-			  Pervasives.Exit -> false
-		      in
-		      let mpo = multi_pushout embeddings.maps h g in 
-		      let infGH = embeddings.src in
-		      if not (is_pullback infGH) then cont
-		      else
-			let gluings =
-			  List.fold_left
-			    (fun tiles (supOpt,hom) ->
-			     let infGH_to_H = Hom.identity (Graph.nodes infGH) in
-			     let infGH_to_G =
-			       Graph.fold_nodes
-				 (fun u hom' ->
-				  try
-				    Hom.add u (Hom.find u hom) hom'
-				  with
-				    Not_found -> hom'
-				  | _ -> failwith "Invariant violation"
-				 ) infGH Hom.empty
-			     in
-			     let span =
-			       ({src = infGH ; trg = h ; maps = [infGH_to_H]},
-				{src = infGH ; trg = g ; maps = [infGH_to_G]})
-			     in
-			     match supOpt with
-			       None -> if is_max infGH then
-					 {span = span ; cospan = None}::tiles
-				       else tiles
-			     | Some supGH ->
-				let co_span =
-				  ({src = h ; trg = supGH ; maps = [hom]},
-				   {src = g ; trg = supGH ; maps = [Hom.identity (Graph.nodes g)]})
-				in
-				{span = span ; cospan = Some co_span}::tiles
-			    ) [] mpo
-			in
-			gluings@cont
-		     ) [] gluing_points
+      (***)
+      print_string "Gluings:\n" ;
+      List.iter (fun span -> print_string (string_of_span span) ; print_newline()) spans ;
+      (***)
+      let mpos =
+	List.fold_left
+	  (fun tiles span ->
+	   (mpo span)@tiles
+	  ) [] spans
+      in
+      (***)
+      print_string "Multi pushouts:\n" ;
+      List.iter (fun tile -> print_string (string_of_tile tile) ; print_newline()) mpos ;
+      (***)
+      
+      List.fold_left
+	(fun cont tile ->
+	 let is_max infGH mpos = (*checks whether infGH is not included in the inf of another tile*)
+	   try
+	     (List.fold_left
+		(fun _ tile ->
+		 if (Graph.size_edge infGH < Graph.size_edge (inf_of_tile tile))
+		    && (Graph.is_included infGH (inf_of_tile tile))
+		 then raise Pervasives.Exit
+		) () mpos ; true)
+	   with
+	     Pervasives.Exit -> false
+	 in
+	 match sup_of_tile tile with
+	   None -> if is_max (inf_of_tile tile) mpos then tile::cont else cont
+	   | Some _ -> tile::cont
+	) [] mpos
 
     let minimize_tile tile min_opt =
       let size_src = Graph.size_edge (inf_of_tile tile) in
@@ -431,6 +478,6 @@ module Make (Node:Node.NodeType) =
 	 else
 	   sharings
 	) []  ((left_of_tile tile) >< (right_of_tile tile))
-           
-		     
+        
+	
   end
