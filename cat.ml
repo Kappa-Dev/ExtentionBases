@@ -1,4 +1,3 @@
-
 module Make (Node:Node.NodeType) =
   struct
     module Hom = Homomorphism.Make (Node)
