@@ -1,4 +1,5 @@
-SOURCES := lib.ml node.ml graph.ml bijection.ml homomorphism.ml cat.ml model.ml shape.ml
-RESULT := test
+all:
+	ocamlbuild shape.native
 
--include OCamlMakefile
+clean:
+	ocamlbuild -clean
