@@ -4,7 +4,7 @@ module Make (Node:Node.NodeType) =
     module Graph = Graph.Make (Node)
 
     module NodeSet = Set.Make (Node)
-			     			      
+			      
     exception Undefined		
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
@@ -41,23 +41,23 @@ module Make (Node:Node.NodeType) =
       let str = Printf.sprintf " %s " (Graph.to_string emb.src) in
       let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
-      str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''^"\n"
-												
+      str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''
+											  
 
     let string_of_co_span (emb,emb') =
       assert (is_co_span emb emb') ;
       let str = Printf.sprintf " %s " (Graph.to_string emb.trg) in
       let str' = Printf.sprintf " %s " (Graph.to_string emb.src) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.src) in
-      str'^"-"^(string_of_embeddings emb)^"->"^str^"<-"^(string_of_embeddings emb')^"-"^str''^"\n"
+      str'^"-"^(string_of_embeddings emb)^"->"^str^"<-"^(string_of_embeddings emb')^"-"^str''
 
     let string_of_tile tile = 
       match tile.cospan with
 	None -> (string_of_span tile.span)^"\n[NO_SUP]"
       | Some co_span ->
 	 (string_of_co_span co_span)^"\n"^(string_of_span tile.span)
-												
-												
+					    
+					    
     let (=>) g h =
       let rec extend hom_list iG jG acc =
 	match hom_list with
@@ -235,133 +235,69 @@ module Make (Node:Node.NodeType) =
       let auto = (emb.src => emb.src) in
       eq_class true emb auto
 	       
-    let flatten emb =
+    let flatten emb = 
       let src = emb.src in
       let trg = emb.trg in
       List.fold_left
 	(fun emb_list hom ->
 	 {src = src ; trg = trg ; maps = [hom]}::emb_list
 	) [] emb.maps
-	       
+
     let mpo (emb_h,emb_g) =
-      assert (match emb_h.maps with [id] -> Hom.is_identity id | _ -> false) ;
+      let rename fresh h (to_h,inf_gh,to_g,g) =
+	Graph.fold_edges
+	  (fun u v (h',h_to_h',fresh) ->
+	   let map u h' h_to_h' fresh =
+	     try
+	       let u0 = Hom.cofind u to_h in (*u is in the inf*)
+	       let u' = Hom.find u0 to_g in
+	       (u',Graph.add_node u' h',Hom.add u u' h_to_h',fresh)
+	     with Not_found -> (*u is not in the inf*)
+		  try
+		    let i0 = Hom.cofind_sub (Node.id u) to_h in
+		    let j = Hom.find_sub i0 to_g in
+		    let u' = Node.rename j u in
+		    if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
+		    else
+		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		  with Not_found -> (*id u is not in the inf*)
+		    let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
+		    in
+		    let u' = Node.rename i u in
+		    (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+	   in
+	   let (u',h',h_to_h',fresh) = map u h' h_to_h' fresh in
+	   let (v',h',h_to_h',fresh) = map v h' h_to_h' fresh in
+	   (Graph.add_edge u' v' h',h_to_h',fresh)
+	  ) h (Graph.empty,Hom.empty,fresh)
+      in
+      
       let h,g = emb_h.trg,emb_g.trg in
       let inf_gh = emb_h.src in
-      let to_h = List.hd emb_h.maps in
-      let fresh = (Graph.max_id g) + 1 in
+      let fresh = (max (Graph.max_id g) (Graph.max_id h)) + 1 in
       List.fold_left
-	(fun tiles to_g ->
-	 try
-	   let h',h_to_h',_ =
-	     Graph.fold_edges
-	       (fun u v (h',h_to_h',fresh) ->
-		let map u h' h_to_h' fresh =
-		  if Graph.has_node u inf_gh then
-		    let u' = Hom.find u to_g in
-		    (u',Graph.add_node u' h',Hom.add u u' h_to_h',fresh)
-		  else
-		    if Hom.comem_sub (Node.id u) to_h then
-		      let j = Hom.find_sub (Node.id u) to_g in
-		      let u' = Node.rename j u in
-		      if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
-		      else
-			(u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		    else
-		      let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
-		      in
-		      let u' = Node.rename i u in
-		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		in
-		let (u',h',h_to_h',fresh) = map u h' h_to_h' fresh in
-		let (v',h',h_to_h',fresh) = map v h' h_to_h' fresh in
-		(Graph.add_edge u' v' h',h_to_h',fresh)
-	       ) h (Graph.empty,Hom.empty,fresh)
-	   in
-	   let sup_gh = Graph.join h' g in
-	   let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [h_to_h']} in
-	   let emb_g_to_sup = extension_class (embed g sup_gh)
-	   in
-	   let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
-	   let new_tiles =
-	     List.fold_left
-	       (fun tiles emb_g_to_sup ->
+	(fun tiles to_h ->
+	 let mpos_for_h = 
+	   List.fold_left
+	     (fun tiles to_g ->
+	      try
+		let h',h_to_h',fresh = rename fresh h (to_h,inf_gh,to_g,g) in
+		let g',g_to_g',fresh = rename fresh g (to_g,inf_gh,to_h,h) in
+		let sup_gh = Graph.join h' g' in
+		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [h_to_h']} in
+		let emb_g_to_sup = identity g sup_gh in
+		let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
+		let emb_h = {src = inf_gh ; trg = h ; maps = [to_h]} in
 		{span = (emb_h,emb_g) ; cospan = Some (emb_h_to_sup,emb_g_to_sup)}::tiles
-	       ) [] (flatten emb_g_to_sup)
-	   in
-	   new_tiles@tiles
-	 with
-	   Graph.Incoherent ->
-	   let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
-	   {span = (emb_h,emb_g) ; cospan = None}::tiles
-	) [] emb_g.maps
-	
-(*	
-    let multi_pushout maps g1 g2 = (*maps: infG1G2 -> G2*)
-      
-      let extend_partial hom0 graph fresh =
-	let apply_ext_hom u hom fresh =
-	  match Hom.id_image u hom with
-	    None ->
-	    let u' = Node.rename fresh u in
-	    (u', Hom.add u u' hom, fresh+1)
-	  | Some i -> 
-	     let u' = Node.rename i u in
-	     (u',Hom.add u u' hom,fresh)
-	in
-	let renamed_opt,hom,_ = 
-	  Graph.fold_edges
-	    (fun u v (renamed_opt,hom,fresh) ->
-	     let subst_opt,hom =
-	       try
-		 let u',hom,fresh = apply_ext_hom u hom fresh
-		 in
-		 let v',hom,fresh = apply_ext_hom v hom fresh
-		 in
-		 (Some (u',v',fresh),hom)
-	       with
-		 Hom.Not_injective -> (None,hom)
-	     in
-	     match (renamed_opt,subst_opt) with
-	       (None, Some (u',v',fresh)) -> (None,hom,fresh)
-	     | (_, None) -> (None,hom,fresh)
-	     | (Some renamed_graph, Some (u',v',fresh)) ->
-		begin
-		  let renamed_graph = Graph.add_node u' (Graph.add_node v' renamed_graph) in
-		  let renamed_graph =
-		    try
-		      Graph.add_edge u' v' renamed_graph
-		    with
-		      Graph.Incoherent ->
-		      (
-			Printf.printf "Cannot add (%s,%s)\n" (Node.to_string u') (Node.to_string v') ;
-			failwith "Invariant violation"
-		      )
-		  in
-		  (Some renamed_graph,hom,fresh)
-		end		
-	    ) graph (Some Graph.empty,hom0,fresh)
-	in
-	(hom,renamed_opt)
-      in
-      
-      let fresh = (max (Graph.max_id g1) (Graph.max_id g2))+1
-      in
-      List.map
-	(fun hom ->
-	 let hom,renamed_opt =
-	   extend_partial hom g1 fresh
+	      with
+		Graph.Incoherent ->
+		let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
+		let emb_h = {src = inf_gh ; trg = h ; maps = [to_h]} in
+		{span = (emb_h,emb_g) ; cospan = None}::tiles
+	     ) [] emb_g.maps
 	 in
-	 match renamed_opt with
-	   None -> (None,hom)
-	 | Some renamed_g1 ->
-	    try
-	      let gh_sup = Graph.join g2 renamed_g1
-	      in
-	      (Some gh_sup,hom)
-	    with
-	      Graph.Incoherent -> (None,hom)
-	) maps
- *)	 
+	 mpos_for_h@tiles
+	) [] emb_h.maps
     	
     let (><) g h =
       (*one_gluings: embeddings of one edge of h into g, partial_gluings: embeddings of n edges of h into g*)
@@ -407,39 +343,30 @@ module Make (Node:Node.NodeType) =
       in
       let one_gluings = 
 	List.fold_left
-	  (fun arr_list subh ->
+	  (fun arr_list subg ->
 	   try 
-	     let embeddings = embed subh g 
+	     let embeddings = embed subg h 
 	     in
 	     embeddings::arr_list
 	   with
 	     Undefined -> arr_list
-	  ) [] (subgraphs_of_edges h)
+	  ) [] (subgraphs_of_edges g)
       in
       let gluing_points = enumerate_gluings one_gluings one_gluings one_gluings [] in
       let spans =
 	List.fold_left
 	  (fun spans emb ->
-	   let to_h = identity emb.src h in 
-	   let to_g = extension_class emb in
+	   let to_h = extension_class emb in 
+	   let to_g =  identity emb.src g in
 	   (to_h,to_g)::spans
 	  ) [] gluing_points
       in
-      (***)
-      print_string "Gluings:\n" ;
-      List.iter (fun span -> print_string (string_of_span span) ; print_newline()) spans ;
-      (***)
       let mpos =
 	List.fold_left
 	  (fun tiles span ->
 	   (mpo span)@tiles
 	  ) [] spans
       in
-      (***)
-      print_string "Multi pushouts:\n" ;
-      List.iter (fun tile -> print_string (string_of_tile tile) ; print_newline()) mpos ;
-      (***)
-      
       List.fold_left
 	(fun cont tile ->
 	 let is_max infGH mpos = (*checks whether infGH is not included in the inf of another tile*)
@@ -455,7 +382,7 @@ module Make (Node:Node.NodeType) =
 	 in
 	 match sup_of_tile tile with
 	   None -> if is_max (inf_of_tile tile) mpos then tile::cont else cont
-	   | Some _ -> tile::cont
+	 | Some _ -> tile::cont
 	) [] mpos
 
     let minimize_tile tile min_opt =
