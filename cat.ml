@@ -252,19 +252,26 @@ module Make (Node:Node.NodeType) =
 	       let u0 = Hom.cofind u to_h in (*u is in the inf*)
 	       let u' = Hom.find u0 to_g in
 	       (u',Graph.add_node u' h',Hom.add u u' h_to_h',fresh)
-	     with Not_found -> (*u is not in the inf*)
-		  try
-		    let i0 = Hom.cofind_sub (Node.id u) to_h in
-		    let j = Hom.find_sub i0 to_g in
-		    let u' = Node.rename j u in
-		    if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
-		    else
-		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		  with Not_found -> (*id u is not in the inf*)
-		    let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
-		    in
-		    let u' = Node.rename i u in
-		    (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+	     with
+	       Hom.Not_injective -> failwith "Invariant violation"
+	      | Not_found -> (*u is not in the inf*)
+		 begin
+		   try
+		     let i0 = Hom.cofind_sub (Node.id u) to_h in
+		     let j = Hom.find_sub i0 to_g in
+		     let u' = Node.rename j u in
+		     if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
+		     else
+		       (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		   with Not_found -> (*id u is not in the inf*)
+		     if fresh < 0 then
+		       (u,Graph.add_node u h', Hom.add u u h_to_h',fresh)
+		     else
+		       let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
+		       in
+		       let u' = Node.rename i u in
+		       (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		 end
 	   in
 	   let (u',h',h_to_h',fresh) = map u h' h_to_h' fresh in
 	   let (v',h',h_to_h',fresh) = map v h' h_to_h' fresh in
@@ -281,13 +288,14 @@ module Make (Node:Node.NodeType) =
 	   List.fold_left
 	     (fun tiles to_g ->
 	      try
-		let h',h_to_h',fresh = rename fresh h (to_h,inf_gh,to_g,g) in
 		let g',g_to_g',fresh = rename fresh g (to_g,inf_gh,to_h,h) in
-		let sup_gh = Graph.join h' g' in
-		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [h_to_h']} in
-		let emb_g_to_sup = identity g sup_gh in
-		let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
-		let emb_h = {src = inf_gh ; trg = h ; maps = [to_h]} in
+		(*let h',h_to_h',_ = rename (-1) h (to_h,inf_gh,Hom.identity (Graph.nodes h),g) in*)
+		
+		let sup_gh = Graph.join h g' in
+		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [Hom.identity (Graph.nodes h)]} in
+		let emb_g_to_sup = {src = g ; trg = sup_gh ; maps = [g_to_g']} in
+		let emb_g =  {src = inf_gh ; trg = g ; maps = [to_g]} in
+		let emb_h =  {src = inf_gh ; trg = h ; maps = [to_h]} in
 		{span = (emb_h,emb_g) ; cospan = Some (emb_h_to_sup,emb_g_to_sup)}::tiles
 	      with
 		Graph.Incoherent ->
@@ -343,9 +351,9 @@ module Make (Node:Node.NodeType) =
       in
       let one_gluings = 
 	List.fold_left
-	  (fun arr_list subg ->
+	  (fun arr_list sub_g ->
 	   try 
-	     let embeddings = embed subg h 
+	     let embeddings = embed sub_g h
 	     in
 	     embeddings::arr_list
 	   with
@@ -355,9 +363,9 @@ module Make (Node:Node.NodeType) =
       let gluing_points = enumerate_gluings one_gluings one_gluings one_gluings [] in
       let spans =
 	List.fold_left
-	  (fun spans emb ->
-	   let to_h = extension_class emb in 
-	   let to_g =  identity emb.src g in
+	  (fun spans inf_to_h ->
+	   let to_h = extension_class inf_to_h in 
+	   let to_g =  identity inf_to_h.src g in (*Asymmetry is important here because all subparts of g are added edges*)
 	   (to_h,to_g)::spans
 	  ) [] gluing_points
       in
@@ -384,27 +392,5 @@ module Make (Node:Node.NodeType) =
 	   None -> if is_max (inf_of_tile tile) mpos then tile::cont else cont
 	 | Some _ -> tile::cont
 	) [] mpos
-
-    let minimize_tile tile min_opt =
-      let size_src = Graph.size_edge (inf_of_tile tile) in
-      List.fold_left
-	(fun sharings tile' ->
-	 let size_src' = Graph.size_edge (inf_of_tile tile') in
-	 if
-	   match min_opt with
-	     None -> true
-	   | Some n ->  (size_src' - size_src) >= n
-	 then
-	   let sharing =
-	     {src = inf_of_tile tile ;
-	      trg = inf_of_tile tile' ;
-	      maps = [Hom.identity (Graph.nodes (inf_of_tile tile))]
-	     }
-	   in
-	   (sharing,tile')::sharings
-	 else
-	   sharings
-	) []  ((left_of_tile tile) >< (right_of_tile tile))
-        
 	
   end

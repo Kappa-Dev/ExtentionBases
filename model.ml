@@ -38,8 +38,8 @@ module Make (Node:Node.NodeType) =
 	  (fun tiles gluing_tile ->
 	   match gluing_tile.Cat.cospan with
 	     None -> tiles
-	   | Some (_,g_to_w) ->
-	      let mpos = Cat.mpo (Cat.identity h_eps pi_eps,g_to_w) in
+	   | Some (_,h_eps_to_w) ->
+	      let mpos = Cat.mpo (Cat.identity h_eps pi_eps,h_eps_to_w) in
 	      match mpos with
 		[] -> tiles (*Gluing is incompatible with pi_eps*)
 	      | [tile] -> (name,gluing_tile)::tiles (*should use [(sup,hom)] here to minimize exploration*)
@@ -64,45 +64,32 @@ module Make (Node:Node.NodeType) =
 	  ) (IMap.empty,IMap.empty) effects
 
       in
-      let build_spans witnesses =
-	let embeddings = 
-	  IMap.fold
-	    (fun rule_id tiles extb ->
-	     let ext_rule_id = 
-	       List.fold_left
-		 (fun ext_rule_id (obs_id,tile) -> (*rule_id --(+/-)--> obs_id through tile *)
-		  match Cat.sup_of_tile tile with
-		    None -> failwith "Invariant violation: gluing is not complete"
-		  | Some sup ->
-		     (Cat.identity (Cat.right_of_tile tile) sup)::ext_rule_id
-		 ) [] tiles
-	     in
-	     ext_rule_id@extb
-	    ) witnesses []
-	in
-	let spans,_ =
-	  List.fold_left
-	    (fun (cont,offset) emb ->
-	     let spans,_ =
-	       List.fold_left
-		 (fun (spans,offset) emb' ->
-		  if offset >= 0 then (spans,offset-1)
-		  else
-		    ((emb,emb')::spans,offset)
-		 ) ([],offset) embeddings
-	     in
-	     (spans@cont,offset+1)
-	    ) ([],0) embeddings
-	in
-	spans
+      let build_extensions witnesses =
+	IMap.fold
+	  (fun rule_id tiles extb ->
+	   List.fold_left
+	     (fun extensions (obs_id,tile) -> (*rule_id --(+/-)--> obs_id through tile *)
+	      match tile.Cat.cospan with
+		None -> failwith "Invariant violation: gluing is not complete"
+	      | Some cospan ->
+		 let ext_r_id = try IMap.find rule_id extensions with Not_found -> []
+		 in
+		 IMap.add rule_id ((obs_id,cospan)::ext_r_id) extensions
+	     ) extb tiles
+	  ) witnesses IMap.empty
       in
-      build_witnesses (get_effects m) m.obs
-		      (*
       let neg_witnesses,pos_witnesses = build_witnesses (get_effects m) m.obs
       in
-      let neg_spans = build_spans neg_witnesses in
-      let pos_spans = build_spans pos_witnesses in
-      print_string (String.concat "\n" (List.map Cat.string_of_span neg_spans)) ; print_newline() ; 
-      print_string (String.concat "\n" (List.map Cat.string_of_span pos_spans)) 
-		       *)
+      let neg_extensions = build_extensions neg_witnesses in
+      let pos_extensions = build_extensions pos_witnesses in
+      IMap.iter
+	(fun rule_id l ->
+	 List.iter
+	   (fun (obs_id,cospan) ->
+	    Printf.printf "%s --> %s is:\n %s\n"
+			  (name_of_id rule_id m)
+			  (name_of_id obs_id m)
+			  (Cat.string_of_co_span cospan)
+	   ) l ;
+	) neg_extensions
   end

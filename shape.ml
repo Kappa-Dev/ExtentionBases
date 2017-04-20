@@ -31,16 +31,18 @@ module Make (Node:Node.NodeType) =
 				     
     let generate_tests () =
       let void = graph_of_library "empty" in
-      let one = graph_of_library "one" in
+      let two = graph_of_library "two" in
       print_string "------- RULES ---------\n" ;
-      let model = Model.add_rule "0->1" (void,one) Model.empty in
-      let model = Model.add_rule "1->0" (one,void) model in
+      let model = Model.add_rule "0->2" (void,two) Model.empty in
+      let model = Model.add_rule "2->0" (two,void) model in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
 		     Model.add_obs name (graph_of_library name) model
 		    ) Node.library model
       in
-      print_newline() ; 
+      print_newline() ;
+      Model.witnesses_of_model model ;
+			       (*
       let nw,pw = Model.witnesses_of_model model in
       
       Lib.IntMap.iter (fun obs_id neglist ->
@@ -63,7 +65,7 @@ module Make (Node:Node.NodeType) =
 				  print_string (Cat.string_of_tile pos) ;
 				  print_newline() ;
 				 ) poslist ;
-		      ) pw ;
+		      ) pw ;*)
       print_newline()        
   end
 
