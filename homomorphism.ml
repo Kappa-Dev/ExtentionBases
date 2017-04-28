@@ -27,6 +27,8 @@ module Make (Node:Node.NodeType) =
        sub = IntBij.empty 
       }
 
+      
+
     let identity nodes = 
       {tot = NodeBij.identity nodes ; 
        sub = IntBij.identity (List.map Node.id nodes)
@@ -69,10 +71,17 @@ module Make (Node:Node.NodeType) =
 
     let find u hom = NodeBij.find u hom.tot
     let cofind u hom = NodeBij.cofind u hom.tot
-
     let find_sub i hom = IntBij.find i hom.sub
     let cofind_sub i hom = IntBij.cofind i hom.sub
 
+    let add2 (u,v) (u',v') hom = add u u' (add v v' hom)
+    let find2 (u,v) hom = (find u hom, find v hom)
+
+    let find2_sub (u,v) hom = (find_sub u hom, find_sub v hom)
+    let cofind2 (u,v) hom = (cofind u hom, cofind v hom)
+    let cofind2_sub (u,v) hom = (cofind_sub u hom, cofind_sub v hom)
+
+   
     let id_image u hom =
       try Some (IntBij.find (Node.id u) hom.sub) with Not_found -> None 
 
@@ -94,6 +103,9 @@ module Make (Node:Node.NodeType) =
 
     let to_string hom =
       IntBij.to_string hom.sub
+
+    let to_dot_label hom =
+      IntBij.to_dot_label hom.sub
 				      
   end
     

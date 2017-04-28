@@ -208,5 +208,35 @@ module Make (Node:Node.NodeType) =
 			(Printf.sprintf "(%s,%s)" (Node.to_string u) (Node.to_string v))::cont
 		       ) g []
 		    )^"}"
+
+    let to_dot_cluster g n fresh =
+      let name = "cluster_"^(string_of_int n) in
+      let nodes,fresh,map = 
+	fold_nodes
+	  (fun u (cont,fresh,map) ->
+	   if Lib.IntMap.mem (Node.id u) map then (cont,fresh,map) 
+	   else
+	     let i = fresh in
+	     let node_str = Node.to_dot u i in
+	     (node_str::cont,fresh+1,Lib.IntMap.add (Node.id u) i map) 
+	  ) g ([],fresh,Lib.IntMap.empty)
+      in
+      let nodes = String.concat "\n" nodes in
+      let edges = 
+	String.concat "\n"
+		      (fold_edges
+			 (fun u v cont ->
+			  let edge_str = 
+			    let i = Lib.IntMap.find (Node.id u) map in
+			    let j = Lib.IntMap.find (Node.id v) map in
+			    Node.dot_of_edge u i v j
+			  in
+			  edge_str::cont
+			 ) g []
+		      )
+      in
+      (Printf.sprintf "subgraph %s { \n %s \n %s \n }\n" name nodes edges,name,fresh)
+	  
+      
   end
     

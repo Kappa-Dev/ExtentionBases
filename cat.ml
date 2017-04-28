@@ -8,8 +8,21 @@ module Make (Node:Node.NodeType) =
     exception Undefined		
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
+	
+    let co_domains emb = 
+      List.fold_left
+	(fun co_domains hom -> 
+	 let cod =
+	   Graph.fold_edges 
+	     (fun u v cod ->
+	      let (u',v') = Hom.find2 (u,v) hom in
+	      let cod = Graph.add_node u' (Graph.add_node v' cod) in
+	      Graph.add_edge u' v' cod
+	     ) emb.src Graph.empty
+	 in
+	 cod::co_domains
+	) [] emb.maps
 
-		  
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
 
@@ -35,6 +48,16 @@ module Make (Node:Node.NodeType) =
 		     
     let string_of_embeddings emb = 
       "\027[91m"^(String.concat " + " (List.map Hom.to_string emb.maps))^"\027[0m"
+
+    let dot_of_embeddings emb =
+      let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in
+      let cluster1,ref_cluster1,_ = Graph.to_dot_cluster emb.trg 1 fresh in
+      let arrows = 
+	String.concat ";\n"
+		      (List.map (fun hom -> ref_cluster0^"->"^ref_cluster1^(Hom.to_dot_label hom)) emb.maps)
+      in
+      String.concat "\n" ["digraph G {\n";cluster0;cluster1;arrows;"}"]
+      
 
     let string_of_span (emb,emb') =
       assert (is_span emb emb') ;
@@ -307,7 +330,7 @@ module Make (Node:Node.NodeType) =
 	 mpos_for_h@tiles
 	) [] emb_h.maps
     	
-    let (><) g h =
+    let glue g h span_option =
       (*one_gluings: embeddings of one edge of h into g, partial_gluings: embeddings of n edges of h into g*)
       let rec enumerate_gluings one_gluings partial_gluings complete_gluings already_done =
 	match partial_gluings with
@@ -339,17 +362,25 @@ module Make (Node:Node.NodeType) =
 	   in
 	   enumerate_gluings one_gluings (tl@succ_n_gluings) complete_gluings' already_done'
       in
-      let subgraphs_of_edges graph =
+      let subgraphs_of_edges graph inf =
 	try
 	  Graph.fold_edges
 	    (fun u v subgraphs ->
-	     let subg = Graph.add_node u (Graph.add_node v Graph.empty) in
+	     let subg = Graph.add_node u (Graph.add_node v inf) in
 	     (Graph.add_edge u v subg)::subgraphs
 	    ) graph []
 	with
 	  Graph.Incoherent -> failwith "Invariant violation: graph is incoherent"
-      in
+      in 
       let one_gluings = 
+	let cstr_edges = 
+	  match span_option with
+	    None -> Graph.empty
+	  | Some (_,emb_to_g) ->
+	     match co_domains emb_to_g with
+	       [cod] -> cod
+	     | _ -> failwith "Invariant violation: Gluing under constraint should use flat embeddings"
+	in
 	List.fold_left
 	  (fun arr_list sub_g ->
 	   try 
@@ -358,7 +389,7 @@ module Make (Node:Node.NodeType) =
 	     embeddings::arr_list
 	   with
 	     Undefined -> arr_list
-	  ) [] (subgraphs_of_edges g)
+	  ) [] (subgraphs_of_edges g cstr_edges)
       in
       let gluing_points = enumerate_gluings one_gluings one_gluings one_gluings [] in
       let spans =
@@ -392,5 +423,26 @@ module Make (Node:Node.NodeType) =
 	   None -> if is_max (inf_of_tile tile) mpos then tile::cont else cont
 	 | Some _ -> tile::cont
 	) [] mpos
+
+    let (><) g h = glue g h None
+
+    let share = function 
+	(emb,emb') as span -> 
+	let compare_tile tile tile' = 
+	  let src = inf_of_tile tile in
+	  let src' = inf_of_tile tile' in
+	  compare (Graph.size_edge src') (Graph.size_edge src)
+	in
+	let gluings = glue emb.trg emb'.trg (Some span) in
+	let ordered_gluings =
+	  List.fast_sort compare_tile gluings 
+	in
+	let rec cut = function
+	  [] | [_] as l -> l
+	  | tile::tile'::tl ->
+	     if (compare_tile tile tile') = 0 then tile::(cut (tile'::tl))
+	     else [tile]
+	in
+	String.concat "\n" (List.map string_of_tile (cut ordered_gluings))
 	
   end

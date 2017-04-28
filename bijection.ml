@@ -89,8 +89,10 @@ module Make (Content:Lib.OrderedType) =
       | bij ->
 	 "("^(String.concat ","
 			    (fold
-			       (fun i j l -> ((Content.to_string i)^"->"^(Content.to_string j))::l
+			       (fun i j l -> ((Content.to_string i)^":"^(Content.to_string j))::l
 			       ) bij [])
 	     )^")"
-		 
+	
+    let to_dot_label bij =
+      "[ label=\""^(to_string bij)^"\"]"
   end

@@ -10,6 +10,8 @@ module type NodeType =
     val compare : t -> t -> int
     val create : int list -> t
     val to_string : t -> string
+    val to_dot : t -> int -> string
+    val dot_of_edge : t -> int -> t -> int -> string
     val coh : (t*t) list -> (t*t) -> bool
     val rename : int -> t -> t
     val library : (t*t) list Lib.StringMap.t
@@ -21,8 +23,9 @@ module SimpleNode =
       type t = int
       let arity = 0
       let rename i u = i
-			 
+			 			 
       let id u = u
+
       let prop = [||]
 		   
       let get_prop _ i = 
@@ -38,10 +41,16 @@ module SimpleNode =
       let create l = 
 	match l with 
 	  [i] -> i
-	| _ -> failwith "Cannot parse node"
-			
+	| _ -> failwith "Cannot parse node"			
       			
       let to_string = string_of_int
+
+      let to_dot u i = 
+	let ref_node = string_of_int i in
+	ref_node^" [label=\""^(to_string u)^"\"]"
+
+      let dot_of_edge u i v j = 
+	Printf.sprintf "%d -> %d [dir=none]" i j 
 			
       let coh _ _ = true
 
@@ -59,20 +68,20 @@ module SimpleNode =
 	in
 	let square =
 	  [
-	    ([10],[11]) ;
-	    ([11],[12]) ;
-	    ([12],[13]) ;
-	    ([13],[10]) ;
+	    ([0],[1]) ;
+	    ([1],[2]) ;
+	    ([2],[3]) ;
+	    ([3],[0]) ;
 	  ]
 	in
 	let triangle =
 	  [
-	    ([20],[21]) ;
-	    ([21],[22]) ;
-	    ([20],[22])
+	    ([0],[1]) ;
+	    ([1],[2]) ;
+	    ([0],[2])
 	  ]
 	in
-	let one = [([100],[200])] in
+	let one = [([0],[1])] in
 	let two = [([0],[1]);([1],[2])] 
 	in
 	let tn = List.map (fun (l,l') -> (create l,create l')) in
@@ -83,7 +92,7 @@ module SimpleNode =
 			  (Lib.StringMap.add "square" (tn square)
 					     (Lib.StringMap.add "triangle" (tn triangle) lib))
 			  
-			  end:NodeType)
+  end:NodeType)
     
 module KappaNode =
   (struct
@@ -114,6 +123,16 @@ module KappaNode =
       let to_string u =
 	(string_of_int u.ag_id)^"."^(string_of_int (u.port_id))
 
+      let to_dot u i = 
+	let ref_node = string_of_int i in
+	ref_node^" [label=\""^(string_of_int (id u))^"\"]"
+
+      let dot_of_edge u i v j =
+	let tl = string_of_int u.port_id in
+	let hl = string_of_int v.port_id in
+	Printf.sprintf "%d->%d [dir = none, taillabel = \"%s\", headlabel = \"%s\"]" i j tl hl
+
+
       let coh edges (w,x) =
 	let ok u v =
 	  if u.ag_id = v.ag_id then ((u.port_id != v.port_id) && (u.label = v.label))
@@ -138,20 +157,20 @@ module KappaNode =
 	in
 	let square =
 	  [
-	    ([10;0;0],[11;0;0]) ;
-	    ([11;1;0],[12;1;0]) ;
-	    ([12;0;0],[13;0;0]) ;
-	    ([13;1;0],[10;1;0])
+	    ([0;0;0],[1;0;0]) ;
+	    ([1;1;0],[2;1;0]) ;
+	    ([2;0;0],[3;0;0]) ;
+	    ([3;1;0],[0;1;0])
 	  ]
 	in
 	let triangle =
 	  [
-	    ([20;0;0],[21;0;0]) ;
-	    ([20;2;0],[22;0;0]) ;
-	    ([22;1;0],[21;2;0])
+	    ([0;0;0],[1;0;0]) ;
+	    ([0;2;0],[2;0;0]) ;
+	    ([2;1;0],[1;2;0])
 	  ]
 	in
-	let one = [([300;0;0],[301;0;0])] in 
+	let one = [([0;0;0],[1;0;0])] in 
 	let tn = List.map (fun (l,l') -> (create l,create l')) 
 	in
 	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
@@ -188,6 +207,13 @@ module DegreeNode =
 			
       let to_string u =
 	"["^(string_of_int u.id)^";"^(string_of_int (u.max_degree))^"]"
+			
+      let to_dot u i = 
+	let ref_node = string_of_int i in
+	ref_node^" [label=\""^(string_of_int (id u))^"\"]"					      
+
+      let dot_of_edge u i v j =
+	Printf.sprintf "%d->%d [dir = none]" i j
 
       let coh edges (w,x) =
 	let dw,dx =
@@ -214,20 +240,20 @@ module DegreeNode =
 	in
 	let square =
 	  [
-	    ([10;2],[11;2]) ;
-	    ([11;2],[12;3]) ;
-	    ([12;3],[13;3]) ;
-	    ([13;3],[10;2]) ;
+	    ([0;2],[1;2]) ;
+	    ([1;2],[2;3]) ;
+	    ([2;3],[3;3]) ;
+	    ([3;3],[0;2]) ;
 	  ]
 	in
 	let triangle =
 	  [
-	    ([20;3],[21;3]) ;
-	    ([21;3],[22;2]) ;
-	    ([20;3],[22;2])
+	    ([0;3],[1;3]) ;
+	    ([1;3],[2;2]) ;
+	    ([0;3],[2;2])
 	  ]
 	in
-	let one = [([100;3],[200;3])]
+	let one = [([0;3],[1;3])]
 	in 
 	let tn = List.map (fun (l,l') -> (create l,create l')) in
 	let lib0 = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in

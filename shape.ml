@@ -30,11 +30,18 @@ module Make (Node:Node.NodeType) =
 
 				     
     let generate_tests () =
-      let void = graph_of_library "empty" in
-      let two = graph_of_library "two" in
-      print_string "------- RULES ---------\n" ;
-      let model = Model.add_rule "0->2" (void,two) Model.empty in
-      let model = Model.add_rule "2->0" (two,void) model in
+      let one = graph_of_library "one" in
+      let house = graph_of_library "house" in
+      let square = graph_of_library "square" in
+      let ext1 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one house))) in
+      let ext2 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one square))) in
+      Printf.printf "adding sharing to: \n %s\n" (Cat.string_of_span (ext1,ext2)) ;
+      print_string (Cat.share (ext1,ext2)) ; 
+      print_newline () ;
+
+      (*let model = Model.add_rule "0->1" (void,one) Model.empty in
+      let model = Model.add_rule "1->house" (one,house) model in
+      let model = Model.add_rule "1->square" (house,square) model in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
 		     Model.add_obs name (graph_of_library name) model
@@ -42,7 +49,11 @@ module Make (Node:Node.NodeType) =
       in
       print_newline() ;
       Model.witnesses_of_model model ;
-			       (*
+      let one_to_square = Cat.extension_class (Cat.embed one square) in
+      let one_to_house = Cat.extension_class (Cat.embed one house) in
+      let share = Cat.share one_to_square one_to_house in
+      print_string share ; print_newline () ;*)
+	(*		       
       let nw,pw = Model.witnesses_of_model model in
       
       Lib.IntMap.iter (fun obs_id neglist ->

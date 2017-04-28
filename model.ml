@@ -28,8 +28,12 @@ module Make (Node:Node.NodeType) =
        name = id
       }
 
+
     let witnesses_of_model m =
-      let get_effects m = IMap.fold (fun id rule effects -> (effect_of_rule id rule)::effects) m.rules []
+      let get_effects m = IMap.fold 
+			    (fun id rule effects -> 
+			     (effect_of_rule id rule)::effects
+			    ) m.rules []
       in
       let enum_witnesses name id_emb obs =
 	let h_eps = id_emb.Cat.src in
@@ -42,7 +46,7 @@ module Make (Node:Node.NodeType) =
 	      let mpos = Cat.mpo (Cat.identity h_eps pi_eps,h_eps_to_w) in
 	      match mpos with
 		[] -> tiles (*Gluing is incompatible with pi_eps*)
-	      | [tile] -> (name,gluing_tile)::tiles (*should use [(sup,hom)] here to minimize exploration*)
+	      | [tile] -> (name,gluing_tile)::tiles (*should use [tile] here to minimize exploration*)
 	      | _ -> failwith "Invariant violation: mpo should have at most one element"
 	  ) [] (h_eps >< obs) 
       in
@@ -86,10 +90,20 @@ module Make (Node:Node.NodeType) =
 	(fun rule_id l ->
 	 List.iter
 	   (fun (obs_id,cospan) ->
-	    Printf.printf "%s --> %s is:\n %s\n"
+	    Printf.printf "%s -(-)-> %s is:\n %s\n"
 			  (name_of_id rule_id m)
 			  (name_of_id obs_id m)
 			  (Cat.string_of_co_span cospan)
 	   ) l ;
-	) neg_extensions
+	) neg_extensions ;
+      IMap.iter
+	(fun rule_id l ->
+	 List.iter
+	   (fun (obs_id,cospan) ->
+	    Printf.printf "%s -(+)-> %s is:\n %s\n"
+			  (name_of_id rule_id m)
+			  (name_of_id obs_id m)
+			  (Cat.string_of_co_span cospan)
+	   ) l ;
+	) pos_extensions
   end
