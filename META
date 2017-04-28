@@ -1,0 +1,5 @@
+name = "KappaLib"
+version = "0~dev"
+description = "Extention bases synthesis for rule based models"
+archive(byte) = "ExtentionBases.cma"
+archive(native) = "ExtentionBases.cmxa"

@@ -72,24 +72,3 @@ module Make (Node:Node.NodeType) =
 module SimpleShape = Make (Node.SimpleNode)
 module KappaShape = Make (Node.KappaNode) 
 module DegreeShape = Make (Node.DegreeNode)  
-			  
-let test =
-  print_string "[kappa|simple|degree]\n";
-  let input = read_line() in
-  match input with
-    "kappa" ->
-    begin
-      print_string "***** Kappa nodes ***** \n" ;
-      KappaShape.generate_tests() ;
-    end
-  | "simple" ->
-     begin
-       print_string "***** Simple nodes *****\n" ;
-       SimpleShape.generate_tests()
-     end
-  | "degree" ->
-     begin
-       print_string "***** Degree nodes ***** \n" ;
-       DegreeShape.generate_tests()
-     end
-  | _ -> failwith "Invalid argument"
