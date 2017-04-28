@@ -1,0 +1,16 @@
+opam-version: "1.2"
+name: "KaSim"
+version: "0~dev"
+maintainer: "Pierre Boutillier <pierre.boutillier@laposte.net>"
+authors: [ "Jean Krivine" ]
+license: "LGPL-3.0"
+homepage: "http://dev.executableknowledge.org/"
+bug-reports: "https://github.com/Kappa-Dev/ExtentionBases/issues"
+dev-repo: "https://github.com/Kappa-Dev/ExtentionBases.git"
+
+depends : [ "ocamlfind" ]
+
+build: [ [ make "all" ] ]
+
+install: [ [ make "libinstall" ] ]
+remove: [ [ "ocamlfind" "remove" "ExtentionBases" ] ]
