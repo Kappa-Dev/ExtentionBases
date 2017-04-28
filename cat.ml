@@ -431,7 +431,7 @@ module Make (Node:Node.NodeType) =
 	let compare_tile tile tile' = 
 	  let src = inf_of_tile tile in
 	  let src' = inf_of_tile tile' in
-	  compare (Graph.size_edge src') (Graph.size_edge src)
+	  compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
 	in
 	let gluings = glue emb.trg emb'.trg (Some span) in
 	let ordered_gluings =

@@ -33,8 +33,9 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
       let square = graph_of_library "square" in
+      let dsquare = graph_of_library "dsquare" in
       let ext1 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one house))) in
-      let ext2 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one square))) in
+      let ext2 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one dsquare))) in
       Printf.printf "adding sharing to: \n %s\n" (Cat.string_of_span (ext1,ext2)) ;
       print_string (Cat.share (ext1,ext2)) ; 
       print_newline () ;
