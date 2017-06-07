@@ -11,17 +11,17 @@ module Make (Node:Node.NodeType) =
     type effect = {neg : Cat.embeddings ; pos : Cat.embeddings ; name : int}
 
     let name_of_id id m = IMap.find id m.dict
-				    
+
     let add_rule name (l,r) m =
       let id = m.fresh in
       {rules = IMap.add id (l,r) m.rules ; obs = IMap.add id l m.obs ; dict = IMap.add id name m.dict ; fresh = m.fresh+1}
-	
+
     let add_obs name o m =
       let id = m.fresh in
       {m with obs = IMap.add id o m.obs ; dict = IMap.add id name m.dict ; fresh = m.fresh+1}
-	
+
     let empty = {rules = IMap.empty ; obs = IMap.empty ; dict = IMap.empty ; fresh = 0}
-		  
+
     let effect_of_rule id (l,r) =
       {neg = Cat.identity (Graph.minus l r) l ;
        pos = Cat.identity (Graph.minus r l) r ;
@@ -30,8 +30,8 @@ module Make (Node:Node.NodeType) =
 
 
     let witnesses_of_model m =
-      let get_effects m = IMap.fold 
-			    (fun id rule effects -> 
+      let get_effects m = IMap.fold
+			    (fun id rule effects ->
 			     (effect_of_rule id rule)::effects
 			    ) m.rules []
       in
@@ -48,7 +48,7 @@ module Make (Node:Node.NodeType) =
 		[] -> tiles (*Gluing is incompatible with pi_eps*)
 	      | [tile] -> (name,gluing_tile)::tiles (*should use [tile] here to minimize exploration*)
 	      | _ -> failwith "Invariant violation: mpo should have at most one element"
-	  ) [] (h_eps >< obs) 
+	  ) [] (h_eps >< obs)
       in
       let build_witnesses effects observables =
 	List.fold_left

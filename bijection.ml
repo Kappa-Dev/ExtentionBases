@@ -2,11 +2,11 @@ module Make (Content:Lib.OrderedType) =
   struct
     module CMap = Map.Make(Content)
     module CSet = Set.Make(Content)
-				
+
     type t = I of CSet.t | B of (Content.t CMap.t) * (Content.t CMap.t)
 
     exception Not_bijective of Content.t * Content.t * t
-												  
+
     let empty = I CSet.empty
 
     let identity clist = I (List.fold_left (fun set c -> CSet.add c set) CSet.empty clist)
@@ -20,7 +20,7 @@ module Make (Content:Lib.OrderedType) =
     let is_empty = function
 	I s -> CSet.is_empty s
       | _ -> false
-	       
+
     let cardinal = function
 	I s -> CSet.cardinal s
       | B (m,_) -> CMap.cardinal m
@@ -28,11 +28,11 @@ module Make (Content:Lib.OrderedType) =
     let is_identity = function
 	I _ -> true
       | B _ -> false
-      
+
     let fold f = function
-      	I dom -> CSet.fold (fun i cont -> f i i cont) dom 
+      	I dom -> CSet.fold (fun i cont -> f i i cont) dom
       | B (map,_) -> CMap.fold (fun i j cont -> f i j cont) map
-		  
+
     let mem i = function
 	I dom -> CSet.mem i dom
       | B (m,_) -> CMap.mem i m
@@ -48,9 +48,9 @@ module Make (Content:Lib.OrderedType) =
     let cofind i = function
 	I dom -> CSet.find i dom
       | B (_,m) -> CMap.find i m
-        
+
     let add i j bij =
-      let valid = 
+      let valid =
 	if mem i bij then
 	  try
 	    j = find i bij
@@ -59,7 +59,7 @@ module Make (Content:Lib.OrderedType) =
 	  not (comem j bij)
       in
       if not valid then raise (Not_bijective (i,j,bij))
-      else			 
+      else
 	match bij with
 	  I dom ->
 	  begin
@@ -77,7 +77,7 @@ module Make (Content:Lib.OrderedType) =
 
 
     let sum bij bij' = fold (fun i j bij_sum -> add i j bij_sum) bij bij'
-      
+
     let to_string = function
 	I dom ->
 	begin
@@ -92,7 +92,7 @@ module Make (Content:Lib.OrderedType) =
 			       (fun i j l -> ((Content.to_string i)^":"^(Content.to_string j))::l
 			       ) bij [])
 	     )^")"
-	
+
     let to_dot_label bij =
       "[ label=\""^(to_string bij)^"\"]"
   end

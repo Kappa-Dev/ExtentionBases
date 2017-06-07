@@ -4,16 +4,16 @@ module Make (Node:Node.NodeType) =
     module Graph = Graph.Make (Node)
 
     module NodeSet = Set.Make (Node)
-			      
-    exception Undefined		
+
+    exception Undefined
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
-	
-    let co_domains emb = 
+
+    let co_domains emb =
       List.fold_left
-	(fun co_domains hom -> 
+	(fun co_domains hom ->
 	 let cod =
-	   Graph.fold_edges 
+	   Graph.fold_edges
 	     (fun u v cod ->
 	      let (u',v') = Hom.find2 (u,v) hom in
 	      let cod = Graph.add_node u' (Graph.add_node v' cod) in
@@ -26,38 +26,38 @@ module Make (Node:Node.NodeType) =
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
 
-				   
+
     let sup_of_tile tile =
       match tile.cospan with
 	None -> None
       | Some (emb,_) -> Some emb.trg
 
-    let left_of_tile tile = 
+    let left_of_tile tile =
       let (emb,_) = tile.span in
       emb.trg
-	
-    let right_of_tile tile = 
+
+    let right_of_tile tile =
       let (_,emb') = tile.span in
       emb'.trg
-	
+
     let is_span emb1 emb2 =
       Graph.is_equal emb1.src emb2.src
-		     
+
     let is_co_span emb1 emb2 =
       Graph.is_equal emb1.trg emb2.trg
-		     
-    let string_of_embeddings emb = 
+
+    let string_of_embeddings emb =
       "\027[91m"^(String.concat " + " (List.map Hom.to_string emb.maps))^"\027[0m"
 
     let dot_of_embeddings emb =
       let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in
       let cluster1,ref_cluster1,_ = Graph.to_dot_cluster emb.trg 1 fresh in
-      let arrows = 
+      let arrows =
 	String.concat ";\n"
 		      (List.map (fun hom -> ref_cluster0^"->"^ref_cluster1^(Hom.to_dot_label hom)) emb.maps)
       in
       String.concat "\n" ["digraph G {\n";cluster0;cluster1;arrows;"}"]
-      
+
 
     let string_of_span (emb,emb') =
       assert (is_span emb emb') ;
@@ -65,7 +65,7 @@ module Make (Node:Node.NodeType) =
       let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
       str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''
-											  
+
 
     let string_of_co_span (emb,emb') =
       assert (is_co_span emb emb') ;
@@ -74,13 +74,13 @@ module Make (Node:Node.NodeType) =
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.src) in
       str'^"-"^(string_of_embeddings emb)^"->"^str^"<-"^(string_of_embeddings emb')^"-"^str''
 
-    let string_of_tile tile = 
+    let string_of_tile tile =
       match tile.cospan with
 	None -> (string_of_span tile.span)^"\n[NO_SUP]"
       | Some co_span ->
 	 (string_of_co_span co_span)^"\n"^(string_of_span tile.span)
-					    
-					    
+
+
     let (=>) g h =
       let rec extend hom_list iG jG acc =
 	match hom_list with
@@ -106,7 +106,7 @@ module Make (Node:Node.NodeType) =
 	     | Some jH ->
 		if Graph.has_edge iH jH h then extend tl iG jG (phi::acc)
 		else extend tl iG jG acc
-	   with Not_found -> failwith "Invariant violation" 
+	   with Not_found -> failwith "Invariant violation"
       in
       let rec explore_cc i hom_list already_done =
 	List.fold_left
@@ -116,19 +116,19 @@ module Make (Node:Node.NodeType) =
 	     (hom_list',already_done)
 	   else
 	     explore_cc j hom_list' (NodeSet.add j already_done)
-	  ) (hom_list,already_done) (Graph.bound_to i g) 
+	  ) (hom_list,already_done) (Graph.bound_to i g)
       in
       let extend_next_root u hom_list g h =
 	List.fold_left (fun hom_list hom ->
 			let fold_candidates_u =
 			  match Hom.id_image u hom with
 			    None -> (*if [Node.id u] is not yet constrained by [hom]*)
-			    (fun f -> Graph.fold_nodes f h) 
+			    (fun f -> Graph.fold_nodes f h)
 			  | Some i -> (*Looking for a candidate among those having [hom (Node.id u)] as id*)
-			     (fun f -> List.fold_right f (Graph.nodes_of_id i h)) 
+			     (fun f -> List.fold_right f (Graph.nodes_of_id i h))
 			in
 			let hom_extended_with_candidates_u =
-			  fold_candidates_u 
+			  fold_candidates_u
 			    (fun u' cont ->
 			     if (Graph.degree u g) <= (Graph.degree u' h) then
 			       try
@@ -137,7 +137,7 @@ module Make (Node:Node.NodeType) =
 				 Hom.Not_structure_preserving | Hom.Not_injective -> cont
 			     else
 			       cont
-				 
+
 			    ) []
 			in
 			hom_extended_with_candidates_u@hom_list
@@ -151,7 +151,7 @@ module Make (Node:Node.NodeType) =
 	 hom_list_extended
 	) [Hom.empty] cc_roots
 
-    let embed g h = 
+    let embed g h =
       match g=>h with
 	[] -> raise Undefined
       | maps -> {src = g ; trg = h ; maps = maps}
@@ -159,7 +159,7 @@ module Make (Node:Node.NodeType) =
     let identity g h =
       {src = g ; trg = h ; maps = [Hom.identity (Graph.nodes g)]}
 
-    let horizontal_compose emb emb' = 
+    let horizontal_compose emb emb' =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
@@ -179,14 +179,14 @@ module Make (Node:Node.NodeType) =
       else
 	let src = Graph.join emb.src emb'.src in
 	let trg = Graph.join emb.trg emb'.trg in
-	{src = src ; trg = trg ; maps = maps}	
+	{src = src ; trg = trg ; maps = maps}
 
     let vertical_compose emb emb' =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
-	   let hom_ext_list = 
-	     List.fold_left 
+	   let hom_ext_list =
+	     List.fold_left
 	       (fun maps hom' ->
 		try
 		  (Hom.compose hom hom')::maps
@@ -199,16 +199,16 @@ module Make (Node:Node.NodeType) =
       in
       if maps = [] then raise Undefined
       else
-	{src = emb.src ; 
-	 trg = emb'.trg ; 
+	{src = emb.src ;
+	 trg = emb'.trg ;
 	 maps = maps}
-      	  
+
 
     let eq_class matching emb auto =
       let close_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-		    assert (Hom.mem u hom') ; 
+		    assert (Hom.mem u hom') ;
 		    let v' = Hom.find u hom' in
 		    Hom.add v v' phi
 		   ) hom Hom.empty
@@ -218,14 +218,14 @@ module Make (Node:Node.NodeType) =
       let close_co_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-		    assert (Hom.comem v hom') ; 
+		    assert (Hom.comem v hom') ;
 		    let u' = Hom.cofind v hom' in
 		    Hom.add u u' phi
 		   ) hom Hom.empty
 	with
 	  Hom.Not_structure_preserving | Hom.Not_injective -> failwith "Invariant violation"
       in
-      let reduced_maps = 
+      let reduced_maps =
 	List.fold_left
 	  (fun quotient hom ->
 	   if List.exists (fun hom' ->
@@ -249,16 +249,16 @@ module Make (Node:Node.NodeType) =
       in
       assert (reduced_maps <> []) ;
       {emb with maps = reduced_maps}
-	
+
     let extension_class emb =
       let auto = (emb.trg => emb.trg) in
       eq_class false emb auto
-	       
+
     let matching_class emb =
       let auto = (emb.src => emb.src) in
       eq_class true emb auto
-	       
-    let flatten emb = 
+
+    let flatten emb =
       let src = emb.src in
       let trg = emb.trg in
       List.fold_left
@@ -301,19 +301,19 @@ module Make (Node:Node.NodeType) =
 	   (Graph.add_edge u' v' h',h_to_h',fresh)
 	  ) h (Graph.empty,Hom.empty,fresh)
       in
-      
+
       let h,g = emb_h.trg,emb_g.trg in
       let inf_gh = emb_h.src in
       let fresh = (max (Graph.max_id g) (Graph.max_id h)) + 1 in
       List.fold_left
 	(fun tiles to_h ->
-	 let mpos_for_h = 
+	 let mpos_for_h =
 	   List.fold_left
 	     (fun tiles to_g ->
 	      try
 		let g',g_to_g',fresh = rename fresh g (to_g,inf_gh,to_h,h) in
 		(*let h',h_to_h',_ = rename (-1) h (to_h,inf_gh,Hom.identity (Graph.nodes h),g) in*)
-		
+
 		let sup_gh = Graph.join h g' in
 		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [Hom.identity (Graph.nodes h)]} in
 		let emb_g_to_sup = {src = g ; trg = sup_gh ; maps = [g_to_g']} in
@@ -329,14 +329,14 @@ module Make (Node:Node.NodeType) =
 	 in
 	 mpos_for_h@tiles
 	) [] emb_h.maps
-    	
+
     let glue g h span_option =
       (*one_gluings: embeddings of one edge of h into g, partial_gluings: embeddings of n edges of h into g*)
       let rec enumerate_gluings one_gluings partial_gluings complete_gluings already_done =
 	match partial_gluings with
 	  [] -> complete_gluings
 	| (n_gluing)::tl ->
-	   let succ_n_gluings,complete_gluings',already_done' = 
+	   let succ_n_gluings,complete_gluings',already_done' =
 	     List.fold_left
 	       (fun (succ_n_gluings,complete_gluings,already_done) one_gluing ->
 		try
@@ -371,9 +371,9 @@ module Make (Node:Node.NodeType) =
 	    ) graph []
 	with
 	  Graph.Incoherent -> failwith "Invariant violation: graph is incoherent"
-      in 
-      let one_gluings = 
-	let cstr_edges = 
+      in
+      let one_gluings =
+	let cstr_edges =
 	  match span_option with
 	    None -> Graph.empty
 	  | Some (_,emb_to_g) ->
@@ -383,7 +383,7 @@ module Make (Node:Node.NodeType) =
 	in
 	List.fold_left
 	  (fun arr_list sub_g ->
-	   try 
+	   try
 	     let embeddings = embed sub_g h
 	     in
 	     embeddings::arr_list
@@ -395,7 +395,7 @@ module Make (Node:Node.NodeType) =
       let spans =
 	List.fold_left
 	  (fun spans inf_to_h ->
-	   let to_h = extension_class inf_to_h in 
+	   let to_h = extension_class inf_to_h in
 	   let to_g =  identity inf_to_h.src g in (*Asymmetry is important here because all subparts of g are added edges*)
 	   (to_h,to_g)::spans
 	  ) [] gluing_points
@@ -426,16 +426,16 @@ module Make (Node:Node.NodeType) =
 
     let (><) g h = glue g h None
 
-    let share = function 
-	(emb,emb') as span -> 
-	let compare_tile tile tile' = 
+    let share = function
+	(emb,emb') as span ->
+	let compare_tile tile tile' =
 	  let src = inf_of_tile tile in
 	  let src' = inf_of_tile tile' in
 	  compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
 	in
 	let gluings = glue emb.trg emb'.trg (Some span) in
 	let ordered_gluings =
-	  List.fast_sort compare_tile gluings 
+	  List.fast_sort compare_tile gluings
 	in
 	let rec cut = function
 	  [] | [_] as l -> l
@@ -444,5 +444,5 @@ module Make (Node:Node.NodeType) =
 	     else [tile]
 	in
 	String.concat "\n" (List.map string_of_tile (cut ordered_gluings))
-	
+
   end

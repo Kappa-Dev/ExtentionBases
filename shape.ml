@@ -4,7 +4,7 @@ module Make (Node:Node.NodeType) =
     module Cat = Cat.Make (Node)
     module Hom = Homomorphism.Make (Node)
     module Model = Model.Make (Node)
-		    
+
     let draw_line u v g =
       let g =
 	List.fold_left
@@ -19,7 +19,7 @@ module Make (Node:Node.NodeType) =
       | (u,v)::tl ->
 	 let g' = draw_line u v g in
 	 draw tl g'
-			      
+
 
     let graph_of_library name =
       try
@@ -28,7 +28,7 @@ module Make (Node:Node.NodeType) =
       with
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
-				     
+
     let generate_tests () =
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
@@ -37,7 +37,7 @@ module Make (Node:Node.NodeType) =
       let ext1 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one house))) in
       let ext2 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one dsquare))) in
       Printf.printf "adding sharing to: \n %s\n" (Cat.string_of_span (ext1,ext2)) ;
-      print_string (Cat.share (ext1,ext2)) ; 
+      print_string (Cat.share (ext1,ext2)) ;
       print_newline () ;
 
       (*let model = Model.add_rule "0->1" (void,one) Model.empty in
@@ -54,9 +54,9 @@ module Make (Node:Node.NodeType) =
       let one_to_house = Cat.extension_class (Cat.embed one house) in
       let share = Cat.share one_to_square one_to_house in
       print_string share ; print_newline () ;*)
-	(*		       
+	(*
       let nw,pw = Model.witnesses_of_model model in
-      
+
       Lib.IntMap.iter (fun obs_id neglist ->
 		       let obs_name = Model.name_of_id obs_id model
 		       in
@@ -78,9 +78,9 @@ module Make (Node:Node.NodeType) =
 				  print_newline() ;
 				 ) poslist ;
 		      ) pw ;*)
-      print_newline()        
+      print_newline()
   end
 
 module SimpleShape = Make (Node.SimpleNode)
-module KappaShape = Make (Node.KappaNode) 
-module DegreeShape = Make (Node.DegreeNode)  
+module KappaShape = Make (Node.KappaNode)
+module DegreeShape = Make (Node.DegreeNode)

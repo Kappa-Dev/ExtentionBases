@@ -1,7 +1,7 @@
 
 module Make (Node:Node.NodeType) =
   struct
-    
+
     exception Incoherent
 
     module NodeSet = Set.Make(struct type t = Node.t let compare = Node.compare end)
@@ -12,7 +12,7 @@ module Make (Node:Node.NodeType) =
        edges : (Node.t list) NodeMap.t ;
        idmap : (Node.t list) Lib.IntMap.t ;
        size : int }
-	       
+
     let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
 
     let equal_support g h =
@@ -29,11 +29,11 @@ module Make (Node:Node.NodeType) =
 	  ) h.idmap () ; true
       with
 	Pervasives.Exit -> false
-      
-    		  
-    let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []		 
+
+
+    let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []
     let nodes g = NodeSet.elements g.nodes
-									    
+
     let size_node g = NodeSet.cardinal g.nodes
     let size_edge g = g.size
 
@@ -47,7 +47,7 @@ module Make (Node:Node.NodeType) =
 	   ) cont bu
 	) g.edges cont
 
-	
+
     let fold_nodes f g cont =
       NodeSet.fold
 	(fun u cont ->
@@ -59,18 +59,18 @@ module Make (Node:Node.NodeType) =
     let has_edge u v g =
       let bu = bound_to u g in
       List.mem v bu
-	       
+
     let has_node u g = NodeSet.mem u g.nodes
-				   
+
     let add_node u g =
       if has_node u g then g
       else
-	let idmap' = 
+	let idmap' =
 	  let l = nodes_of_id (Node.id u) g in
 	  Lib.IntMap.add (Node.id u) (u::l) g.idmap
 	in
 	{g with nodes = NodeSet.add u g.nodes ; idmap = idmap'}
-	  
+
     let add_edge u v g =
       if has_edge u v g then g
       else
@@ -90,7 +90,7 @@ module Make (Node:Node.NodeType) =
 	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1}
 	else
 	  raise Incoherent
-		
+
     let meet g h =
       try
 	NodeMap.fold (fun u buG meet ->
@@ -101,22 +101,22 @@ module Make (Node:Node.NodeType) =
 					let meet = add_node u meet in
 					let meet = add_node v meet in
 					add_edge u v meet
-				       ) meet vGH 
+				       ) meet vGH
 		      with
 			Not_found -> meet
 		     ) g.edges empty
       with
 	Incoherent -> failwith "Invariant violation: meet operation is undefined"
-				    
+
     let join g h =
       NodeMap.fold
 	(fun u buG join ->
 	 List.fold_left
 	   (fun join v ->
 	    let join = add_node u join in
-	    let join = add_node v join in 
+	    let join = add_node v join in
 	    add_edge u v join
-	   ) join buG 
+	   ) join buG
 	) g.edges h
 
     let minus g h =
@@ -128,17 +128,17 @@ module Make (Node:Node.NodeType) =
 		let diff = add_node v diff in
 		try add_edge u v diff with Incoherent -> failwith "Invariant violation"
 	     ) g empty
-	   
+
     let max_id g =
       fold_nodes (fun u max -> if Node.id u > max then Node.id u else max) g 0
-		 
+
     let is_equal g h =
       if (size_node g = size_node h) && (size_edge g = size_edge h) then
 	(fold_nodes (fun u b -> b && (has_node u h)) g true) &&
 	  (fold_edges (fun u v b -> b && (has_edge u v h)) g true)
       else
-	false			
-	  
+	false
+
     let connected_components g =
       let ccmap,ccsize =
 	fold_nodes
@@ -153,27 +153,27 @@ module Make (Node:Node.NodeType) =
 	   let s_i = NodeMap.find rep_i ccsize in
 	   let rep_j = NodeMap.find j ccmap in
 	   let s_j = NodeMap.find rep_j ccsize in
-	   let mn_size,mn_rep,mx_size,mx_rep = 
+	   let mn_size,mn_rep,mx_size,mx_rep =
 	     if s_i < s_j then s_i,rep_i,s_j,rep_j else s_j,rep_j,s_i,rep_i in
 	   let ccsize' = NodeMap.add mx_rep (mn_size+mx_size+1) ccsize in
 	   let ccsize' = NodeMap.add mn_rep 0 ccsize' in
-	   let ccmap' = 
-	     NodeMap.fold 
+	   let ccmap' =
+	     NodeMap.fold
 	       (fun a b ccmap -> if b = mn_rep then NodeMap.add a mx_rep ccmap else ccmap
-	       ) ccmap ccmap 
+	       ) ccmap ccmap
 	   in
 	   (ccmap',ccsize')
 	  ) g (ccmap,ccsize)
       in
       let _,cc =
 	NodeMap.fold (fun u rep_u (visited,cc) ->
-		      if NodeSet.mem rep_u visited then (visited,cc) 
+		      if NodeSet.mem rep_u visited then (visited,cc)
 		      else
 			(NodeSet.add rep_u visited, u::cc)
 		     ) cc_map (NodeSet.empty,[])
       in
       cc
-	
+
     let subparts g =
       let rec enum edges subs =
 	match edges with
@@ -211,22 +211,22 @@ module Make (Node:Node.NodeType) =
 
     let to_dot_cluster g n fresh =
       let name = "cluster_"^(string_of_int n) in
-      let nodes,fresh,map = 
+      let nodes,fresh,map =
 	fold_nodes
 	  (fun u (cont,fresh,map) ->
-	   if Lib.IntMap.mem (Node.id u) map then (cont,fresh,map) 
+	   if Lib.IntMap.mem (Node.id u) map then (cont,fresh,map)
 	   else
 	     let i = fresh in
 	     let node_str = Node.to_dot u i in
-	     (node_str::cont,fresh+1,Lib.IntMap.add (Node.id u) i map) 
+	     (node_str::cont,fresh+1,Lib.IntMap.add (Node.id u) i map)
 	  ) g ([],fresh,Lib.IntMap.empty)
       in
       let nodes = String.concat "\n" nodes in
-      let edges = 
+      let edges =
 	String.concat "\n"
 		      (fold_edges
 			 (fun u v cont ->
-			  let edge_str = 
+			  let edge_str =
 			    let i = Lib.IntMap.find (Node.id u) map in
 			    let j = Lib.IntMap.find (Node.id v) map in
 			    Node.dot_of_edge u i v j
@@ -236,7 +236,7 @@ module Make (Node:Node.NodeType) =
 		      )
       in
       (Printf.sprintf "subgraph %s { \n %s \n %s \n }\n" name nodes edges,name,fresh)
-	  
-      
+
+
   end
-    
+
