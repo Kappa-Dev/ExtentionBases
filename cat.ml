@@ -9,19 +9,24 @@ module Make (Node:Node.NodeType) =
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
 
-    let co_domains emb =
+    let is_domain_identity emb =
+      List.for_all Hom.is_identity emb.maps
+
+    let images g emb =
       List.fold_left
-	(fun co_domains hom ->
-	 let cod =
+        (fun images hom ->
+         let im =
 	   Graph.fold_edges
 	     (fun u v cod ->
 	      let (u',v') = Hom.find2 (u,v) hom in
 	      let cod = Graph.add_node u' (Graph.add_node v' cod) in
 	      Graph.add_edge u' v' cod
-	     ) emb.src Graph.empty
+	     ) g Graph.empty
 	 in
-	 cod::co_domains
-	) [] emb.maps
+	 im::images
+        ) [] emb.maps
+
+    let co_domains emb = images emb.src emb
 
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
@@ -277,24 +282,24 @@ module Make (Node:Node.NodeType) =
 	       (u',Graph.add_node u' h',Hom.add u u' h_to_h',fresh)
 	     with
 	       Hom.Not_injective -> failwith "Invariant violation"
-	      | Not_found -> (*u is not in the inf*)
-		 begin
-		   try
-		     let i0 = Hom.cofind_sub (Node.id u) to_h in
-		     let j = Hom.find_sub i0 to_g in
-		     let u' = Node.rename j u in
-		     if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
-		     else
-		       (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		   with Not_found -> (*id u is not in the inf*)
-		     if fresh < 0 then
-		       (u,Graph.add_node u h', Hom.add u u h_to_h',fresh)
-		     else
-		       let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
-		       in
-		       let u' = Node.rename i u in
-		       (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		 end
+	     | Not_found -> (*u is not in the inf*)
+		begin
+		  try
+		    let i0 = Hom.cofind_sub (Node.id u) to_h in
+		    let j = Hom.find_sub i0 to_g in
+		    let u' = Node.rename j u in
+		    if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
+		    else
+		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		  with Not_found -> (*id u is not in the inf*)
+		    if fresh < 0 then
+		      (u,Graph.add_node u h', Hom.add u u h_to_h',fresh)
+		    else
+		      let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
+		      in
+		      let u' = Node.rename i u in
+		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
+		end
 	   in
 	   let (u',h',h_to_h',fresh) = map u h' h_to_h' fresh in
 	   let (v',h',h_to_h',fresh) = map v h' h_to_h' fresh in
@@ -426,7 +431,8 @@ module Make (Node:Node.NodeType) =
 
     let (><) g h = glue g h None
 
-    let share = function
+    (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
+    let share max = function
 	(emb,emb') as span ->
 	let compare_tile tile tile' =
 	  let src = inf_of_tile tile in
@@ -438,11 +444,12 @@ module Make (Node:Node.NodeType) =
 	  List.fast_sort compare_tile gluings
 	in
 	let rec cut = function
-	  [] | [_] as l -> l
-	  | tile::tile'::tl ->
-	     if (compare_tile tile tile') = 0 then tile::(cut (tile'::tl))
-	     else [tile]
+	    [] | [_] as l -> l
+	    | tile::tile'::tl ->
+	       if (compare_tile tile tile') = 0 then tile::(cut (tile'::tl))
+	       else [tile]
 	in
-	String.concat "\n" (List.map string_of_tile (cut ordered_gluings))
+	if max then cut ordered_gluings
+        else ordered_gluings
 
   end

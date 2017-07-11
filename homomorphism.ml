@@ -28,7 +28,6 @@ module Make (Node:Node.NodeType) =
       }
 
 
-
     let identity nodes =
       {tot = NodeBij.identity nodes ;
        sub = IntBij.identity (List.map Node.id nodes)

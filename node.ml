@@ -172,6 +172,15 @@ module KappaNode =
 	    ([3;1;0],[0;1;0])
 	  ]
 	in
+        let dsquare =
+	  [
+	    ([0;0;0],[1;0;0]) ;
+	    ([1;1;0],[2;1;0]) ;
+	    ([2;0;0],[3;0;0]) ;
+	    ([3;1;0],[0;1;0]) ;
+            ([3;2;0],[1;2;0]) ;
+	  ]
+	in
 	let triangle =
 	  [
 	    ([0;0;0],[1;0;0]) ;
@@ -186,6 +195,8 @@ module KappaNode =
 	let lib = Lib.StringMap.add "house" (tn house) lib
 	in
 	let lib = Lib.StringMap.add "square" (tn square) lib
+	in
+	let lib = Lib.StringMap.add "dsquare" (tn dsquare) lib
 	in
 	let lib = Lib.StringMap.add "one" (tn one) lib in
 	Lib.StringMap.add "triangle" (tn triangle) lib

@@ -34,50 +34,38 @@ module Make (Node:Node.NodeType) =
       let house = graph_of_library "house" in
       let square = graph_of_library "square" in
       let dsquare = graph_of_library "dsquare" in
-      let ext1 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one house))) in
-      let ext2 = List.hd (Cat.flatten (Cat.extension_class (Cat.embed one dsquare))) in
-      Printf.printf "adding sharing to: \n %s\n" (Cat.string_of_span (ext1,ext2)) ;
-      print_string (Cat.share (ext1,ext2)) ;
-      print_newline () ;
+      let model = Model.add_rule "1->house" (one,house) Model.empty in
+      let eff = Model.effect_of_rule 0 (one,house) in
+      Printf.printf "Negative effect of 1->house: %s\n" (match eff.Model.neg with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      Printf.printf "Positive effect of 1->house: %s\n" (match eff.Model.pos with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      let model = Model.add_rule "house->dsquare" (house,dsquare) model in
+      let eff = Model.effect_of_rule 0 (house,dsquare) in
+      Printf.printf "Negative effect of house->dsquare: %s\n" (match eff.Model.neg with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      Printf.printf "Positive effect of house->dsquare: %s\n" (match eff.Model.pos with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
 
-      (*let model = Model.add_rule "0->1" (void,one) Model.empty in
-      let model = Model.add_rule "1->house" (one,house) model in
-      let model = Model.add_rule "1->square" (house,square) model in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
 		     Model.add_obs name (graph_of_library name) model
 		    ) Node.library model
       in
       print_newline() ;
-      Model.witnesses_of_model model ;
-      let one_to_square = Cat.extension_class (Cat.embed one square) in
-      let one_to_house = Cat.extension_class (Cat.embed one house) in
-      let share = Cat.share one_to_square one_to_house in
-      print_string share ; print_newline () ;*)
-	(*
       let nw,pw = Model.witnesses_of_model model in
-
       Lib.IntMap.iter (fun obs_id neglist ->
 		       let obs_name = Model.name_of_id obs_id model
 		       in
-		       List.iter (fun (name_id,neg) ->
-				  let name = Model.name_of_id name_id model in
-				  print_string ("Negative witness for ** "^name^" |><| "^obs_name^" ** \n") ;
-				  print_string (Cat.string_of_tile neg) ;
-				  print_newline() ;
-				 ) neglist ;
+                       Printf.printf "observable %s has %d negative witnesses\n" obs_name (List.length neglist) ;
+                       let _ =
+		         List.fold_left (fun (prev_name,counter) (name_id,neg_effect) ->
+				         let name = Model.name_of_id name_id model in
+                                         if prev_name = name then
+                                           (prev_name,counter+1)
+                                         else
+                                           (Printf.printf "%d witnesses for %s\n" counter name ;
+                                            (name,1))
+				        ) ("",0) neglist
+                       in
+                       print_newline() ;
 		      ) nw ;
-      print_newline() ;
-      Lib.IntMap.iter (fun obs_id poslist ->
-		       let obs_name = Model.name_of_id obs_id model
-		       in
-		       List.iter (fun (name_id,pos) ->
-				  let name = Model.name_of_id name_id model in
-				  print_string ("Positive witness for ** "^name^" |><| "^obs_name^" ** \n") ;
-				  print_string (Cat.string_of_tile pos) ;
-				  print_newline() ;
-				 ) poslist ;
-		      ) pw ;*)
       print_newline()
   end
 

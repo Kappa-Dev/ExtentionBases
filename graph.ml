@@ -14,6 +14,7 @@ module Make (Node:Node.NodeType) =
        size : int }
 
     let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
+    let is_empty g = g.size = 0
 
     let equal_support g h =
       try
