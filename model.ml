@@ -46,17 +46,20 @@ module Make (Node:Node.NodeType) =
 	  (fun tiles gluing_tile ->
 	   match gluing_tile.Cat.cospan with
 	     None -> tiles
-	   | Some (_,pi_eps_to_w) ->
-              assert (List.tl (pi_eps_to_w.Cat.maps) = []) ;
-              let h_eps' = List.hd (Cat.images h_eps pi_eps_to_w) in
-	      let witness = pi_eps_to_w.Cat.trg in
+	   | Some (_,h_eps_to_w) ->
+              assert (List.tl (h_eps_to_w.Cat.maps) = []) ;
 
-              (*Checking that h_eps' is included in the witness*)
-              if Graph.is_included h_eps' witness then
-                (obs_name,gluing_tile)::tiles
-              else
-                tiles
-	  ) [] (pi_eps >< obs)
+              (*Checking that w and pi_eps have a sup.*)
+              if Cat.mpo (h_eps_to_w,id_emb) = [] then tiles
+              else (obs_name,gluing_tile)::tiles
+          (*
+            (*Checking that h_eps' is included in the witness*)
+            if Graph.is_included h_eps' witness then
+            (obs_name,gluing_tile)::tiles
+            else
+            tiles
+           *)
+	  ) [] (h_eps >< obs)
       in
       let build_witnesses effects observables =
 	List.fold_left
