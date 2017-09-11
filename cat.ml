@@ -52,7 +52,7 @@ module Make (Node:Node.NodeType) =
       Graph.is_equal emb1.trg emb2.trg
 
     let string_of_embeddings emb =
-      "\027[91m"^(String.concat " + " (List.map Hom.to_string emb.maps))^"\027[0m"
+      Lib.InOut.red (String.concat "+" (List.map Hom.to_string emb.maps))
 
     let dot_of_embeddings emb =
       let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in

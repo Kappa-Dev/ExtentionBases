@@ -32,16 +32,17 @@ module Make (Node:Node.NodeType) =
     let generate_tests () =
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
-      let square = graph_of_library "square" in
       let dsquare = graph_of_library "dsquare" in
-      let model = Model.add_rule "1->house" (one,house) Model.empty in
-      let eff = Model.effect_of_rule 0 (one,house) in
-      Printf.printf "Negative effect of 1->house: %s\n" (match eff.Model.neg with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
-      Printf.printf "Positive effect of 1->house: %s\n" (match eff.Model.pos with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      let model = Model.add_rule "one->house" (one,house) Model.empty in
+      let eff_oh = Model.effect_of_rule (one,house) in
+      Printf.printf "Negative effect of one->house: %s\n" (match eff_oh.Model.neg with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      Printf.printf "Positive effect of one->house: %s\n" (match eff_oh.Model.pos with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+
       let model = Model.add_rule "house->dsquare" (house,dsquare) model in
-      let eff = Model.effect_of_rule 0 (house,dsquare) in
-      Printf.printf "Negative effect of house->dsquare: %s\n" (match eff.Model.neg with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
-      Printf.printf "Positive effect of house->dsquare: %s\n" (match eff.Model.pos with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      let eff_hd = Model.effect_of_rule (house,dsquare) in
+
+      Printf.printf "Negative effect of house->dsquare: %s\n" (match eff_hd.Model.neg with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
+      Printf.printf "Positive effect of house->dsquare: %s\n" (match eff_hd.Model.pos with None -> "none" | Some emb -> Cat.string_of_embeddings emb) ;
 
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
@@ -50,23 +51,25 @@ module Make (Node:Node.NodeType) =
       in
       print_newline() ;
       let nw,pw = Model.witnesses_of_model model in
-      Lib.IntMap.iter (fun obs_id neglist ->
-		       let obs_name = Model.name_of_id obs_id model
+      Lib.IntMap.iter (fun r_id pos_map ->
+		       let rule_name = Lib.Dict.to_name r_id model.Model.dict
 		       in
-                       Printf.printf "observable %s has %d negative witnesses\n" obs_name (List.length neglist) ;
-                       let _ =
-		         List.fold_left (fun (prev_name,counter) (name_id,neg_effect) ->
-				         let name = Model.name_of_id name_id model in
-                                         if prev_name = name then
-                                           (prev_name,counter+1)
-                                         else
-                                           (Printf.printf "%d witnesses for %s\n" counter name ;
-                                            (name,1))
-				        ) ("",0) neglist
-                       in
-                       print_newline() ;
+                       Lib.IntMap.iter
+                         (fun obs_id l ->
+                          Printf.printf "Rule %s has %d positive witnesse(s) for observable %s\n" rule_name (List.length l) (Lib.Dict.to_name obs_id model.Model.dict)
+                         ) pos_map ;
+		      ) pw ;
+      print_newline() ;
+      Lib.IntMap.iter (fun r_id neg_map ->
+		       let rule_name = Lib.Dict.to_name r_id model.Model.dict
+		       in
+                       Lib.IntMap.iter
+                         (fun obs_id l ->
+                          Printf.printf "Rule %s has %d negative witnesse(s) for observable %s\n" rule_name (List.length l) (Lib.Dict.to_name obs_id model.Model.dict)
+                         ) neg_map ;
 		      ) nw ;
       print_newline()
+
   end
 
 module SimpleShape = Make (Node.SimpleNode)

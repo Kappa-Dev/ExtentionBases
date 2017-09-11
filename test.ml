@@ -1,6 +1,6 @@
 let test =
-  print_string "[kappa|simple|degree]\n";
-  let input = read_line() in
+  let input = Lib.InOut.ask_until "[kappa|simple|degree]\n" (function "kappa"|"simple"|"degree" -> true | _ -> false)
+  in
   match input with
     "kappa" ->
     begin
