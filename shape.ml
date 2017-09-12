@@ -65,7 +65,8 @@ module Make (Node:Node.NodeType) =
 		       in
                        Lib.IntMap.iter
                          (fun obs_id l ->
-                          Printf.printf "Rule %s has %d negative witnesse(s) for observable %s\n" rule_name (List.length l) (Lib.Dict.to_name obs_id model.Model.dict)
+                          Printf.printf "Rule %s has %d negative witnesse(s) for observable %s\n" rule_name (List.length l) (Lib.Dict.to_name obs_id model.Model.dict) ;
+                          List.iter (fun cospan -> Printf.printf "%s\n" (Cat.string_of_co_span cospan)) l ;
                          ) neg_map ;
 		      ) nw ;
       print_newline()

@@ -31,6 +31,7 @@ module Make (Node:Node.NodeType) =
        pos = minus r l
       }
 
+    (** witnesses_of_model : model -> (r_id -> obs_id -> cospan list) where the [cospan] is always the identity for obs_id*)
     let witnesses_of_model m =
       let get_effects m = Lib.IntMap.fold
 			    (fun id rule effects ->

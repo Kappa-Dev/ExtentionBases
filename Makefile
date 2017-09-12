@@ -1,4 +1,4 @@
-SOURCES := lib.ml bijection.ml node.ml graph.ml homomorphism.ml cat.ml model.ml shape.ml
+SOURCES := lib.ml bijection.ml node.ml graph.ml homomorphism.ml cat.ml model.ml shape.ml basis.ml test.ml
 RESULT := ExtentionBases
 LIBINSTALL_FILES := $(RESULT).cma $(RESULT).cmxa $(RESULT).a $(SOURCES:.ml=.cmi) $(SOURCES:.ml=.cmx)
 
