@@ -69,7 +69,11 @@ module Make (Node:Node.NodeType) =
                           List.iter (fun cospan -> Printf.printf "%s\n" (Cat.string_of_co_span cospan)) l ;
                          ) neg_map ;
 		      ) nw ;
-      print_newline()
+      print_newline() ;
+      let emb = List.hd (Cat.flatten (Cat.embed one house)) in
+      let emb' = List.hd (Cat.flatten (Cat.embed one dsquare)) in
+      let (emb,tile) = List.hd (Cat.share true (emb,emb')) in
+      Printf.printf "Sharing one->house one->dsquare: \n %s \n %s\n" (Cat.string_of_embeddings emb) (Cat.string_of_tile tile);
 
   end
 

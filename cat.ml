@@ -443,13 +443,15 @@ module Make (Node:Node.NodeType) =
 	let ordered_gluings =
 	  List.fast_sort compare_tile gluings
 	in
+        let sharings = List.map (fun tile -> ({emb' with trg = inf_of_tile tile},tile)) ordered_gluings
+        in
 	let rec cut = function
 	    [] | [_] as l -> l
-	    | tile::tile'::tl ->
-	       if (compare_tile tile tile') = 0 then tile::(cut (tile'::tl))
-	       else [tile]
+	    | (emb,tile)::(emb',tile')::tl ->
+	       if (compare_tile tile tile') = 0 then ((emb,tile)::(cut ((emb',tile')::tl)))
+	       else [(emb,tile)]
 	in
-	if max then cut ordered_gluings
-        else ordered_gluings
+	if max then cut sharings
+        else sharings
 
   end
