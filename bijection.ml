@@ -9,6 +9,10 @@ module Make (Content:Lib.OrderedType) =
 
     let empty = I CSet.empty
 
+    let invert = function
+        I s -> I s
+      | B (m,m') -> B (m',m)
+
     let identity clist = I (List.fold_left (fun set c -> CSet.add c set) CSet.empty clist)
 
     let is_equal f bij bij' =

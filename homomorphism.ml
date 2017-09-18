@@ -27,6 +27,9 @@ module Make (Node:Node.NodeType) =
        sub = IntBij.empty
       }
 
+    let invert hom =
+      {tot = NodeBij.invert hom.tot ;
+       sub = IntBij.invert hom.sub}
 
     let identity nodes =
       {tot = NodeBij.identity nodes ;
@@ -86,9 +89,10 @@ module Make (Node:Node.NodeType) =
 
     let fold f hom = NodeBij.fold (fun u v cont -> f u v cont) hom.tot
 
+    (*[compose h h'] = (h o h') *)
     let compose hom hom' =
       try
-	fold (fun u v hom'' -> add u (find v hom') hom'') hom empty
+	fold (fun u v hom'' -> add u (find v hom) hom'') hom' empty
       with
 	Not_found -> raise Not_injective
 

@@ -454,4 +454,9 @@ module Make (Node:Node.NodeType) =
 	if max then cut sharings
         else sharings
 
+    let is_iso emb =
+      List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)
+
+    let invert emb =
+      {src = emb.trg ; trg = emb.src ; maps = List.map Hom.invert emb.maps}
   end
