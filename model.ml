@@ -14,6 +14,9 @@ module Make (Node:Node.NodeType) =
       let dict = Lib.Dict.add id name dict in
       {rules = Lib.IntMap.add id (l,r) m.rules ; obs = Lib.IntMap.add id l m.obs ; dict = dict}
 
+    let get_rule id m = Lib.IntMap.find id m.rules
+    let get_obs id m = Lib.IntMap.find id m.obs
+
     let add_obs name o m =
       let id,dict = Lib.Dict.fresh m.dict in
       let dict = Lib.Dict.add id name dict in

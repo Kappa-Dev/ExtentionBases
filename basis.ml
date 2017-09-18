@@ -61,7 +61,21 @@ module Make (Node:Node.NodeType) =
       in
       propagate (get_point i ext_base).prev Lib.IntSet.empty ext_base
 
-    let insert i span obs_emb ext_base =
+    let simple_insert wit_emb obs_emb ext_base =
+      let p = {value = wit_emb.Cat.trg ;
+               next = [] ;
+               prev = [0] ;
+               obs = Some obs_emb ;
+               conflict = Lib.IntSet.empty ;
+               witnesses = Lib.IntSet.empty}
+      in
+      let ext_base,i = add_point p ext_base in
+      let p0 = get_point 0 ext_base in
+      (*Costly assertion, to be removed*)
+      assert (Graph.is_equal p0.value wit_emb.Cat.src) ;
+      replace_point 0 {p0 with witnesses = Lib.IntSet.add i p0.witnesses ; next = (get_hom wit_emb,i)::p0.next} ext_base
+
+    let share_insert i span obs_emb ext_base =
       (*Costly assertion, to be removed*)
       assert (
           let p = get_point i ext_base in
