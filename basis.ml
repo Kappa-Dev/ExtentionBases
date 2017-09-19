@@ -3,42 +3,47 @@ module Make (Node:Node.NodeType) =
     module Hom = Homomorphism.Make (Node)
     module Graph = Graph.Make (Node)
     module Cat = Cat.Make (Node)
+    open Lib.Util
 
     type point = {value : Graph.t ;
-                  next : (Hom.t * int) list ;
+                  next : Hom.t Lib.IntMap.t ;
                   prev : int list ;
-                  obs : Cat.embeddings option ;
+                  obs : (Cat.embeddings*int) option ;
                   conflict : Lib.IntSet.t ;
                   witnesses : Lib.IntSet.t}
 
     type param = {min : int ; deep : bool ; unique: bool}
 
-    type t = {points : point Lib.IntMap.t ; size : int ; sharing : param}
+    type t = {points : point Lib.IntMap.t ; size : int ; sharing : param ; leafs : Lib.IntSet.t}
 
-    let add_point p ext_base =
+    let add p ext_base =
       ({ext_base with points = Lib.IntMap.add ext_base.size p ext_base.points ;
-                     size = ext_base.size+1},ext_base.size-1)
+                      leafs = Lib.IntSet.add ext_base.size ext_base.leafs ;
+                      size = ext_base.size+1
+       },ext_base.size-1)
 
-    let replace_point i p ext_base =
+
+    let replace i p ext_base =
       assert (Lib.IntMap.mem i ext_base.points) ;
       {ext_base with points = Lib.IntMap.add i p ext_base.points}
 
-    let init h_eps min deep unique =
-      let p0 = {value = h_eps ;
-                next = [] ;
-                prev = [] ;
-                obs = None ;
-                conflict = Lib.IntSet.empty ;
-                witnesses = Lib.IntSet.empty}
-      in
-      {points = Lib.IntMap.add 0 p0 Lib.IntMap.empty ; size = 1 ; sharing = {min = min ; deep = deep ; unique = unique}}
+    let mem i ext_base = Lib.IntMap.mem i ext_base.points
 
-    let get_point i ext_base = Lib.IntMap.find i ext_base.points
+    let empty ?(min = 1) ?(deep=false) ?(unique=true) =
+      assert (min>0) ;
+      {points = Lib.IntMap.empty ;
+       size = 0 ;
+       sharing = {min = min ; deep = deep ; unique = unique} ;
+       leafs = Lib.IntSet.empty}
+
+    let is_empty ext_base = ext_base.size = 0
+
+    let find i ext_base = Lib.IntMap.find i ext_base.points
 
     let to_emb i f j ext_base =
       try
-        let iG = (get_point i ext_base).value in
-        let jG = (get_point j ext_base).value in
+        let iG = (find i ext_base).value in
+        let jG = (find j ext_base).value in
         {Cat.src = iG ; Cat.trg = jG ; Cat.maps = [f]}
       with Not_found -> failwith "Unkown point identifier"
 
@@ -56,40 +61,33 @@ module Make (Node:Node.NodeType) =
       | j::tl ->
          if Lib.IntSet.mem j updated then propagate tl updated ext_base
          else
-         let p = get_point j ext_base in
-         propagate (p.prev@tl) (Lib.IntSet.add j updated) (replace_point j {p with witnesses = Lib.IntSet.add i p.witnesses} ext_base)
+         let p = find j ext_base in
+         propagate (p.prev@tl) (Lib.IntSet.add j updated) (replace j {p with witnesses = Lib.IntSet.add i p.witnesses} ext_base)
       in
-      propagate (get_point i ext_base).prev Lib.IntSet.empty ext_base
+      propagate (find i ext_base).prev Lib.IntSet.empty ext_base
 
-    let simple_insert wit_emb obs_emb ext_base =
-      let p = {value = wit_emb.Cat.trg ;
-               next = [] ;
-               prev = [0] ;
-               obs = Some obs_emb ;
-               conflict = Lib.IntSet.empty ;
-               witnesses = Lib.IntSet.empty}
+    let share_insert i wit_emb id_obs obs_emb ext_base =
+      if not (mem i ext_base) then
+        failwith ("Unkown point "^(string_of_int i)^" in extension base")
+      else
+      let p0 = find 0 ext_base in
+      let p = find i ext_base in
+      let emb_to_i =
+        try {Cat.src = p0.value ; Cat.trg = p.value ; Cat.maps = [Lib.IntMap.find i p0.next]}
+        with Not_found ->
+          if i=0 then Cat.identity p0.value p0.value
+          else failwith "Trying to compare a witness with an unkown point"
       in
-      let ext_base,i = add_point p ext_base in
-      let p0 = get_point 0 ext_base in
-      (*Costly assertion, to be removed*)
-      assert (Graph.is_equal p0.value wit_emb.Cat.src) ;
-      replace_point 0 {p0 with witnesses = Lib.IntSet.add i p0.witnesses ; next = (get_hom wit_emb,i)::p0.next} ext_base
-
-    let share_insert i span obs_emb ext_base =
-      (*Costly assertion, to be removed*)
-      assert (
-          let p = get_point i ext_base in
-          let emb = (fun (f,_) -> f) span in Graph.is_equal emb.Cat.trg p.value
-        );
+      let span = (emb_to_i,wit_emb) in
       match Cat.share ext_base.sharing.unique span with
-        [] -> (ext_base,Lib.IntSet.empty)
+        [] -> ext_base
       | (emb_sharing,_)::_ as sharings ->
          let n_trg = Graph.size_edge emb_sharing.Cat.trg in
          let n_src = Graph.size_edge emb_sharing.Cat.src in
-         (*if computed sharing is interesting enough*)
-         if n_trg - n_src >= ext_base.sharing.min then
+         (*if computed sharing is interesting enough --it has to be if comparing with the root of the EB*)
+         if i=0 || n_trg - n_src >= ext_base.sharing.min then
            List.fold_left
-             (fun (ext_base,midpoints) (emb_s,tile_s) ->
+             (fun ext_base (emb_s,tile_s) ->
               let sh_left,sh_right = tile_s.Cat.span in
               let iso_left = Cat.is_iso sh_left in
               let iso_right = Cat.is_iso sh_right in
@@ -100,38 +98,41 @@ module Make (Node:Node.NodeType) =
                 if iso_right then
                   let obs_emb' = (sh_left @@ (Cat.invert sh_right)) @@ obs_emb
                   in
-                  let p = {(get_point i ext_base) with obs = Some obs_emb'} in
-                  let ext_base = replace_point i p ext_base in
+                  let ext_base = replace i {p with obs = Some (obs_emb',id_obs)} ext_base in
 
                   (*sons of i should know that i is a now the id of a witness*)
                   let ext_base = update_witnesses i ext_base in
-                  (ext_base,midpoints)
+                  ext_base
                 else (*Iso left but not iso right*)
-                  let w = {value = obs_emb.Cat.trg ; next = [] ;
+                  let w = {value = obs_emb.Cat.trg ; next = Lib.IntMap.empty ;
                            prev = [i] ;
-                           obs = Some obs_emb ;
+                           obs = Some (obs_emb,id_obs) ;
                            conflict = Lib.IntSet.empty ;
                            witnesses = Lib.IntSet.empty}
                   in
-                  let p = get_point i ext_base in
+                  let p = find i ext_base in
                   let hom_p_w = get_hom (sh_right @@ (Cat.invert sh_left)) in
-                  let ext_base,j = add_point w ext_base in
-                  (replace_point i {p with next = (hom_p_w,j)::p.next ; witnesses = Lib.IntSet.add j p.witnesses} ext_base, midpoints)
+                  let ext_base,j = add w ext_base in
+                  let ext_base = replace 0 {p0 with next = Lib.IntMap.add j (get_hom wit_emb) p0.next} ext_base in
+                  let ext_base = {ext_base with leafs = Lib.IntSet.add j (Lib.IntSet.remove i ext_base.leafs)}
+                  in
+                  replace i {p with next = Lib.IntMap.add j hom_p_w p.next ; witnesses = Lib.IntSet.add j p.witnesses} ext_base
               else (*not iso left*)
                 if iso_right then (*but iso right*)
-                  let p = get_point i ext_base in
+                  let p = find i ext_base in
                   let hom_w_p = get_hom (sh_left @@ (Cat.invert sh_right)) in
                   let w = {value = obs_emb.Cat.trg ;
-                           next = [(hom_w_p,i)] ;
+                           next = Lib.IntMap.add i hom_w_p Lib.IntMap.empty ;
                            prev = [0] ;
-                           obs = Some obs_emb ;
+                           obs = Some (obs_emb,id_obs) ;
                            conflict = Lib.IntSet.empty ;
                            witnesses = p.witnesses}
                   in
-                  let ext_base,j = add_point w ext_base in
+                  let ext_base,j = add w ext_base in
+                  let ext_base = {ext_base with leafs = Lib.IntSet.add j (Lib.IntSet.remove i ext_base.leafs)} in
                   let hom_p0_w = get_hom ((fun (_,g) -> g) span) in
-                  let p0 = get_point 0 ext_base in
-                  (replace_point 0 {p0 with next = (hom_p0_w,j)::p0.next ; witnesses = Lib.IntSet.add j p0.witnesses} ext_base, midpoints)
+                  let p0 = find 0 ext_base in
+                  replace 0 {p0 with next = Lib.IntMap.add j hom_p0_w p0.next ; witnesses = Lib.IntSet.add j p0.witnesses} ext_base
                 else (*neither iso right nor left*)
                   let conflict_w =
                     match tile_s.Cat.cospan with
@@ -139,39 +140,64 @@ module Make (Node:Node.NodeType) =
                     | Some _ -> Lib.IntSet.empty
                   in
                   let w = {value = obs_emb.Cat.trg ;
-                           next = [] ;
+                           next = Lib.IntMap.empty ;
                            prev = [] ;
-                           obs = Some obs_emb ;
+                           obs = Some (obs_emb,id_obs) ;
                            conflict = conflict_w ;
                            witnesses = Lib.IntSet.empty}
                   in
-                  let ext_base,j = add_point w ext_base in
-                  let p = get_point i ext_base in
+                  let ext_base,j = add w ext_base in
+                  let ext_base = replace 0 {p0 with next = Lib.IntMap.add j (get_hom wit_emb) p0.next} ext_base in
+                  let ext_base = {ext_base with leafs = Lib.IntSet.add j (Lib.IntSet.remove i ext_base.leafs)} in
+                  let p = find i ext_base in
                   let ext_base =
                     if Lib.IntSet.is_empty conflict_w then ext_base
                     else
-                      replace_point i {p with conflict = Lib.IntSet.add j p.conflict} ext_base
+                      replace i {p with conflict = Lib.IntSet.add j p.conflict} ext_base
                   in
                   let hom_mp_p = get_hom sh_left in
                   let hom_mp_w = get_hom sh_right in
                   let mp = {value = emb_s.Cat.src ;
-                            next = [(hom_mp_p,i);(hom_mp_w,j)] ;
+                            next = Lib.IntMap.add  i hom_mp_p (Lib.IntMap.add j hom_mp_w Lib.IntMap.empty) ;
                             prev = [0];
                             witnesses = Lib.IntSet.add j p.witnesses ;
                             conflict = Lib.IntSet.empty ;
                             obs = None
                            }
                   in
-                  let ext_base,k = add_point mp ext_base in
-                  let ext_base = replace_point j {w with prev = [k]} (replace_point i {p with prev = k::p.prev} ext_base)
+                  let ext_base,k = add mp ext_base in
+                  let ext_base = replace j {w with prev = [k]} (replace i {p with prev = k::p.prev} ext_base)
                   in
                   let hom_p0_mp = get_hom emb_s in
-                  let p0 = get_point 0 ext_base in
-                  let ext_base = replace_point 0 {p0 with next = (hom_p0_mp,k)::p0.next; witnesses = Lib.IntSet.add j p0.witnesses } ext_base in
-                  (ext_base, Lib.IntSet.add k midpoints)
-             ) (ext_base,Lib.IntSet.empty) sharings
+                  let p0 = find 0 ext_base in
+                  replace 0 {p0 with next = Lib.IntMap.add k hom_p0_mp p0.next; witnesses = Lib.IntSet.add j p0.witnesses } ext_base
+             ) ext_base sharings
          else (*sharing is not worth adding to the extension base*)
-           (ext_base,Lib.IntSet.empty)
+           ext_base
+
+    let insert id_obs tile ext_base =
+      let rec deep_insert ext_base = function
+          [] -> ext_base
+        | i::tl ->
+           match tile.Cat.cospan with
+             None -> failwith "Witness tile is incomplete"
+           | Some (obs_emb,wit_emb) ->
+              deep_insert (share_insert i wit_emb id_obs obs_emb ext_base) tl
+
+      let ext_base =
+        if is_empty ext_base then
+          let p0 = {value = Cat.right_of_tile tile;
+                    next = Lib.IntMap.empty ;
+                    prev = [];
+                    obs = None;
+                    conflict = Lib.IntSet.empty;
+                    witnesses = Lib.IntSet.empty
+                   }
+          in
+          proj_left (add p0 ext_base)
+        else
+          ext_base
+      in
 
     let to_dot ext_base =
       let l =
@@ -180,10 +206,10 @@ module Make (Node:Node.NodeType) =
            let str = Printf.sprintf "%d [label=\"{%s}\"];" i (String.concat "," (Lib.IntSet.fold (fun i cont -> string_of_int i::cont) p.witnesses [])) in
            let str2 =
              String.concat "\n"
-                           (List.fold_left
-                              (fun dot_string (_,j) ->
+                           (Lib.IntMap.fold
+                              (fun j _ dot_string ->
                                (Printf.sprintf "%d -> %d ;" i j)::dot_string
-                              ) [] p.next)
+                              ) p.next [])
            in
            (str^str2)::dot_string
           ) ext_base.points []

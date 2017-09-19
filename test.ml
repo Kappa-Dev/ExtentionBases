@@ -1,5 +1,7 @@
+open Lib.Util
+
 let test =
-  let input = Lib.InOut.ask_until "[kappa|simple|degree]\n" (function "kappa"|"simple"|"degree" -> true | _ -> false)
+  let input = ask_until "[kappa|simple|degree]\n" (function "kappa"|"simple"|"degree" -> true | _ -> false)
   in
   match input with
     "kappa" ->

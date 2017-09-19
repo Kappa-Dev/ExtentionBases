@@ -4,6 +4,7 @@ module Make (Node:Node.NodeType) =
     module Graph = Graph.Make (Node)
 
     module NodeSet = Set.Make (Node)
+    open Lib.Util
 
     exception Undefined
     type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
@@ -52,7 +53,7 @@ module Make (Node:Node.NodeType) =
       Graph.is_equal emb1.trg emb2.trg
 
     let string_of_embeddings emb =
-      Lib.InOut.red (String.concat "+" (List.map Hom.to_string emb.maps))
+      red (String.concat "+" (List.map Hom.to_string emb.maps))
 
     let dot_of_embeddings emb =
       let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in

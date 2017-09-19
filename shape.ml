@@ -44,8 +44,10 @@ module Make (Node:Node.NodeType) =
 		     Model.add_obs name (graph_of_library name) model
 		    ) Node.library model
       in
-      let nw,pw = Model.witnesses_of_model model in
+      let nw,pw = Model.witnesses_of_rule (house,dsquare) model in
+      (*let pos_ext_base = Basis.create (house,dsquare) pw in*)
       ()
+
       (*
       Lib.IntMap.fold
         (fun r_id witMap ext_basis ->
