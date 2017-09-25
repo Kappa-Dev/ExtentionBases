@@ -32,12 +32,16 @@ module Make (Node:Node.NodeType) =
 
 
     let generate_tests () =
+      Printexc.record_backtrace true ;
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
       let dsquare = graph_of_library "dsquare" in
-      let model = Model.add_rule "one->house" (one,house) Model.empty in
+      let square = graph_of_library "square" in
 
+      let model = Model.add_rule "one->house" (one,house) Model.empty in
       let model = Model.add_rule "house->dsquare" (house,dsquare) model in
+      let model = Model.add_rule "square->dsquare" (square,dsquare) model in
+      let model = Model.add_rule "house->one" (house,one) model in
 
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
@@ -45,33 +49,22 @@ module Make (Node:Node.NodeType) =
 		    ) Node.library model
       in
       let nw,pw = Model.witnesses_of_rule (house,dsquare) model in
-      (*let pos_ext_base = Basis.create (house,dsquare) pw in*)
-      ()
-
-      (*
-      Lib.IntMap.fold
-        (fun r_id witMap ext_basis ->
-         let r = Model.get_rule r_id model in
-         let eff = Model.effect_of_rule r in
-         let init_eb = function
-             None -> None
-           | Some emb -> Some EB.init emb.src 0 false true
-         in
-         let pos_ext_b = init_eb eff.Model.pos in
-         let neg_ext_b = init_eb eff.Model.neg in
-         match pos_ext_b with
-           None -> None
-         | Some ext_base ->
-            let witnesses = Lib.IntMap.find r_id pw in
-            let ext_base =
-              Lib.IntMap.fold
-                (fun obs_id cospans ext_base ->
-                 ...
-                ) witnesses ext_base
-            in
-            Lib.IntMap.add r_id ext_base ext_basis
-        ) nw Lib.IntMap.empty
-       *)
+      let neg_ext_base = List.fold_left
+                           (fun ext_base (id_obs,tile) ->
+                             EB.insert id_obs tile ext_base
+                           ) (EB.empty 1) nw
+      in
+      let pos_ext_base = List.fold_left
+                           (fun ext_base (id_obs,tile) ->
+                             EB.insert id_obs tile ext_base
+                           ) (EB.empty 1) pw
+      in
+      let d = open_out "neg_base.dot" in
+      let d' = open_out "pos_base.dot" in
+      Printf.fprintf d "%s\n" (EB.to_dot neg_ext_base) ;
+      Printf.fprintf d' "%s\n" (EB.to_dot pos_ext_base) ;
+      close_out d ;
+      close_out d'
   end
 
 module SimpleShape = Make (Node.SimpleNode)

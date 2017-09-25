@@ -382,12 +382,12 @@ module Make (Node:Node.NodeType) =
 	let cstr_edges =
 	  match span_option with
 	    None -> Graph.empty
-	  | Some (_,emb_to_g) ->
-	     match co_domains emb_to_g with
+	  | Some (emb_to_g,_) ->
+             match co_domains emb_to_g with
 	       [cod] -> cod
 	     | _ -> failwith "Invariant violation: Gluing under constraint should use flat embeddings"
 	in
-	List.fold_left
+        List.fold_left
 	  (fun arr_list sub_g ->
 	   try
 	     let embeddings = embed sub_g h
