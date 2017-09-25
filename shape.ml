@@ -7,6 +7,8 @@ module Make (Node:Node.NodeType) =
     module Model = Model.Make (Node)
     module EB = Basis.Make (Node)
 
+    open Lib.Util
+
     let draw_line u v g =
       let g =
 	List.fold_left
@@ -32,7 +34,9 @@ module Make (Node:Node.NodeType) =
 
 
     let generate_tests () =
-      Printexc.record_backtrace true ;
+      debug_mode () ;
+
+      if db() then Printexc.record_backtrace true ;
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
       let dsquare = graph_of_library "dsquare" in

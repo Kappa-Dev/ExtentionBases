@@ -19,6 +19,11 @@ module Dict =
 
 module Util =
   struct
+    let db_mode = ref false
+    let db () = !db_mode
+    let debug_mode () =
+      (print_string "Entering debug mode\n" ; db_mode := true)
+
     let proj_left = (fun (x,_) -> x)
     let proj_right = (fun (_,y) -> y)
 
@@ -31,6 +36,8 @@ module Util =
       !inp
 
     let red str = "\027[91m"^str^"\027[0m"
+    let green str = "\027[92m"^str^"\027[0m"
+    let yellow str = "\027[93m"^str^"\027[0m"
 
     let to_list fold x =
       fold (fun i cont -> i::cont) x []
