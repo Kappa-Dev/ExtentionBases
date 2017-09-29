@@ -452,8 +452,9 @@ module Make (Node:Node.NodeType) =
 	       if (compare_tile tile tile') = 0 then ((emb,tile)::(cut ((emb',tile')::tl)))
 	       else [(emb,tile)]
 	in
-	if max then cut sharings
-        else sharings
+	if max then [List.hd sharings]
+        else
+          cut sharings
 
     let is_iso emb =
       List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)

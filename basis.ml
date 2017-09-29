@@ -50,32 +50,43 @@ module Make (Node:Node.NodeType) =
 
     let mem i ext_base = Lib.IntMap.mem i ext_base.points
 
-    let empty ?(deep=true) ?(unique=true) min =
+    let empty ?(deep=true) ?(unique=true) ?(min=1) h_eps =
       assert (min>0) ;
-      {points = Lib.IntMap.empty ;
-       fresh = 0 ;
+      {points = Lib.IntMap.add 0 {value = h_eps ;
+                                  next = Lib.IntMap.empty ;
+                                  prev = [] ;
+                                  obs = None ;
+                                  conflict = Lib.IntSet.empty ;
+                                  witnesses = Lib.IntSet.empty
+                                 } Lib.IntMap.empty ;
+       fresh = 1 ;
        sharing = {min = min ; deep = deep ; unique = unique} ;
-       leaves = Lib.IntSet.empty}
+       leaves = Lib.IntSet.singleton 0}
 
-    let is_empty ext_base = ext_base.fresh = 0
+    let is_empty ext_base = ext_base.fresh = 1
 
-    let find i ext_base = Lib.IntMap.find i ext_base.points
+    let find i ext_base = try Lib.IntMap.find i ext_base.points with Not_found -> failwith ("Point "^(string_of_int i)^" is not in the base")
 
     let cut_leaf i ext_base =
       let pi = find i ext_base in
-      if Lib.IntMap.is_empty pi.next then
-        let ext_base =
-          List.fold_left
-            (fun ext_base j ->
-             let pj = find j ext_base in
-             replace j {pj with next = Lib.IntMap.remove i pj.next ;
-                                witnesses = Lib.IntSet.remove i pj.witnesses
-                       } ext_base
-            ) ext_base pi.prev
-        in
-        {ext_base with points = Lib.IntMap.remove i ext_base.points}
-      else
-        failwith "Can only remove leaves"
+
+      let ext_base = (*removing i from prev of successors of i*)
+        Lib.IntMap.fold
+          (fun j hom ext_base ->
+           let pj = find j ext_base in
+           replace j {pj with prev = List.filter (fun x -> x<>i) pj.prev} ext_base
+          ) pi.next ext_base
+      in
+      let ext_base = (*removing i from next and witnesses of predecessors of i*)
+        List.fold_left
+          (fun ext_base j ->
+           let pj = find j ext_base in
+           replace j {pj with next = Lib.IntMap.remove i pj.next ;
+                              witnesses = Lib.IntSet.remove i pj.witnesses
+                     } ext_base
+          ) ext_base pi.prev
+      in
+      {ext_base with points = Lib.IntMap.remove i ext_base.points}
 
     let to_emb i f j ext_base =
       try
@@ -114,7 +125,8 @@ module Make (Node:Node.NodeType) =
         try {Cat.src = p0.value ; Cat.trg = p.value ; Cat.maps = [Lib.IntMap.find i p0.next]}
         with Not_found ->
           if i=0 then Cat.identity p0.value p0.value
-          else failwith "Trying to compare a witness with an unkown point"
+          else
+            failwith ("Trying unkown point "^(string_of_int i))
 
     let add_extension i j hom_ij ext_base =
       if db() then Printf.printf "add_extension %d->%d = %s\n" i j (Hom.to_string hom_ij) ;
@@ -132,36 +144,28 @@ module Make (Node:Node.NodeType) =
 
 
     let add_witness emb_w emb_obs obs_id ext_base =
-      let ext_base =
-        if is_empty ext_base then
-          begin
-            if db() then Printf.printf "Initializing H_eps in empty basis\n" ;
-            let ext_base,x0 = add {value = emb_w.Cat.src;
-                                   next = Lib.IntMap.empty ;
-                                   prev = [] ;
-                                   obs = None ;
-                                   conflict = Lib.IntSet.empty ;
-                                   witnesses = Lib.IntSet.empty
-                                  } ext_base
-            in
-            {ext_base with leaves = Lib.IntSet.singleton x0}
-          end
-        else ext_base
-      in
-      let pw = {value = emb_w.Cat.trg ;
+      if Cat.is_iso emb_w then
+        let p0 = find 0 ext_base in
+        let obs =
+          match p0.obs with
+            None -> Some (emb_obs,[obs_id])
+          | Some (emb,obs_ids) -> Some (emb,obs_id::obs_ids)
+        in
+        (replace 0 {p0 with obs = obs} ext_base,0)
+      else
+        let pw = {value = emb_w.Cat.trg ;
                 next = Lib.IntMap.empty ;
                 prev = [0] ;
                 obs = Some (emb_obs,[obs_id]) ;
                 conflict = Lib.IntSet.empty ;
                 witnesses = Lib.IntSet.empty
                }
-      in
-      let ext_base,k = add pw ext_base in
-      let hom_0k = get_hom emb_w in
-      let ext_base = add_extension 0 k hom_0k ext_base in
-      if db() then Printf.printf "Add witness %d\n" k ;
-
-      ({ext_base with leaves = Lib.IntSet.add k ext_base.leaves},k)
+        in
+        let ext_base,k = add pw ext_base in
+        let hom_0k = get_hom emb_w in
+        let ext_base = add_extension 0 k hom_0k ext_base in
+        if db() then Printf.printf "Add witness %d\n" k ;
+        ({ext_base with leaves = Lib.IntSet.add k ext_base.leaves},k)
 
     let add_conflict i j ext_base =
       let pi = find i ext_base in
@@ -170,8 +174,9 @@ module Make (Node:Node.NodeType) =
               (replace j {pj with conflict = Lib.IntSet.add i pj.conflict} ext_base)
 
     (*Invariant j is the new witness in the base*)
-    let compare i (*new*) j (*old*) ext_base =
-      if db() then Printf.printf "Comparing %d %d \n" i j ;
+    let compare i (*new*) j (*old*) ext_base dict =
+      print_string (to_dot dict ext_base) ;
+      if db() then Printf.printf "Comparing new %d with old %d \n" i j ;
       if i=j then ext_base
       else
         let emb_to_i = find_extension i ext_base in
@@ -195,73 +200,79 @@ module Make (Node:Node.NodeType) =
            if i=0 || n_trg - n_src >= ext_base.sharing.min then
              List.fold_left
                (fun ext_base (emb_s,tile_s) ->
-                let sh_left,sh_right = tile_s.Cat.span in
-                let iso_left = Cat.is_iso sh_left in
-                let iso_right = Cat.is_iso sh_right in
-                let pj = find j ext_base in
-                (*Special cases, when sharing reveals a sub-graph relationship*)
-                if iso_left then
-                  (*Both left and right embeddings of the span are actually isos*)
-                  if iso_right then (*passing observable of pi to pj*)
-                    let pi = find i ext_base in
-                    let new_obs_emb,new_obs_ids = match pi.obs with None -> failwith "not a witness" | Some v -> v in
-                    if db() then print_string (yellow "iso left and right\n") ;
-                    let obs_emb,obs_ids,add_obs =
-                      match pj.obs with
-                        None -> ((sh_left @@ (Cat.invert sh_right)) @@ new_obs_emb, new_obs_ids, true)
-                      | Some (obs_emb,obs_ids') -> (obs_emb,obs_ids'@new_obs_ids, false) (*first obs_id in the list points to the reference graph*)
-                    in
-                    let ext_base = replace j {pj with obs = Some (obs_emb,obs_ids)} ext_base in
-                    let ext_base = cut_leaf i ext_base in (*removing the new leaf*)
-                    if db() then
+                if not (mem i ext_base) then ext_base (*when i was found isomorphic to another point of the base*)
+                else
+                  let sh_left,sh_right = tile_s.Cat.span in
+                  let iso_left = Cat.is_iso sh_left in
+                  let iso_right = Cat.is_iso sh_right in
+                  let pj = find j ext_base in
+                  (*Special cases, when sharing reveals a sub-graph relationship*)
+                  if iso_left then
+                    (*Both left and right embeddings of the span are actually isos*)
+                    if iso_right then (*passing observable of pi to pj*)
+                      let pi = find i ext_base in
+                      let new_obs_emb,new_obs_ids =
+                        match pi.obs with
+                          None -> failwith "not a witness"
+                        | Some v -> v
+                      in
+                      (if db() then print_string (yellow "iso left and right\n")) ;
+                      let obs_emb,obs_ids,add_obs =
+                        match pj.obs with
+                          None -> ((sh_left @@ (Cat.invert sh_right)) @@ new_obs_emb, new_obs_ids, true)
+                        | Some (obs_emb,obs_ids') -> (obs_emb,obs_ids'@new_obs_ids, false) (*first obs_id in the list points to the reference graph*)
+                      in
+                      let ext_base = replace j {pj with obs = Some (obs_emb,obs_ids)} ext_base in
+                      let ext_base = cut_leaf i ext_base in (*removing the new leaf*)
                       begin
-                        print_string (red "Removing "^(string_of_int i)^" from basis\n") ;
-                      end ;
-                    if add_obs then
-                      (*sons of j should know that j is a now the id of a witness*)
-                      update_witnesses j ext_base
-                    else
-                      ext_base
+                        if db() then
+                          print_string (red "Removing "^(string_of_int i)^" from basis\n") ;
+                      end;
+                      if add_obs then
+                        (*sons of j should know that j is a now the id of a witness*)
+                        update_witnesses j ext_base
+                      else
+                        ext_base
                     else (*Iso left but not iso right*)
                       let hom_pj_pi = get_hom (sh_right @@ (Cat.invert sh_left)) in
-                      if db() then print_string (green "iso left\n") ;
+                      (if db() then print_string (green "iso left\n") );
                       add_extension j i hom_pj_pi ext_base
-                      else (*not iso left*)
-                        if iso_right then (*but iso right*)
-                          let hom_pi_pj = get_hom (sh_left @@ (Cat.invert sh_right)) in
-                          if db() then print_string (green "iso right and right\n") ;
-                          add_extension i j hom_pi_pj ext_base
-                          else (*neither iso right nor left*)
-                            let ext_base =
-                              match tile_s.Cat.cospan with
-                                None -> add_conflict i j ext_base
-                              | Some _ -> ext_base
-                            in
-                            if db() then print_string (green "Found a sharing point\n") ;
-                            let hom_mp_pj = get_hom sh_left in
-                            let hom_mp_pi = get_hom sh_right in
-                            let mp = {value = emb_s.Cat.src ;
-                                      next = Lib.IntMap.add i hom_mp_pi (Lib.IntMap.add j hom_mp_pj Lib.IntMap.empty) ;
-                                      prev = [0];
-                                      witnesses = Lib.IntSet.add i pj.witnesses ;
-                                      conflict = Lib.IntSet.empty ;
-                                      obs = None
-                                     }
-                            in
-                            let ext_base,k = add mp ext_base in
-                            let hom_p0_mp = get_hom emb_s in
-                            let ext_base = add_extension 0 k hom_p0_mp ext_base in
-                            let ext_base = add_extension k j hom_mp_pj ext_base in
-                            add_extension k i hom_mp_pi ext_base
+                  else (*not iso left*)
+                    if iso_right then (*but iso right*)
+                      let hom_pi_pj = get_hom (sh_left @@ (Cat.invert sh_right)) in
+                      (if db() then print_string (green "iso right\n") );
+                      add_extension i j hom_pi_pj ext_base
+                    else (*neither iso right nor left*)
+                      let ext_base =
+                        match tile_s.Cat.cospan with
+                          None -> add_conflict i j ext_base
+                        | Some _ -> ext_base
+                      in
+                      (if db() then print_string (green "Found a sharing point\n")) ;
+                      let hom_mp_pj = get_hom sh_left in
+                      let hom_mp_pi = get_hom sh_right in
+                      let mp = {value = emb_s.Cat.src ;
+                                next = Lib.IntMap.add i hom_mp_pi (Lib.IntMap.add j hom_mp_pj Lib.IntMap.empty) ;
+                                prev = [0];
+                                witnesses = Lib.IntSet.add i pj.witnesses ;
+                                conflict = Lib.IntSet.empty ;
+                                obs = None
+                               }
+                      in
+                      let ext_base,k = add mp ext_base in
+                      let hom_p0_mp = get_hom emb_s in
+                      let ext_base = add_extension 0 k hom_p0_mp ext_base in
+                      let ext_base = add_extension k j hom_mp_pj ext_base in
+                      add_extension k i hom_mp_pi ext_base
                ) ext_base sharings
            else (*sharing is not worth adding to the extension base*)
              begin
-               if db() then print_string (red "not worth adding\n") ;
+               (if db() then print_string (red "not worth adding\n") );
                ext_base
              end
 
 
-    let insert id_obs tile ext_base =
+    let insert id_obs tile ext_base dict =
       let rec deep_insert i ext_base acc todo =
         if not (mem i ext_base) then ext_base (*i might have been removed if isomorphic to an already existing point*)
         else
@@ -285,7 +296,7 @@ module Make (Node:Node.NodeType) =
                      ) acc pj.prev
                  else acc
                in
-               let ext_base = compare i j ext_base in
+               let ext_base = compare i j ext_base dict in
                deep_insert i ext_base acc tl
       in
 
@@ -296,7 +307,9 @@ module Make (Node:Node.NodeType) =
       in
       (*Adding new points in the basis, without comparing with the others*)
       let ext_base,id_w = add_witness emb_w emb_obs id_obs ext_base in
-      if db() then Printf.printf "Computing sharing for witness %d ...\n" id_w;
-      deep_insert id_w ext_base [] (to_list Lib.IntSet.fold ext_base.leaves)
+      if id_w = 0 then ext_base
+      else
+        let _ =  if db() then Printf.printf "Computing sharing for witness %d ...\n" id_w in
+        deep_insert id_w ext_base [] (to_list Lib.IntSet.fold ext_base.leaves)
 
   end

@@ -52,16 +52,26 @@ module Make (Node:Node.NodeType) =
 		     Model.add_obs name (graph_of_library name) model
 		    ) Node.library model
       in
-      let nw,pw = Model.witnesses_of_rule (one,dsquare) model in
-      let neg_ext_base = List.fold_left
-                           (fun ext_base (id_obs,tile) ->
-                             EB.insert id_obs tile ext_base
-                           ) (EB.empty 1) nw
+      let nw,pw = Model.witnesses_of_rule (house,one) model in
+      let get_seed = function
+          (id_obs,tile)::_ -> Cat.inf_of_tile tile
+        | [] -> raise Not_found
       in
-      let pos_ext_base = List.fold_left
-                           (fun ext_base (id_obs,tile) ->
-                             EB.insert id_obs tile ext_base
-                           ) (EB.empty 1) pw
+      let dict = model.Model.dict in
+      let neg_ext_base = try
+          List.fold_left
+            (fun ext_base (id_obs,tile) ->
+             EB.insert id_obs tile ext_base dict
+            ) (EB.empty (get_seed nw)) nw
+        with Not_found -> EB.empty Graph.empty
+      in
+      let pos_ext_base =
+        try
+          List.fold_left
+            (fun ext_base (id_obs,tile) ->
+             EB.insert id_obs tile ext_base dict
+            ) (EB.empty (get_seed pw)) pw
+        with Not_found -> EB.empty Graph.empty
       in
       let d = open_out "neg_base.dot" in
       let d' = open_out "pos_base.dot" in
