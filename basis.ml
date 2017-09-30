@@ -173,10 +173,32 @@ module Make (Node:Node.NodeType) =
       replace i {pi with conflict = Lib.IntSet.add j pi.conflict}
               (replace j {pj with conflict = Lib.IntSet.add i pj.conflict} ext_base)
 
+    type sharing_info = {to_left : Cat.embeddings ; to_right : Cat.embeddings ; to_midpoint : Cat.embeddings ; has_sup : bool}
+    type comparison = Iso of Cat.embeddings | Below of Cat.embeddings | Above of Cat.embeddings | Incomp of sharing_info
+
+    let compare i ext obs_emb obs_id ext_base =
+      assert (mem i ext_base) ;
+      let ext_i = find_extension i ext_base in
+      match Cat.share ext_base.sharing.unique (ext_i,ext) with
+        [] -> failwith "Extension should at least share their sources"
+      | sharings ->
+         List.fold_left
+           (fun comparisons (ext_mp,sharing_tile) ->
+             let sh_left,sh_right = sharing_tile.Cat.span in
+             let iso_left = Cat.is_iso sh_left in
+             let iso_right = Cat.is_iso sh_right in
+             if iso_left then
+                    (*Both left and right embeddings of the span are actually isos*)
+                    if iso_right then (*passing observable of pi to pj*)
+           ) [] sharings
+
     (*Invariant j is the new witness in the base*)
     let compare i (*new*) j (*old*) ext_base dict =
-      print_string (to_dot dict ext_base) ;
-      if db() then Printf.printf "Comparing new %d with old %d \n" i j ;
+      if db() then
+        begin
+          (*print_string (to_dot dict ext_base) ;*)
+          Printf.printf "Comparing new %d with old %d \n" i j ;
+        end ;
       if i=j then ext_base
       else
         let emb_to_i = find_extension i ext_base in

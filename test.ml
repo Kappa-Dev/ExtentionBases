@@ -13,17 +13,17 @@ let test =
   match input with
     "kappa" ->
     begin
-      print_string "***** Kappa nodes ***** \n" ;
       Shape.KappaShape.generate_tests debug ;
+      print_string "done\n"
     end
   | "simple" ->
      begin
-       print_string "***** Simple nodes *****\n" ;
-       Shape.SimpleShape.generate_tests debug
+       Shape.SimpleShape.generate_tests debug ;
+       print_string "done\n"
      end
   | "degree" ->
      begin
-       print_string "***** Degree nodes ***** \n" ;
-       Shape.DegreeShape.generate_tests debug
+       Shape.DegreeShape.generate_tests debug ;
+       print_string "done\n"
      end
   | _ -> failwith "Invalid argument"
