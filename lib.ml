@@ -30,8 +30,8 @@ module Util =
     let ask_until str stop_cond =
       let inp = ref "" in
       while not (stop_cond !inp) do
-        print_string str ;
-        inp := Pervasives.read_line () ;
+        print_string str ; flush stdout ;
+        inp := Pervasives.input_line stdin ;
       done ;
       !inp
 

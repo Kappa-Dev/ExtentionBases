@@ -33,8 +33,8 @@ module Make (Node:Node.NodeType) =
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
 
-    let generate_tests () =
-      debug_mode () ;
+    let generate_tests debug =
+      if debug then debug_mode () ;
 
       if db() then Printexc.record_backtrace true ;
       let one = graph_of_library "one" in

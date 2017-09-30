@@ -3,20 +3,27 @@ open Lib.Util
 let test =
   let input = ask_until "[kappa|simple|degree]\n" (function "kappa"|"simple"|"degree" -> true | _ -> false)
   in
+  let debug = ask_until "Debug mode y/n? \n" (function "y"|"n" -> true | _ -> false)
+  in
+  let debug =
+    match debug with
+      "y" -> true
+      | _ -> false
+  in
   match input with
     "kappa" ->
     begin
       print_string "***** Kappa nodes ***** \n" ;
-      Shape.KappaShape.generate_tests() ;
+      Shape.KappaShape.generate_tests debug ;
     end
   | "simple" ->
      begin
        print_string "***** Simple nodes *****\n" ;
-       Shape.SimpleShape.generate_tests()
+       Shape.SimpleShape.generate_tests debug
      end
   | "degree" ->
      begin
        print_string "***** Degree nodes ***** \n" ;
-       Shape.DegreeShape.generate_tests()
+       Shape.DegreeShape.generate_tests debug
      end
   | _ -> failwith "Invalid argument"

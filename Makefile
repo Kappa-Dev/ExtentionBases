@@ -5,11 +5,15 @@ LIBINSTALL_FILES := $(RESULT).cma $(RESULT).cmxa $(RESULT).a $(SOURCES:.ml=.cmi)
 .DEFAULT_GOAL := all
 
 test: ExtentionBases.cma test.ml
+	$(OCAMLC) -o $@ $^
+
+test-debug: ExtentionBases.cma test.ml
 	$(OCAMLC) -g -o $@ $^
+
 
 all: native-code-library test
 
-debug: debug-code test
+debug: debug-code test-debug
 
 clean::
 	rm -f test
