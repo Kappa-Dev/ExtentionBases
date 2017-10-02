@@ -57,11 +57,12 @@ module Make (Node:Node.NodeType) =
           (id_obs,tile)::_ -> Cat.inf_of_tile tile
         | [] -> raise Not_found
       in
-      let dict = model.Model.dict in
       let neg_ext_base = try
           List.fold_left
             (fun ext_base (id_obs,tile) ->
-             EB.insert id_obs tile ext_base dict
+             match tile.Cat.cospan with
+               None -> failwith "no witness"
+             | Some (to_w,to_o) -> EB.insert to_w to_o id_obs ext_base
             ) (EB.empty (get_seed nw)) nw
         with Not_found -> EB.empty Graph.empty
       in
@@ -69,7 +70,9 @@ module Make (Node:Node.NodeType) =
         try
           List.fold_left
             (fun ext_base (id_obs,tile) ->
-             EB.insert id_obs tile ext_base dict
+             match tile.Cat.cospan with
+               None -> failwith "no witness"
+             | Some (to_w,to_o) -> EB.insert to_w to_o id_obs ext_base
             ) (EB.empty (get_seed pw)) pw
         with Not_found -> EB.empty Graph.empty
       in
