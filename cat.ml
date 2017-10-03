@@ -46,10 +46,10 @@ module Make (Node:Node.NodeType) =
       let (_,emb') = tile.span in
       emb'.trg
 
-    let is_span emb1 emb2 =
+    let is_span (emb1,emb2) =
       Graph.is_equal emb1.src emb2.src
 
-    let is_co_span emb1 emb2 =
+    let is_co_span (emb1,emb2) =
       Graph.is_equal emb1.trg emb2.trg
 
     let string_of_embeddings emb =
@@ -66,7 +66,7 @@ module Make (Node:Node.NodeType) =
 
 
     let string_of_span (emb,emb') =
-      assert (is_span emb emb') ;
+      assert (is_span (emb,emb')) ;
       let str = Printf.sprintf " %s " (Graph.to_string emb.src) in
       let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
@@ -74,7 +74,7 @@ module Make (Node:Node.NodeType) =
 
 
     let string_of_co_span (emb,emb') =
-      assert (is_co_span emb emb') ;
+      assert (is_co_span (emb,emb')) ;
       let str = Printf.sprintf " %s " (Graph.to_string emb.trg) in
       let str' = Printf.sprintf " %s " (Graph.to_string emb.src) in
       let str'' = Printf.sprintf " %s " (Graph.to_string emb'.src) in
@@ -434,17 +434,20 @@ module Make (Node:Node.NodeType) =
 
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
     let share max = function
-	(emb,emb') as span ->
+	(emb_left,emb_right) as span ->
+        assert (is_span span) ;
+
 	let compare_tile tile tile' =
 	  let src = inf_of_tile tile in
 	  let src' = inf_of_tile tile' in
 	  compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
 	in
-	let gluings = glue emb.trg emb'.trg (Some span) in
+
+	let gluings = glue emb_left.trg emb_right.trg (Some span) in
 	let ordered_gluings =
 	  List.fast_sort compare_tile gluings
 	in
-        let sharings = List.map (fun tile -> ({emb' with trg = inf_of_tile tile},tile)) ordered_gluings
+        let sharings = List.map (fun tile -> ({emb_right with trg = inf_of_tile tile},tile)) ordered_gluings
         in
 	let rec cut = function
 	    [] | [_] as l -> l

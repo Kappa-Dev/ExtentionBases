@@ -89,8 +89,12 @@ module Make (Node:Node.NodeType) =
 
     let fold f hom = NodeBij.fold (fun u v cont -> f u v cont) hom.tot
 
+    let to_string hom =
+      IntBij.to_string hom.sub
+
     (*[compose h h'] = (h o h') *)
     let compose hom hom' =
+      Printf.printf "Compose %s %s\n" (to_string hom) (to_string hom') ;
       try
 	fold (fun u v hom'' -> add u (find v hom) hom'') hom' empty
       with
@@ -103,9 +107,6 @@ module Make (Node:Node.NodeType) =
 
     let comem u hom = NodeBij.comem u hom.tot
     let comem_sub i hom = IntBij.comem i hom.sub
-
-    let to_string hom =
-      IntBij.to_string hom.sub
 
     let to_dot_label hom =
       IntBij.to_dot_label hom.sub

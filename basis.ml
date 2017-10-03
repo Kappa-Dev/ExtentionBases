@@ -170,6 +170,7 @@ module Make (Node:Node.NodeType) =
     let compare i ext_wit obs_emb obs_id ext_base =
       assert (mem i ext_base) ;
       let ext_i = find_extension i ext_base in
+      Printf.printf "Sharing %s\n"  (Cat.string_of_span (ext_wit,ext_i)) ;
       match Cat.share ext_base.sharing.unique (ext_i,ext_wit) with
         [] -> failwith "Extension should at least share their sources"
       | sharings ->
@@ -180,16 +181,20 @@ module Make (Node:Node.NodeType) =
              let iso_right = Cat.is_iso sh_right in
              if iso_left then
                if iso_right then
-                 let cmp = Iso (sh_left @@ (Cat.invert sh_right)) (*Iso wit <-> i *)
-                 in
-                 cmp::comparisons
+                 begin
+                   assert (Cat.is_co_span (sh_left,obs_emb)) ;
+                   Printf.printf "%s o (%s)^- o %s\n" (Cat.string_of_embeddings sh_left) (Cat.string_of_embeddings sh_right) (Cat.string_of_embeddings obs_emb) ;
+                   let cmp = Iso (sh_right @@ (Cat.invert sh_left) @@ obs_emb) (*Iso obs -> i *)
+                   in
+                   cmp::comparisons
+                 end
                else
-                 let cmp = Above (sh_right @@ (Cat.invert sh_left)) (*Above i -> wit *)
+                 let cmp = Below (sh_left @@ (Cat.invert sh_right)) (*Below wit -> i*)
                  in
                  cmp::comparisons
              else
                if iso_right then
-                 let cmp = Below (sh_left @@ (Cat.invert sh_right)) (*Below wit -> i*)
+                 let cmp = Above (sh_right @@ (Cat.invert sh_left)) (*Above i -> wit *)
                  in
                  cmp::comparisons
                else
@@ -212,19 +217,31 @@ module Make (Node:Node.NodeType) =
              List.fold_left
                (fun (ext_base,cont) cmp ->
                 match cmp with
+
+                  (*i <---(> w) <--- obs: emb*)
                   Iso emb ->
-                  (add_obs i (emb@@obs_emb) obs_id ext_base,cont)
+                  print_string (red "iso\n");
+                  (add_obs i obs_emb obs_id ext_base,cont)
+
+                (* emb: w(j) --> i*)
                 | Below emb ->
+                   print_string (blue ("below "^(string_of_int i)^"\n"));
                    let ext_base,j = add_witness ext_wit (Some (obs_emb,[obs_id])) Lib.IntSet.empty Lib.IntSet.empty ext_base in
                    (add_extension j i (get_hom emb) ext_base,cont)
+
+                (* emb: i --> w(j) *)
                 | Above emb ->
+                   print_string (yellow ("above "^(string_of_int i)^"\n"));
                    if Lib.IntSet.mem i ext_base.leaves then
                      let ext_base,j = add_witness ext_wit (Some (obs_emb,[obs_id])) Lib.IntSet.empty Lib.IntSet.empty ext_base in
                      (add_extension i j (get_hom emb) ext_base,cont)
                    else
                      let pi = find i ext_base in
                      (ext_base,Lib.IntMap.fold (fun j _ cont -> j::cont) pi.next cont)
+
+                (*i <-- mp --> w(j) *)
                 | Incomp sh_info ->
+                   print_string (green ("new point "^(string_of_int i)^"\n"));
                    let ext_base,j = add_witness ext_wit (Some (obs_emb,[obs_id])) Lib.IntSet.empty Lib.IntSet.empty ext_base in
                    let pi = find i ext_base in
                    let conflict =

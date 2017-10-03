@@ -54,7 +54,7 @@ module Make (Node:Node.NodeType) =
       in
       let nw,pw = Model.witnesses_of_rule (house,one) model in
       let get_seed = function
-          (id_obs,tile)::_ -> Cat.inf_of_tile tile
+          (id_obs,tile)::_ -> Cat.right_of_tile tile
         | [] -> raise Not_found
       in
       let neg_ext_base = try
@@ -62,7 +62,7 @@ module Make (Node:Node.NodeType) =
             (fun ext_base (id_obs,tile) ->
              match tile.Cat.cospan with
                None -> failwith "no witness"
-             | Some (to_w,to_o) -> EB.insert to_w to_o id_obs ext_base
+             | Some (from_o,to_w) -> EB.insert to_w from_o id_obs ext_base
             ) (EB.empty (get_seed nw)) nw
         with Not_found -> EB.empty Graph.empty
       in
@@ -72,7 +72,7 @@ module Make (Node:Node.NodeType) =
             (fun ext_base (id_obs,tile) ->
              match tile.Cat.cospan with
                None -> failwith "no witness"
-             | Some (to_w,to_o) -> EB.insert to_w to_o id_obs ext_base
+             | Some (from_o,to_w) -> EB.insert to_w from_o id_obs ext_base
             ) (EB.empty (get_seed pw)) pw
         with Not_found -> EB.empty Graph.empty
       in
