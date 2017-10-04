@@ -94,7 +94,6 @@ module Make (Node:Node.NodeType) =
 
     (*[compose h h'] = (h o h') *)
     let compose hom hom' =
-      Printf.printf "Compose %s %s\n" (to_string hom) (to_string hom') ;
       try
 	fold (fun u v hom'' -> add u (find v hom) hom'') hom' empty
       with

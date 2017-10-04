@@ -13,22 +13,6 @@ module Make (Node:Node.NodeType) =
     let is_domain_identity emb =
       List.for_all Hom.is_identity emb.maps
 
-    let images g emb =
-      List.fold_left
-        (fun images hom ->
-         let im =
-	   Graph.fold_edges
-	     (fun u v cod ->
-	      let (u',v') = Hom.find2 (u,v) hom in
-	      let cod = Graph.add_node u' (Graph.add_node v' cod) in
-	      Graph.add_edge u' v' cod
-	     ) g Graph.empty
-	 in
-	 im::images
-        ) [] emb.maps
-
-    let co_domains emb = images emb.src emb
-
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
 
@@ -86,6 +70,21 @@ module Make (Node:Node.NodeType) =
       | Some co_span ->
 	 (string_of_co_span co_span)^"\n"^(string_of_span tile.span)
 
+    let images g emb =
+      List.fold_left
+        (fun images hom ->
+         let im =
+	   Graph.fold_edges
+	     (fun u v cod ->
+	      let (u',v') = Hom.find2 (u,v) hom in
+	      let cod = Graph.add_node u' (Graph.add_node v' cod) in
+	      Graph.add_edge u' v' cod
+	     ) g Graph.empty
+	 in
+	 im::images
+        ) [] emb.maps
+
+    let co_domains emb = images emb.src emb
 
     let (=>) g h =
       let rec extend hom_list iG jG acc =
@@ -387,15 +386,16 @@ module Make (Node:Node.NodeType) =
 	       [cod] -> cod
 	     | _ -> failwith "Invariant violation: Gluing under constraint should use flat embeddings"
 	in
+        let sub_g = subgraphs_of_edges g cstr_edges in
         List.fold_left
 	  (fun arr_list sub_g ->
 	   try
-	     let embeddings = embed sub_g h
+             let embeddings = embed sub_g h
 	     in
 	     embeddings::arr_list
 	   with
 	     Undefined -> arr_list
-	  ) [] (subgraphs_of_edges g cstr_edges)
+	  ) [] sub_g
       in
       let gluing_points = enumerate_gluings one_gluings one_gluings one_gluings [] in
       let spans =
@@ -434,20 +434,21 @@ module Make (Node:Node.NodeType) =
 
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
     let share max = function
-	(emb_left,emb_right) as span ->
+	(emb_to_base,emb_to_wit) as span ->
         assert (is_span span) ;
-
+        
 	let compare_tile tile tile' =
 	  let src = inf_of_tile tile in
 	  let src' = inf_of_tile tile' in
 	  compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
 	in
 
-	let gluings = glue emb_left.trg emb_right.trg (Some span) in
+	let gluings = glue emb_to_base.trg emb_to_wit.trg (Some span)
+        in
 	let ordered_gluings =
 	  List.fast_sort compare_tile gluings
 	in
-        let sharings = List.map (fun tile -> ({emb_right with trg = inf_of_tile tile},tile)) ordered_gluings
+        let sharings = List.map (fun tile -> ({emb_to_base with trg = inf_of_tile tile},tile)) ordered_gluings
         in
 	let rec cut = function
 	    [] | [_] as l -> l
