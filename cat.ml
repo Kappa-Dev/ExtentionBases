@@ -436,7 +436,7 @@ module Make (Node:Node.NodeType) =
     let share max = function
 	(emb_to_base,emb_to_wit) as span ->
         assert (is_span span) ;
-        
+
 	let compare_tile tile tile' =
 	  let src = inf_of_tile tile in
 	  let src' = inf_of_tile tile' in
