@@ -7,7 +7,7 @@ module Make (Node:Node.NodeType) =
     type point = {value : Graph.t ;
                   next : Cat.embeddings Lib.IntMap.t ;
                   prev : int list ;
-                  obs : (Cat.embeddings * (int list)) option ;
+                  obs : (Cat.embeddings * int) list ;
                   conflict : Lib.IntSet.t ;
                   witnesses : Lib.IntSet.t}
 
@@ -23,7 +23,13 @@ module Make (Node:Node.NodeType) =
            let str = Printf.sprintf "%d [label=\"%d{sees: %s}[obs: %s]\"];" i
                                     i
                                     (String.concat "," (Lib.IntSet.fold (fun i cont -> string_of_int i::cont) p.witnesses []))
-                                    (match p.obs with None -> "" | Some (_,ol) -> String.concat "," (List.map (fun x -> Lib.Dict.to_name x dict) ol))
+                                    (match p.obs with
+                                       [] -> ""
+                                     | ol -> String.concat ","
+                                                           (List.map (fun (emb,x) ->
+                                                                (Cat.string_of_embeddings ~nocolor:true emb)
+                                                                  ^","^(Lib.Dict.to_name x dict)
+                                                              ) ol))
            in
            let str2 =
              String.concat "\n"
@@ -56,12 +62,12 @@ module Make (Node:Node.NodeType) =
 
     let mem i ext_base = Lib.IntMap.mem i ext_base.points
 
-    let empty ?(deep=true) ?(unique=false) ?(min=1) h_eps =
+    let empty ?(deep=true) ?(unique=true) ?(min=1) h_eps =
       assert (min>0) ;
       {points = Lib.IntMap.add 0 {value = h_eps ;
                                   next = Lib.IntMap.empty ;
                                   prev = [] ;
-                                  obs = None ;
+                                  obs = [] ;
                                   conflict = Lib.IntSet.empty ;
                                   witnesses = Lib.IntSet.empty
                                  } Lib.IntMap.empty ;
@@ -125,8 +131,8 @@ module Make (Node:Node.NodeType) =
       let pi = find i ext_base in
       let pj = find j ext_base in
       let new_wit = match pj.obs with
-          None -> pj.witnesses
-        | Some _ -> Lib.IntSet.add j pj.witnesses
+          [] -> pj.witnesses
+        | _ -> Lib.IntSet.add j pj.witnesses
       in
       replace j {pj with prev = i::pj.prev}
               (replace i {pi with next = Lib.IntMap.add j emb_ij pi.next ;
@@ -208,8 +214,8 @@ module Make (Node:Node.NodeType) =
       let pi = find i ext_base in
       let pi =
         match pi.obs with
-          None -> {pi with obs = Some (ext,[obs_id])}
-        | Some (_,obs_ids) -> {pi with obs = Some (ext,obs_id::obs_ids)}
+          [] -> {pi with obs = [ext,obs_id]}
+        | obs_ids -> {pi with obs = (ext,obs_id)::obs_ids}
       in
       replace i pi ext_base
 
@@ -266,7 +272,7 @@ module Make (Node:Node.NodeType) =
                         if w<>0 then remove_point w ext_base
                         else ext_base
                       in*)
-                      (add_obs i (emb@@obs_emb) obs_id ext_base,cont,inf,inf_to_w) (*emptying continuation since w has been already found*)
+                      (add_obs i (emb@@obs_emb) obs_id ext_base,[],inf,inf_to_w)
 
                       (* emb: w --> mp*)
                       | Below sh_info ->
@@ -274,7 +280,7 @@ module Make (Node:Node.NodeType) =
                          let pi = find i ext_base in
                          let ext_base,w =
                            add_extension ((Cat.invert sh_info.to_w)@@ext_wit)
-                                         (Some (obs_emb @@ sh_info.to_midpoint,[obs_id]))
+                                         [obs_emb @@ sh_info.to_midpoint,obs_id]
                                          pi.witnesses Lib.IntSet.empty ext_base
                          in
                          let ext_base = add_step inf w sh_info.to_midpoint ext_base in
@@ -289,11 +295,12 @@ module Make (Node:Node.NodeType) =
                          if Lib.IntMap.is_empty pi.next then
                            let ext_base,w =
                              add_extension ext_wit
-                                           (Some (obs_emb,[obs_id]))
+                                           [obs_emb,obs_id]
                                            Lib.IntSet.empty Lib.IntSet.empty ext_base
                            in
                            (add_step i w emb_i_w ext_base, cont, i, emb_i_w)
                          else
+                           let _ = if db() then print_string "Defering insertion\n" in
                            (ext_base,Lib.IntMap.fold
                                        (fun j emb cont ->
                                         (j,emb)::cont
@@ -306,6 +313,11 @@ module Make (Node:Node.NodeType) =
                            if sh_info.has_sup then Lib.IntSet.empty
                            else Lib.IntSet.singleton i
                          in
+                         let ext_base,w =
+                           add_extension ext_wit
+                                         [obs_emb,obs_id]
+                                         Lib.IntSet.empty Lib.IntSet.empty ext_base
+                         in
                          let pw = find w ext_base in
                          let ext_base = replace w {pw with conflict = conflict_w} ext_base in
                          let pi = find i ext_base in
@@ -316,7 +328,7 @@ module Make (Node:Node.NodeType) =
 
                          let ext_base,mp =
                            add_extension (sh_info.to_midpoint@@(find_extension inf ext_base))
-                                         None (*no observable*)
+                                         [] (*no observable*)
                                          Lib.IntSet.empty (*no immediate conflict*)
                                          witnesses_mp (*inherits the witnesses of i and {w}*)
                                          ext_base
@@ -332,12 +344,7 @@ module Make (Node:Node.NodeType) =
                          (ext_base,cont,mp,mp_to_w)
                    ) (ext_base,tl,inf,inf_to_w) comparisons
                in
-               if not (mem w ext_base) then
-                 let _ = if db() then Printf.printf "Point %d has been removed, I will stop trying to compare it\n" w ;
-                 in
-                 ext_base
-               else
-                 push inf inf_to_w w ext_base cont
+                 push inf inf_to_w ext_base cont
       in
       (*
       let ext_base,w =

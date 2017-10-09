@@ -36,7 +36,7 @@ module Make (Node:Node.NodeType) =
     let is_co_span (emb1,emb2) =
       Graph.is_equal emb1.trg emb2.trg
 
-    let string_of_embeddings ?(full=false) emb =
+    let string_of_embeddings ?(full=false) ?(nocolor=false) emb =
       let str0 =
         if full then
           Printf.sprintf "%s -" (Graph.to_string emb.src)
@@ -49,7 +49,9 @@ module Make (Node:Node.NodeType) =
         else
           ""
       in
-      str0^(red (String.concat "+" (List.map Hom.to_string emb.maps)))^str1
+      let col = if nocolor then fun x -> x else red
+      in
+      str0^(col (String.concat "+" (List.map Hom.to_string emb.maps)))^str1
 
     let dot_of_embeddings emb =
       let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in
@@ -445,6 +447,23 @@ module Make (Node:Node.NodeType) =
     let (><) g h = glue g h None
 
 
+    let merge_embeddings emb emb' =
+      assert (Graph.is_equal emb.src emb'.src && Graph.is_equal emb.trg emb'.trg) ;
+      extension_class {src = emb.src ; trg = emb.trg ; maps = emb.maps@emb'.maps}
+
+    let merge_tile tile tile' =
+      let merge_pair (emb0,emb0') (emb1,emb1') =
+        ((merge_embeddings emb0 emb1), (merge_embeddings emb0' emb1'))
+      in
+      let span = merge_pair tile.span tile'.span in
+      let cospan =
+        match (tile.cospan,tile'.cospan) with
+          None,None -> None
+        | Some csp,Some csp' -> Some (merge_pair csp csp')
+        | _ -> failwith "Cannot merge tiles"
+      in
+      {span = span ; cospan = cospan}
+
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
     let share max = function
 	(emb_to_base,emb_to_wit) as span ->
@@ -458,8 +477,9 @@ module Make (Node:Node.NodeType) =
 
 	let gluings = glue emb_to_base.trg emb_to_wit.trg (Some span)
         in
+        let reduce_gluings = List.fold_left (fun tile tile' -> merge_tile tile tile') (List.hd gluings) (List.tl gluings) in
 	let ordered_gluings =
-	  List.fast_sort compare_tile gluings
+	  List.fast_sort compare_tile (flatten reduce_gluings)
 	in
         let sharings = List.map (fun tile -> ({emb_to_base with trg = inf_of_tile tile},tile)) ordered_gluings
         in
