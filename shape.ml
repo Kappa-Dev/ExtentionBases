@@ -50,7 +50,7 @@ module Make (Node:Node.NodeType) =
       in
       let nw,pw = Model.witnesses_of_rule (Graph.empty,one) model in
       let get_seed = function
-          (id_obs,tile)::_ -> Cat.right_of_tile tile
+          (id_obs,tile)::_ -> Cat.left_of_tile tile
         | [] -> Graph.empty
       in
       let neg_ext_base =
@@ -58,7 +58,7 @@ module Make (Node:Node.NodeType) =
           (fun ext_base (id_obs,tile) ->
            match tile.Cat.cospan with
              None -> failwith "no witness"
-           | Some (from_o,to_w) -> EB.insert to_w from_o id_obs ext_base
+           | Some (to_w,from_o) -> EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw
       in
       let pos_ext_base =
@@ -66,7 +66,7 @@ module Make (Node:Node.NodeType) =
           (fun ext_base (id_obs,tile) ->
            match tile.Cat.cospan with
              None -> failwith "no witness"
-           | Some (from_o,to_w) -> EB.insert to_w from_o id_obs ext_base
+           | Some (to_w,from_o) -> EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed pw)) pw
       in
       let d = open_out "neg_base.dot" in

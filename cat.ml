@@ -36,8 +36,20 @@ module Make (Node:Node.NodeType) =
     let is_co_span (emb1,emb2) =
       Graph.is_equal emb1.trg emb2.trg
 
-    let string_of_embeddings emb =
-      red (String.concat "+" (List.map Hom.to_string emb.maps))
+    let string_of_embeddings ?(full=false) emb =
+      let str0 =
+        if full then
+          Printf.sprintf "%s -" (Graph.to_string emb.src)
+        else
+          ""
+      in
+      let str1 =
+        if full then
+          Printf.sprintf "-> %s" (Graph.to_string emb.trg)
+        else
+          ""
+      in
+      str0^(red (String.concat "+" (List.map Hom.to_string emb.maps)))^str1
 
     let dot_of_embeddings emb =
       let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in
@@ -204,8 +216,8 @@ module Make (Node:Node.NodeType) =
       in
       if maps = [] then raise Undefined
       else
-	{src = emb.src ;
-	 trg = emb'.trg ;
+	{src = emb'.src ;
+	 trg = emb.trg ;
 	 maps = maps}
 
 
@@ -403,7 +415,7 @@ module Make (Node:Node.NodeType) =
 	  (fun spans inf_to_h ->
 	   let to_h = extension_class inf_to_h in
 	   let to_g =  identity inf_to_h.src g in (*Asymmetry is important here because all subparts of g are added edges*)
-	   (to_h,to_g)::spans
+	   (to_g,to_h)::spans
 	  ) [] gluing_points
       in
       let mpos =
@@ -431,6 +443,7 @@ module Make (Node:Node.NodeType) =
 	) [] mpos
 
     let (><) g h = glue g h None
+
 
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
     let share max = function
