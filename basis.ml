@@ -170,7 +170,15 @@ module Make (Node:Node.NodeType) =
       in*)
       if db() then
         begin
-          Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (mp_to_i,mp_to_w))
+          try Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (mp_to_i,mp_to_w))
+          with _ ->
+            Printf.printf "\t Sharing (Not a span!!!) %s<-%s-%s, %s-%s->%s\n"
+                          (Graph.to_string mp_to_i.Cat.trg)
+                          (Cat.string_of_embeddings mp_to_i)
+                          (Graph.to_string mp_to_i.Cat.src)
+                          (Graph.to_string mp_to_w.Cat.src)
+                          (Cat.string_of_embeddings mp_to_w)
+                          (Graph.to_string mp_to_w.Cat.trg)
         end;
       match Cat.share ext_base.sharing.unique (mp_to_i,mp_to_w) with
         [] -> failwith "\t Extension should at least share their sources"
@@ -248,6 +256,7 @@ module Make (Node:Node.NodeType) =
                      points = Lib.IntMap.remove i ext_base.points ;
                      leaves = Lib.IntSet.remove i ext_base.leaves}
 
+(*Bug should test whether to_mipoint is not an iso*)
     let insert ext_wit obs_emb obs_id ext_base =
       let rec push inf inf_to_w ext_base = function
           [] -> if db() then Printf.printf "Push stack: {}\n" ; ext_base
@@ -324,6 +333,9 @@ module Make (Node:Node.NodeType) =
                          let conflict_i = if sh_info.has_sup then Lib.IntSet.add w pi.conflict else pi.conflict in
                          let ext_base = replace i {pi with conflict = conflict_i} ext_base in
 
+                         (*TODO HERE: check whether sh_info.to_midpoint is an iso*)
+                         (*Do not create a new midpoint if it is*)
+
                          let witnesses_mp = Lib.IntSet.add w pi.witnesses in
 
                          let ext_base,mp =
@@ -335,22 +347,16 @@ module Make (Node:Node.NodeType) =
                          in
 
                          if db() then print_string (green ("new point "^(string_of_int mp)^"\n"));
-                         let mp_to_w = sh_info.to_w in
                          let ext_base = add_step inf mp sh_info.to_midpoint ext_base in
                          let ext_base = add_step mp i sh_info.to_base ext_base in
-                         let ext_base = add_step mp w mp_to_w ext_base in
+                         let ext_base = add_step mp w sh_info.to_w ext_base in
                          let ext_base = remove_step inf i ext_base in
                          let ext_base = remove_step inf w ext_base in
-                         (ext_base,cont,mp,mp_to_w)
+                         (ext_base,cont,mp,sh_info.to_w)
                    ) (ext_base,tl,inf,inf_to_w) comparisons
                in
                  push inf inf_to_w ext_base cont
       in
-      (*
-      let ext_base,w =
-        add_extension ext_wit (Some (obs_emb,[obs_id])) Lib.IntSet.empty Lib.IntSet.empty ext_base
-      in
-       *)
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       push 0 ext_wit ext_base [(0,id_0)]

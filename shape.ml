@@ -58,7 +58,10 @@ module Make (Node:Node.NodeType) =
           (fun ext_base (id_obs,tile) ->
            match tile.Cat.cospan with
              None -> failwith "no witness"
-           | Some (to_w,from_o) -> EB.insert to_w from_o id_obs ext_base
+           | Some (to_w,from_o) ->
+              if db() then
+                Printf.printf "Inserting witness of observable \"%s\": %s\n" (Lib.Dict.to_name id_obs model.Model.dict) (Cat.string_of_co_span (to_w,from_o)) ;
+              EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw
       in
       let pos_ext_base =
@@ -66,7 +69,10 @@ module Make (Node:Node.NodeType) =
           (fun ext_base (id_obs,tile) ->
            match tile.Cat.cospan with
              None -> failwith "no witness"
-           | Some (to_w,from_o) -> EB.insert to_w from_o id_obs ext_base
+           | Some (to_w,from_o) ->
+              if db() then
+                Printf.printf "Inserting witness of observable '%s': %s\n" (Lib.Dict.to_name id_obs model.Model.dict) (Cat.string_of_co_span (to_w,from_o)) ;
+              EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed pw)) pw
       in
       let d = open_out "neg_base.dot" in

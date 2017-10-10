@@ -98,6 +98,16 @@ module Make (Node:Node.NodeType) =
 	 im::images
         ) [] emb.maps
 
+    let (===) emb emb' =
+      match images emb.src emb with
+        [trg] ->
+        begin
+          match images emb'.src emb' with
+            [trg'] -> Graph.is_equal trg trg'
+          | _ -> failwith "Can only compare flat embeddings"
+        end
+       | _ -> failwith "Can only compare flat embeddings"
+
     let co_domains emb = images emb.src emb
 
     let (=>) g h =
@@ -464,6 +474,8 @@ module Make (Node:Node.NodeType) =
       in
       {span = span ; cospan = cospan}
 
+    let (@@) = vertical_compose
+
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
     let share max = function
 	(emb_to_base,emb_to_wit) as span ->
@@ -477,11 +489,20 @@ module Make (Node:Node.NodeType) =
 
 	let gluings = glue emb_to_base.trg emb_to_wit.trg (Some span)
         in
-        let reduce_gluings = List.fold_left (fun tile tile' -> merge_tile tile tile') (List.hd gluings) (List.tl gluings) in
-	let ordered_gluings =
-	  List.fast_sort compare_tile (flatten reduce_gluings)
+        let ordered_gluings =
+	  List.fast_sort compare_tile gluings
 	in
-        let sharings = List.map (fun tile -> ({emb_to_base with trg = inf_of_tile tile},tile)) ordered_gluings
+        let sharings =
+          List.fold_left
+            (fun sharings tile ->
+              let sharing_emb = {emb_to_base with trg = inf_of_tile tile} in
+              let (emb_to_base',emb_to_wit') = tile.span in
+              if (emb_to_base === (emb_to_base' @@ sharing_emb)) && (emb_to_wit === (emb_to_wit' @@ sharing_emb))
+              then
+                (sharing_emb,tile)::sharings
+              else
+                sharings
+            ) [] ordered_gluings
         in
 	let rec cut = function
 	    [] | [_] as l -> l
