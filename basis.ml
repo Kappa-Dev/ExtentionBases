@@ -36,7 +36,7 @@ module Make (Node:Node.NodeType) =
              String.concat "\n"
                            (Lib.IntMap.fold
                               (fun j _ dot_string ->
-                               (Printf.sprintf "%d -> %d [weight = 10000];" i j)::dot_string
+                               (Printf.sprintf "%d -> %d ;" i j)::dot_string
                               ) p.next [])
            in
            let str3 =
@@ -44,7 +44,7 @@ module Make (Node:Node.NodeType) =
                            (Lib.IntSet.fold
                               (fun j dot_string ->
                                 if i < j then
-                                  (Printf.sprintf "%d -> %d [style = \"dotted\", dir = \"none\", weight = 1];" i j)::dot_string
+                                  (Printf.sprintf "%d -> %d [style = \"dotted\", dir = \"none\", constraint = false];" i j)::dot_string
                                 else
                                   dot_string
                               ) p.conflict [])
