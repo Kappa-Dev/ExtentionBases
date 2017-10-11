@@ -98,17 +98,33 @@ module Make (Node:Node.NodeType) =
 	 im::images
         ) [] emb.maps
 
-    let (===) emb emb' =
-      match images emb.src emb with
-        [trg] ->
-        begin
-          match images emb'.src emb' with
-            [trg'] -> Graph.is_equal trg trg'
-          | _ -> failwith "Can only compare flat embeddings"
-        end
-       | _ -> failwith "Can only compare flat embeddings"
-
     let co_domains emb = images emb.src emb
+
+    let (===) emb emb' =
+      let commute =
+        try
+          List.iter2
+            (fun hom hom' ->
+             Hom.fold
+               (fun u v () ->
+                if v <> Hom.find u hom' then raise Exit
+               ) hom ()
+            ) emb.maps emb'.maps ;
+          true
+        with
+          Exit -> false
+      in
+      if not commute then false
+      else
+        try
+          List.iter2
+            (fun cod cod' ->
+             if not (Graph.is_equal cod cod') then raise Exit
+            ) (co_domains emb) (co_domains emb') ;
+          true
+        with
+          Exit -> false
+
 
     let (=>) g h =
       let rec extend hom_list iG jG acc =
@@ -510,7 +526,7 @@ module Make (Node:Node.NodeType) =
 	       if (compare_tile tile tile') = 0 then ((emb,tile)::(cut ((emb',tile')::tl)))
 	       else [(emb,tile)]
 	in
-	if max then [List.hd sharings]
+	if max then (match sharings with hd::_ -> [hd] | [] -> [])
         else
           cut sharings
 
