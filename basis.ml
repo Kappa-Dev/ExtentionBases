@@ -265,12 +265,10 @@ module Make (Node:Node.NodeType) =
                   cmp::comparisons
                 end
               else
-                let is_compatible =
-                  match sharing_tile.Cat.cospan with
-                    None -> false
-                  | Some _ -> true
-                in
-                (Incomp {to_w = sh_to_w ; to_base = sh_to_base ; to_midpoint = ext_mp ; has_sup = is_compatible})::comparisons
+                match sharing_tile.Cat.cospan with
+                  None -> (Incomp {to_w = sh_to_w ; to_base = sh_to_base ; to_midpoint = ext_mp ; has_sup = false})::comparisons
+                | Some (b_to_sup,w_to_sup) ->
+                   if Cat.is_iso ...
            ) [] sharings
 
     let add_obs i ext obs_id ext_base =
@@ -410,6 +408,7 @@ module Make (Node:Node.NodeType) =
                      if Cat.is_iso sh_info.to_midpoint then
                        let _ = if db() then print_string "Sharing is not worth adding\n"
                        in
+                       (*BUG Here should check that iso i <--> w is not from above when sh_info.has_sup*)
                        (add_step inf w inf_to_w ext_base,tl,inf,inf_to_w,Some w)
                      else
                        let ext_base,mp =

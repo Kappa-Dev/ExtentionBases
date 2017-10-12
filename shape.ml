@@ -44,7 +44,8 @@ module Make (Node:Node.NodeType) =
 
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if name = "triangle" || (name = "one") || (name = "dsquare") || (name = "house") then Model.add_obs name (graph_of_library name) model
+		     if name = "triangle" || (name = "one") || (name = "dsquare") || (name = "house") then
+                       Model.add_obs name (graph_of_library name) (Model.add_obs name (graph_of_library name) model)
                      else model
 		    ) Node.library Model.empty
       in
