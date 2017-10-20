@@ -520,15 +520,7 @@ module Make (Node:Node.NodeType) =
                 sharings
             ) [] ordered_gluings
         in
-	let rec cut = function
-	    [] | [_] as l -> l
-	    | (emb,tile)::(emb',tile')::tl ->
-	       if (compare_tile tile tile') = 0 then ((emb,tile)::(cut ((emb',tile')::tl)))
-	       else [(emb,tile)]
-	in
-	if max then (match sharings with hd::_ -> [hd] | [] -> [])
-        else
-          cut sharings
+	match sharings with hd::_ -> Some hd | [] -> None
 
     let is_iso emb =
       List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)
