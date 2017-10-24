@@ -7,24 +7,33 @@ module Make (Node:Node.NodeType) =
     type point = {value : Graph.t ;
                   next : Cat.embeddings Lib.IntMap.t ;
                   obs : (Cat.embeddings * int) list ;
-                  conflict : Lib.IntSet.t
+                  conflict : Lib.IntSet.t ;
+                  future : Lib.IntSet.t ;
                  }
 
     type param = {min : int ; deep : bool ; unique: bool}
 
     type t = {points : point Lib.IntMap.t ; (*corresp int -> point *)
-              fresh : int ; (*next fresh point id*)
               sharing : param ; (*various tuning params*)
               witnesses : Lib.IntSet.t ; (*set of points that are witnesses (not midpoints) *)
               extensions : Cat.embeddings Lib.IntMap.t (* i |-->  (0 -->i) --extension from root to i*)
              }
 
 
+    let point g =
+      {value = g ;
+       next = Lib.IntMap.empty ;
+       obs = [] ;
+       conflict = Lib.IntSet.empty ;
+       future = Lib.IntSet.empty
+      }
+
+
     let to_dot dict ext_base =
       let l =
         Lib.IntMap.fold
           (fun i p dot_string ->
-           let str = Printf.sprintf "%d [label=\"%d [obs: %s]\" , shape = \"%s\"];" i
+           let str = Printf.sprintf "%d [label=\"%d [obs: %s] {sees:%s}\" , shape = \"%s\"];" i
                                     i
                                     (match p.obs with
                                        [] -> ""
@@ -33,6 +42,7 @@ module Make (Node:Node.NodeType) =
                                                                       (Cat.string_of_embeddings ~nocolor:true emb)
                                                                       ^","^(Lib.Dict.to_name x dict)
                                                                      ) ol))
+                                    (String.concat "," (List.map string_of_int (to_list Lib.IntSet.fold p.future)))
                                     (if Lib.IntMap.is_empty p.next then "rectangle" else "oval")
            in
            let str2 =
@@ -46,10 +56,10 @@ module Make (Node:Node.NodeType) =
              String.concat "\n"
                            (Lib.IntSet.fold
                               (fun j dot_string ->
-                                if i < j then
-                                  (Printf.sprintf "%d -> %d [style = \"dotted\", dir = \"none\", constraint = false];" i j)::dot_string
-                                else
-                                  dot_string
+                               if i < j then
+                                 (Printf.sprintf "%d -> %d [style = \"dotted\", dir = \"none\", constraint = false];" i j)::dot_string
+                               else
+                                 dot_string
                               ) p.conflict [])
            in
            (str^"\n"^str2^"\n"^str3)::dot_string
@@ -57,18 +67,17 @@ module Make (Node:Node.NodeType) =
       in
       "digraph G{\n"^(String.concat "\n" l)^"\n}"
 
-    let add p ext_p ext_base =
-      ({points = Lib.IntMap.add ext_base.fresh p ext_base.points ;
-        witnesses =
-          begin
-            match p.obs with
-              [] -> ext_base.witnesses
-            | _ -> Lib.IntSet.add ext_base.fresh ext_base.witnesses
-          end ;
-        fresh = ext_base.fresh+1 ;
-        extensions = Lib.IntMap.add ext_base.fresh ext_p ext_base.extensions ;
-        sharing = ext_base.sharing ;
-       },ext_base.fresh)
+    let add i p ext_p ext_base =
+      {points = Lib.IntMap.add i p ext_base.points ;
+       witnesses =
+         begin
+           match p.obs with
+             [] -> ext_base.witnesses
+           | _ -> Lib.IntSet.add i ext_base.witnesses
+         end ;
+       extensions = Lib.IntMap.add i ext_p ext_base.extensions ;
+       sharing = ext_base.sharing ;
+      }
 
     let replace i p ext_base =
       assert (Lib.IntMap.mem i ext_base.points) ;
@@ -78,18 +87,13 @@ module Make (Node:Node.NodeType) =
 
     let empty ?(deep=true) ?(unique=true) ?(min=1) h_eps =
       assert (min>0) ;
-      {points = Lib.IntMap.add 0 {value = h_eps ;
-                                  next = Lib.IntMap.empty ;
-                                  obs = [] ;
-                                  conflict = Lib.IntSet.empty ;
-                                 } Lib.IntMap.empty ;
-       fresh = 1 ;
+      {points = Lib.IntMap.add 0 (point h_eps) Lib.IntMap.empty ;
        sharing = {min = min ; deep = deep ; unique = unique} ;
        witnesses = Lib.IntSet.empty;
        extensions = Lib.IntMap.add 0 (Cat.identity h_eps h_eps) Lib.IntMap.empty
       }
 
-    let is_empty ext_base = ext_base.fresh = 1
+    let is_empty ext_base = (Lib.IntMap.cardinal ext_base.points = 1)
 
     let find i ext_base = Lib.IntMap.find i ext_base.points
 
@@ -111,7 +115,7 @@ module Make (Node:Node.NodeType) =
 
     exception Found of Cat.embeddings list
 
-    let search i j ext_base =
+    let delta i j ext_base =
       let rec compose emb_list acc =
         match emb_list with
           [] -> acc
@@ -127,10 +131,10 @@ module Make (Node:Node.NodeType) =
             let ext,visited =
               Lib.IntMap.fold
                 (fun k hom_ik (ext,visited) ->
-                  match ext with
-                    [] -> if Lib.IntSet.mem k visited then (ext,visited)
-                          else dfs k (hom_ik::ext) (Lib.IntSet.add k visited)
-                  | _ -> raise (Found ext)
+                 match ext with
+                   [] -> if Lib.IntSet.mem k visited then (ext,visited)
+                         else dfs k (hom_ik::ext) (Lib.IntSet.add k visited)
+                 | _ -> raise (Found ext)
                 ) pi.next (ext,visited)
             in
             if ext <> [] then raise (Found ext)
@@ -150,13 +154,20 @@ module Make (Node:Node.NodeType) =
 
 
     let add_step i j emb_ij ext_base =
-      if db() then Printf.printf "Add Step %d |-> %d = %s-%s->%s\n" i j
-                                 (Graph.to_string emb_ij.Cat.src)
-                                 (Cat.string_of_embeddings emb_ij)
-                                 (Graph.to_string emb_ij.Cat.trg) ;
-
       let pi = find i ext_base in
-      replace i {pi with next = Lib.IntMap.add j emb_ij pi.next} ext_base
+      if Lib.IntSet.mem j pi.future then
+        let _ = if db() then print_string (red (Printf.sprintf "Not adding step: %d is in the future of %d\n" j i))
+        in
+        ext_base
+      else
+        let pj = find j ext_base in
+        if db() then Printf.printf "Add Step %d |-> %d = %s-%s->%s\n" i j
+                                   (Graph.to_string emb_ij.Cat.src)
+                                   (Cat.string_of_embeddings emb_ij)
+                                   (Graph.to_string emb_ij.Cat.trg) ;
+        replace i {pi with next = Lib.IntMap.add j emb_ij pi.next;
+                           future = Lib.IntSet.add j (Lib.IntSet.union pi.future pj.future)
+                  } ext_base
 
     let add_conflict i j ext_base =
       let pi = find i ext_base in
@@ -190,7 +201,7 @@ module Make (Node:Node.NodeType) =
                           (Cat.string_of_embeddings inf_to_w)
                           (Graph.to_string inf_to_w.Cat.trg)
         end;
-      match Cat.share ext_base.sharing.unique (inf_to_i,inf_to_w) with
+      match Cat.share (inf_to_i,inf_to_w) with
         None -> Conflicting
       | Some (inf_to_sh,sharing_tile) ->
          let sh_to_base,sh_to_w = sharing_tile.Cat.span in
@@ -215,44 +226,140 @@ module Make (Node:Node.NodeType) =
 
     let remove_step i j ext_base =
       let pi = find i ext_base in
+      let _ = if db() then
+                if Lib.IntMap.mem j pi.next then print_string (red (Printf.sprintf "Removing step %d |-x-> %d\n" i j))
+      in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
-    let rec progress inf ext_w ext_base =
-      Lib.IntMap.fold
-        (fun i ext_inf_i actions ->
-         match compare ext_inf_i ext_w ext_base with
-           Conflicting -> (fun w ext_base -> add_conflict i w ext_base)::actions
-         | Below ext_w_i -> (fun w ext_base -> add_step w i ext_w_i ext_base)::actions
-         | Above ext_i_w -> (progress i ext_i_w ext_base)@actions (*may still find a point that is isomorphic to witness*)
-         | Iso iso_w_i -> raise (Found_iso (iso_w_i,i))
-         | Incomp sh_info ->
-            let actions =
-              if sh_info.has_sup then
-                actions
-              else
-                (fun w ext_base -> add_conflict i w ext_base)::actions
-            in
-            if Cat.is_iso sh_info.to_midpoint then
-              actions
-            else
-              (*Not a trivial midpoint*)
-              (fun w ext_base ->
-               let mp = {value = sh_info.to_midpoint.Cat.trg ;
-                         next = Lib.IntMap.empty ;
-                         obs = [] ;
-                         conflict = Lib.IntSet.empty ;
-                        }
+    let rec progress fresh_id ext_base actions compared next_layer todo =
+      let _ = if db() then
+                begin
+                  Printf.printf "stack: {%s}\n"
+                                (String.concat
+                                   ","
+                                   (List.map (fun (inf,_,i,_) -> "("^(string_of_int inf)^","^(string_of_int i)^")") todo)) ;
+                  Printf.printf "next calls: {%s}\n"
+                                (String.concat
+                                   ","
+                                   (List.map (fun (inf,_,i,_) -> "("^(string_of_int inf)^","^(string_of_int i)^")") next_layer)) ;
+                  Printf.printf "0 |--> {%s}\n" (String.concat "," (List.map string_of_int (Lib.IntMap.fold (fun i _ cont -> i::cont) (find 0 ext_base).next [])))
+                end
+      in
+      match todo with
+        [] -> if next_layer = [] then actions else progress fresh_id ext_base actions compared [] next_layer
+      | (inf,ext_inf_i,i,ext_inf_w)::todo ->
+         if Lib.IntSet.mem i compared then
+           progress fresh_id ext_base actions compared next_layer todo
+         else
+           let _ = if db() then Printf.printf "Visiting (%d,%d)\n" inf i in
+           begin
+             assert (mem i ext_base) ;
+             match compare ext_inf_i ext_inf_w ext_base with
+               Conflicting ->
+               if db() then print_string (red "Conflicting points\n");
+               let next_layer',stop =
+                 Lib.IntMap.fold
+                   (fun j ext_ij (cont,b) ->
+                    print_int i ; print_string "|-->" ; print_int j ; print_newline ();
+                    ((inf,ext_ij @@ ext_inf_i,j,ext_inf_w)::cont,false)
+                   ) (find i ext_base).next (next_layer,true)
                in
-               let ext_base,inf' = add mp (sh_info.to_midpoint @@ (find_extension inf ext_base)) ext_base in
-               let ext_base = add_step inf inf' sh_info.to_midpoint ext_base in
-               let ext_base = add_step inf' i sh_info.to_base ext_base in
-               remove_step inf i ext_base
-              )::actions
-        ) (find inf ext_base).next []
+               let actions' =
+                 if stop then
+                   (fun w ext_base -> add_step inf w ext_inf_w (add_conflict i w ext_base))::actions
+                 else
+                   (fun w ext_base -> add_conflict i w ext_base)::actions
+               in
+               progress fresh_id ext_base actions' (Lib.IntSet.add i compared) next_layer' todo
+               | Below ext_w_i ->
+                  if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
+                  progress fresh_id ext_base ((fun w ext_base -> add_step w i ext_w_i ext_base)::actions) (Lib.IntSet.add i compared) next_layer todo
+               | Above ext_i_w ->
+                  if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
+                  let todo',stop =
+                    Lib.IntMap.fold
+                      (fun j ext_ij (cont,b) ->
+                       ((i,ext_ij,j,ext_i_w)::cont,false)
+                      ) (find i ext_base).next (todo,true)
+                  in
+                  let actions' =
+                    if stop then
+                      (fun w ext_base -> add_step i w ext_i_w ext_base)::actions
+                    else
+                      actions
+                  in
+                  progress fresh_id
+                           ext_base
+                           actions'
+                           (Lib.IntSet.add i compared)
+                           next_layer
+                           todo'
+               | Iso iso_w_i ->
+                  if db() then print_string (red "iso\n");
+                  raise (Found_iso (iso_w_i,i))
+               | Incomp sh_info ->
+                  if db() then print_string (green (Printf.sprintf "I found a midpoint %s (%d)!\n" (Graph.to_string sh_info.to_midpoint.Cat.trg) fresh_id));
+                  let actions' =
+                    if sh_info.has_sup then
+                      actions
+                    else
+                      (fun w ext_base -> add_conflict i w ext_base)::actions
+                  in
+                  if Cat.is_iso sh_info.to_midpoint then
+                    let next_layer',stop =
+                      if db() then print_string (green (Printf.sprintf "...that is not worth adding\n")) ;
+                      Lib.IntMap.fold
+                        (fun j ext_ij (cont,b) ->
+                         ((inf,ext_ij @@ ext_inf_i,j,ext_inf_w)::cont,false)
+                        ) (find i ext_base).next (next_layer,true)
+                    in
+                    let actions' =
+                      if stop then
+                        (fun w ext_base -> add_step inf w ext_inf_w ext_base)::actions'
+                      else
+                        actions'
+                    in
+                    progress fresh_id ext_base actions' (Lib.IntSet.add i compared) next_layer' todo
+                  else
+                    (*Not a trivial midpoint*)
+                    let next_layer',stop =
+                      Lib.IntMap.fold
+                        (fun j ext_ij (cont,b) ->
+                         ((fresh_id,ext_ij @@ sh_info.to_base,j,sh_info.to_w)::cont,false)
+                        ) (find i ext_base).next (next_layer,true)
+                    in
+                    let actions' =
+                      (fun w ext_base ->
+                       let mp = point sh_info.to_midpoint.Cat.trg in
+                       let ext_base = add fresh_id mp (sh_info.to_midpoint @@ (find_extension inf ext_base)) ext_base in
+                       let ext_base =
+                         if stop then (add_step fresh_id w sh_info.to_w ext_base)
+                         else ext_base
+                       in
+                       let ext_base = add_step inf fresh_id sh_info.to_midpoint ext_base in
+                       let ext_base = add_step fresh_id i sh_info.to_base ext_base in
+                       remove_step inf i (remove_step inf w ext_base) (*will remove steps only if they exists and they are direct*)
+                      )::actions'
+                    in
+                    progress (fresh_id+1) ext_base actions' (Lib.IntSet.add i compared) next_layer' todo
+           end
+
+    let insert ext_w obs_emb obs_id ext_base =
+      let p0 = find 0 ext_base in
+      let id_0 = Cat.identity p0.value p0.value in
+      try
+        let w = Lib.IntMap.cardinal ext_base.points in
+        let actions = progress (w+1) ext_base [] Lib.IntSet.empty [] [(0,id_0,0,ext_w)] in
+        let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) in
+        let ext_base = add w (point ext_w.Cat.trg) ext_w ext_base in
+        let ext_base = add_obs w obs_emb obs_id ext_base in
+        List.fold_left (fun ext_base act -> act w ext_base) ext_base actions
+      with
+        Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
 
-    (*Bug should test whether to_mipoint is not an iso*)
- (*   let insert ext_wit obs_emb obs_id ext_base =
+                                         (*Bug should test whether to_mipoint is not an iso*)
+  (*   let insert ext_wit obs_emb obs_id ext_base =
       let rec push inf inf_to_w ext_base w_opt = function
           [] -> if db() then Printf.printf "Push stack: {}\n" ; ext_base
           | (j,emb_i,i)::tl as call_st ->
@@ -373,6 +480,6 @@ module Make (Node:Node.NodeType) =
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       push 0 ext_wit ext_base None [(0,id_0,0)]
-  *)
+   *)
 
   end

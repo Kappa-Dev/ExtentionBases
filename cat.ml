@@ -492,8 +492,44 @@ module Make (Node:Node.NodeType) =
 
     let (@@) = vertical_compose
 
+    let pb (l_to_sup,r_to_sup) =
+      let im_l = match co_domains l_to_sup with [g] -> g | _ -> failwith "Not a flat embedding" in
+      let im_r = match co_domains r_to_sup with [g] -> g | _ -> failwith "Not a flat embedding" in
+      let inf' = Graph.meet im_l im_r in
+      let inf'_to_l = {src = inf' ; trg = l_to_sup.src ; maps = List.map Hom.invert l_to_sup.maps} in
+      let inf'_to_r = {src = inf' ; trg = r_to_sup.src ; maps = List.map Hom.invert r_to_sup.maps} in
+      (inf'_to_l,inf'_to_r)
+
+
+    let share span =
+      let emb_to_base,emb_to_wit = span in
+      let compare_tile tile tile' =
+	let src = inf_of_tile tile in
+	let src' = inf_of_tile tile' in
+	compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
+      in
+      let tiles = mpo span in
+      let ordered_gluings =
+	List.fast_sort compare_tile tiles
+      in
+      let sharings =
+        List.fold_left
+          (fun sharings tile ->
+           let sharing_emb = {emb_to_base with trg = inf_of_tile tile} in
+           let (emb_to_base',emb_to_wit') = tile.span in
+           if (emb_to_base === (emb_to_base' @@ sharing_emb)) && (emb_to_wit === (emb_to_wit' @@ sharing_emb))
+           then
+             (print_string "sharing found\n" ;
+              (sharing_emb,tile)::sharings)
+           else
+             (print_string "sharing does not commute\n" ;
+              sharings)
+          ) [] ordered_gluings
+      in
+      match sharings with hd::_ -> Some hd | [] -> None
+
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
-    let share max = function
+    (*let share max = function
 	(emb_to_base,emb_to_wit) as span ->
         assert (is_span span) ;
 
@@ -515,12 +551,14 @@ module Make (Node:Node.NodeType) =
               let (emb_to_base',emb_to_wit') = tile.span in
               if (emb_to_base === (emb_to_base' @@ sharing_emb)) && (emb_to_wit === (emb_to_wit' @@ sharing_emb))
               then
-                (sharing_emb,tile)::sharings
+                (print_string "sharing found\n" ;
+                (sharing_emb,tile)::sharings)
               else
-                sharings
+                (print_string "sharing does not commute\n" ;
+                sharings)
             ) [] ordered_gluings
         in
-	match sharings with hd::_ -> Some hd | [] -> None
+	match sharings with hd::_ -> Some hd | [] -> None*)
 
     let is_iso emb =
       List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)
