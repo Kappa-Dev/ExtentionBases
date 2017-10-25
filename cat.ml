@@ -616,5 +616,5 @@ module Make (Node:Node.NodeType) =
               with
                 Hom.Not_injective | Hom.Not_structure_preserving -> hom_sup_inf_list
            ) [] hom_sup_inf_list
-        ) trg [(p_hom,sup,inf)]
+        ) sup [(p_hom,sup,inf)]
   end
