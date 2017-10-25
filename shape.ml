@@ -32,20 +32,31 @@ module Make (Node:Node.NodeType) =
       with
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
+    let (=>) = Cat.embed
+
+    let simple_test debug =
+      if debug then debug_mode () ;
+      let square = graph_of_library "square" in
+      let dsquare = graph_of_library "dsquare" in
+      let one = graph_of_library "one" in
+
+      let f = List.hd (Cat.flatten (Cat.extension_class (one => square))) in
+      let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
+      let sharing = Cat.share true (f,g) in
+      match sharing with
+        None -> print_string "None"
+      | Some (_,tile) -> print_string (Cat.string_of_tile tile)
+
 
     let generate_tests debug =
       if debug then debug_mode () ;
 
       if db() then Printexc.record_backtrace true ;
       let one = graph_of_library "one" in
-      (*let model = Model.add_rule "one->house" (one,house) Model.empty in
-      let model = Model.add_rule "house->dsquare" (house,dsquare) model in
-      let model = Model.add_rule "square->dsquare" (square,dsquare) model in*)
-
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (*(name = "triangle") || (name = "one") ||*) (name = "dsquare") || (name = "house") then
-                       Model.add_obs name (graph_of_library name) model
+		     if (*(name = "triangle") || (name = "one") || *) (name = "dsquare") || (name = "house") then
+                       Model.add_obs name (graph_of_library name) (Model.add_obs name (graph_of_library name) model)
                      else model
 		    ) Node.library Model.empty
       in
@@ -82,6 +93,7 @@ module Make (Node:Node.NodeType) =
       Printf.fprintf d' "%s\n" (EB.to_dot model.Model.dict pos_ext_base) ;
       close_out d ;
       close_out d'
+
   end
 
 module SimpleShape = Make (Node.SimpleNode)

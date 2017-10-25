@@ -13,6 +13,8 @@ module Make (Node:Node.NodeType) =
        idmap : (Node.t list) Lib.IntMap.t ;
        size : int }
 
+    module EdgeSet = Set.Make(struct type t = Node.t * Node.t let compare = compare end)
+
     let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
     let is_empty g = g.size = 0
 

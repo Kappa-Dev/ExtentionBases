@@ -7,7 +7,7 @@ module Make (Node:Node.NodeType) =
     open Lib.Util
 
     exception Undefined
-    type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list}
+    type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list ; partial : bool}
     type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
 
     let is_domain_identity emb =
@@ -199,10 +199,10 @@ module Make (Node:Node.NodeType) =
     let embed g h =
       match g=>h with
 	[] -> raise Undefined
-      | maps -> {src = g ; trg = h ; maps = maps}
+      | maps -> {src = g ; trg = h ; maps = maps ; partial = false}
 
     let identity g h =
-      {src = g ; trg = h ; maps = [Hom.identity (Graph.nodes g)]}
+      {src = g ; trg = h ; maps = [Hom.identity (Graph.nodes g)] ; partial = false}
 
     let horizontal_compose emb emb' =
       let maps =
@@ -224,7 +224,7 @@ module Make (Node:Node.NodeType) =
       else
 	let src = Graph.join emb.src emb'.src in
 	let trg = Graph.join emb.trg emb'.trg in
-	{src = src ; trg = trg ; maps = maps}
+	{src = src ; trg = trg ; maps = maps ; partial = emb.partial || emb'.partial}
 
     let vertical_compose emb emb' =
       let maps =
@@ -246,7 +246,8 @@ module Make (Node:Node.NodeType) =
       else
 	{src = emb'.src ;
 	 trg = emb.trg ;
-	 maps = maps}
+	 maps = maps;
+         partial = emb.partial || emb'.partial}
 
 
     let eq_class matching emb auto =
@@ -303,12 +304,13 @@ module Make (Node:Node.NodeType) =
       let auto = (emb.src => emb.src) in
       eq_class true emb auto
 
+
     let flatten emb =
       let src = emb.src in
       let trg = emb.trg in
       List.fold_left
 	(fun emb_list hom ->
-	 {src = src ; trg = trg ; maps = [hom]}::emb_list
+	 {src = src ; trg = trg ; maps = [hom]; partial = false}::emb_list
 	) [] emb.maps
 
     let mpo (emb_h,emb_g) =
@@ -360,15 +362,15 @@ module Make (Node:Node.NodeType) =
 		(*let h',h_to_h',_ = rename (-1) h (to_h,inf_gh,Hom.identity (Graph.nodes h),g) in*)
 
 		let sup_gh = Graph.join h g' in
-		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [Hom.identity (Graph.nodes h)]} in
-		let emb_g_to_sup = {src = g ; trg = sup_gh ; maps = [g_to_g']} in
-		let emb_g =  {src = inf_gh ; trg = g ; maps = [to_g]} in
-		let emb_h =  {src = inf_gh ; trg = h ; maps = [to_h]} in
+		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [Hom.identity (Graph.nodes h)]; partial = false} in
+		let emb_g_to_sup = {src = g ; trg = sup_gh ; maps = [g_to_g']; partial = false} in
+		let emb_g =  {src = inf_gh ; trg = g ; maps = [to_g]; partial = false} in
+		let emb_h =  {src = inf_gh ; trg = h ; maps = [to_h]; partial = false} in
 		{span = (emb_h,emb_g) ; cospan = Some (emb_h_to_sup,emb_g_to_sup)}::tiles
 	      with
 		Graph.Incoherent ->
-		let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]} in
-		let emb_h = {src = inf_gh ; trg = h ; maps = [to_h]} in
+		let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]; partial = false} in
+		let emb_h = {src = inf_gh ; trg = h ; maps = [to_h]; partial = false} in
 		{span = (emb_h,emb_g) ; cospan = None}::tiles
 	     ) [] emb_g.maps
 	 in
@@ -475,7 +477,7 @@ module Make (Node:Node.NodeType) =
 
     let merge_embeddings emb emb' =
       assert (Graph.is_equal emb.src emb'.src && Graph.is_equal emb.trg emb'.trg) ;
-      extension_class {src = emb.src ; trg = emb.trg ; maps = emb.maps@emb'.maps}
+      extension_class {src = emb.src ; trg = emb.trg ; maps = emb.maps@emb'.maps; partial = false}
 
     let merge_tile tile tile' =
       let merge_pair (emb0,emb0') (emb1,emb1') =
@@ -496,19 +498,26 @@ module Make (Node:Node.NodeType) =
       let im_l = match co_domains l_to_sup with [g] -> g | _ -> failwith "Not a flat embedding" in
       let im_r = match co_domains r_to_sup with [g] -> g | _ -> failwith "Not a flat embedding" in
       let inf' = Graph.meet im_l im_r in
-      let inf'_to_l = {src = inf' ; trg = l_to_sup.src ; maps = List.map Hom.invert l_to_sup.maps} in
-      let inf'_to_r = {src = inf' ; trg = r_to_sup.src ; maps = List.map Hom.invert r_to_sup.maps} in
+      let inf'_to_l = {src = inf' ; trg = l_to_sup.src ; maps = List.map Hom.invert l_to_sup.maps; partial = false} in
+      let inf'_to_r = {src = inf' ; trg = r_to_sup.src ; maps = List.map Hom.invert r_to_sup.maps; partial = false} in
       (inf'_to_l,inf'_to_r)
 
+    let ipo span =
+      List.fold_left
+        (fun cont tile ->
+         match tile.cospan with
+           None -> {span = span ; cospan = None}::cont
+         | Some csp -> {span = pb csp ; cospan = Some csp}::cont
+        ) [] (mpo span)
 
-    let share span =
+   (* let share span =
       let emb_to_base,emb_to_wit = span in
       let compare_tile tile tile' =
 	let src = inf_of_tile tile in
 	let src' = inf_of_tile tile' in
 	compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
       in
-      let tiles = mpo span in
+      let tiles = ipo span in
       let ordered_gluings =
 	List.fast_sort compare_tile tiles
       in
@@ -527,9 +536,10 @@ module Make (Node:Node.NodeType) =
           ) [] ordered_gluings
       in
       match sharings with hd::_ -> Some hd | [] -> None
+    *)
 
     (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
-    (*let share max = function
+    let share max = function
 	(emb_to_base,emb_to_wit) as span ->
         assert (is_span span) ;
 
@@ -549,6 +559,7 @@ module Make (Node:Node.NodeType) =
             (fun sharings tile ->
               let sharing_emb = {emb_to_base with trg = inf_of_tile tile} in
               let (emb_to_base',emb_to_wit') = tile.span in
+              Printf.printf "trying %s\n" (string_of_span tile.span) ;
               if (emb_to_base === (emb_to_base' @@ sharing_emb)) && (emb_to_wit === (emb_to_wit' @@ sharing_emb))
               then
                 (print_string "sharing found\n" ;
@@ -558,11 +569,52 @@ module Make (Node:Node.NodeType) =
                 sharings)
             ) [] ordered_gluings
         in
-	match sharings with hd::_ -> Some hd | [] -> None*)
+	match sharings with hd::_ -> Some hd | [] -> None
 
     let is_iso emb =
       List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)
 
     let invert emb =
-      {src = emb.trg ; trg = emb.src ; maps = List.map Hom.invert emb.maps}
+      let emb' = {src = emb.trg ; trg = emb.src ; maps = List.map Hom.invert emb.maps ; partial = false}
+      in
+      try
+        let _ = co_domains emb' in
+        emb'
+      with Not_found -> {emb' with partial = true}
+
+    (*given a span, returns a cospan where the left upper map is a partial morphism*)
+    let ppo (inf_to_left,inf_to_right) =
+      let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
+      let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
+      assert (part_left_to_sup.partial) ;
+      (part_left_to_sup,right_to_sup)
+
+
+    let extend u src p_hom sup inf =
+      assert (not (Hom.mem u p_hom)) ;
+      Graph.fold_nodes
+        (fun u' hom_sup_inf_list ->
+         List.fold_left
+           (fun hom_sup_inf_list (hom,sup,inf) ->
+            if Hom.comem u' hom then hom_sup_inf_list
+            else
+              try
+                let hom_uu' = Hom.add u u' hom in
+                let sup',inf' =
+                  List.fold_left
+                    (fun (sup',inf') v ->
+                     try
+                       let v' = Hom.find v hom_uu' in
+                       let inf' = if Graph.EdgeSet.mem (u',v') sup' then Graph.add_edge u' v' inf' else inf' in
+                       let sup' = Graph.EdgeSet.add (u',v') (Graph.EdgeSet.add (v',u') sup) in
+                       (sup',inf')
+                     with
+                       Not_found -> (sup',inf')
+                    ) (sup,inf) (Graph.bound_to u src)
+                in
+                (hom_uu',sup',inf')::hom_sup_inf_list
+              with
+                Hom.Not_injective | Hom.Not_structure_preserving -> hom_sup_inf_list
+           ) [] hom_sup_inf_list
+        ) trg [(p_hom,sup,inf)]
   end
