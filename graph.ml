@@ -11,11 +11,18 @@ module Make (Node:Node.NodeType) =
       {nodes : NodeSet.t ;
        edges : (Node.t list) NodeMap.t ;
        idmap : (Node.t list) Lib.IntMap.t ;
-       size : int }
+       size : int ;
+       coherent : bool
+      }
 
     module EdgeSet = Set.Make(struct type t = Node.t * Node.t let compare = compare end)
 
-    let empty = {nodes = NodeSet.empty ; edges = NodeMap.empty ; idmap = Lib.IntMap.empty ; size = 0}
+    let empty = {nodes = NodeSet.empty ;
+                 edges = NodeMap.empty ;
+                 idmap = Lib.IntMap.empty ;
+                 size = 0 ;
+                 coherent = true}
+
     let is_empty g = g.size = 0
 
     let equal_support g h =
@@ -50,12 +57,12 @@ module Make (Node:Node.NodeType) =
 	   ) cont bu
 	) g.edges cont
 
-
     let fold_nodes f g cont =
       NodeSet.fold
 	(fun u cont ->
 	 f u cont
 	) g.nodes cont
+
     let bound_to u g =
       try NodeMap.find u g.edges with Not_found -> []
 
@@ -74,7 +81,7 @@ module Make (Node:Node.NodeType) =
 	in
 	{g with nodes = NodeSet.add u g.nodes ; idmap = idmap'}
 
-    let add_edge u v g =
+    let add_edge ?(weak=false) u v g =
       if has_edge u v g then g
       else
 	let bu = bound_to u g in
@@ -88,9 +95,9 @@ module Make (Node:Node.NodeType) =
 	  in
 	  Node.coh edges (u,v)
 	in
-	if is_coherent then
+	if is_coherent || weak then
 	  let edges' = NodeMap.add u (v::bu) (NodeMap.add v (u::bv) g.edges) in
-	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1}
+	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1 ; coherent = is_coherent}
 	else
 	  raise Incoherent
 
@@ -111,14 +118,14 @@ module Make (Node:Node.NodeType) =
       with
 	Incoherent -> failwith "Invariant violation: meet operation is undefined"
 
-    let join g h =
+    let join ?(weak=false) g h =
       NodeMap.fold
 	(fun u buG join ->
 	 List.fold_left
 	   (fun join v ->
 	    let join = add_node u join in
 	    let join = add_node v join in
-	    add_edge u v join
+	    add_edge ~weak:weak u v join
 	   ) join buG
 	) g.edges h
 
