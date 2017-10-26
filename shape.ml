@@ -34,7 +34,7 @@ module Make (Node:Node.NodeType) =
 
     let (=>) = Cat.embed
 
-    let simple_test debug =
+    let simple_tests debug =
       if debug then debug_mode () ;
       let square = graph_of_library "square" in
       let dsquare = graph_of_library "dsquare" in
@@ -42,10 +42,10 @@ module Make (Node:Node.NodeType) =
 
       let f = List.hd (Cat.flatten (Cat.extension_class (one => square))) in
       let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
-      let sharing = Cat.share true (f,g) in
+      let sharing = Cat.share2 (f,g) in
       match sharing with
-        None -> print_string "None"
-      | Some (_,tile) -> print_string (Cat.string_of_tile tile)
+        [] -> print_string "None"
+      | (_,tile)::_ -> print_string (Cat.string_of_tile tile)
 
 
     let generate_tests debug =

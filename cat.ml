@@ -582,61 +582,123 @@ module Make (Node:Node.NodeType) =
         emb'
       with Not_found -> {emb' with partial = true}
 
-    let complete src p_hom sup inf =
-      let extend u src p_hom sup inf =
-        assert (not (Hom.mem u p_hom)) ;
-        Graph.fold_nodes
-          (fun u' hom_sup_inf_list ->
-            List.fold_left
-              (fun hom_sup_inf_list (hom,sup,inf) ->
-                if Hom.comem u' hom then hom_sup_inf_list
-                else
-                  try
-                    let hom_uu' = Hom.add u u' hom in
-                    let sup',inf' =
-                      List.fold_left
-                        (fun (sup',inf') v ->
-                          try
-                            let v' = Hom.find v hom_uu' in
-                            let inf' = if Graph.has_edge u' v' sup' then Graph.add_edge u' v' inf' else inf' in
-                            let sup' = Graph.add_edge ~weak:true u' v' sup in
-                            (sup',inf')
-                          with
-                            Not_found -> (sup',inf')
-                          | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
-                        ) (sup,inf) (Graph.bound_to u src)
-                    in
-                    (hom_uu',sup',inf')::hom_sup_inf_list
-                  with
-                    Hom.Not_injective | Hom.Not_structure_preserving -> hom_sup_inf_list
-              ) [] hom_sup_inf_list
-          ) sup [(p_hom,sup,inf)]
-      in
-      Graph.fold_nodes
-        (fun u hom_sup_inf_list ->
+    let complete left p_left_to_sup sup inf_to_left inf inf_to_right =
+      
+      Printf.printf "Completing %s --%s--\\ %s\n" (Graph.to_string left) (Hom.to_string p_left_to_sup) (Graph.to_string sup) ;
+
+      let extend u p_hom sup inf_to_left inf inf_to_right =
+        assert (not (Hom.mem u p_left_to_sup)) ;
+        let ext_uu' =
           List.fold_left
-            (fun hom_sup_inf_list_ext_u (hom,sup,inf) ->
-              if Hom.mem u hom then hom_sup_inf_list_ext_u
+            (fun hom_sup_inf_list (p_hom,sup,inf_to_left,inf,inf_to_sup)  ->
+             let ext =
+               Graph.fold_nodes
+                 (fun u' hom_sup_inf_list  ->
+                  if Hom.comem u' p_hom then hom_sup_inf_list
+                  else
+                    try
+                      let hom_uu' = Hom.add u u' p_hom in
+                      Printf.printf "--%s--\\ \n" (Hom.to_string hom_uu') ;
+                      
+                      let sup',inf_to_left',inf',inf_to_right' =
+                        List.fold_left
+                          (fun (sup,inf_to_left,inf,inf_to_right) v ->
+                           try
+                             let v' = Hom.find v hom_uu' in
+                             let inf_to_left',inf',inf_to_right' =
+                               if Graph.has_edge u' v' sup then
+                                 let _ = print_string "Growing inf!\n" in
+                                 let u_inf =
+                                   Node.rename ((Graph.max_id inf)+1) u' in
+                                 let v_inf = Hom.cofind v' inf_to_right in
+                                 let inf' = Graph.add_edge u_inf v_inf (Graph.add_node u_inf inf) in
+                                 (Hom.add u_inf u inf_to_left,inf',Hom.add u_inf u' inf_to_right)
+                               else
+                                 (inf_to_left,inf,inf_to_right)
+                             in
+                             let sup' = Graph.add_edge ~weak:true u' v' sup
+                             in
+                             (sup',inf_to_left',inf',inf_to_right')
+                           with
+                             Not_found -> (sup,inf_to_left,inf,inf_to_right)
+                           | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
+                          ) (sup,inf_to_left,inf,inf_to_sup) (Graph.bound_to u left)
+                      in
+                      (hom_uu',sup',inf_to_left',inf',inf_to_right')::hom_sup_inf_list
+                    with
+                      Hom.Not_injective | Hom.Not_structure_preserving -> hom_sup_inf_list
+                 ) sup hom_sup_inf_list
+             in
+             ext@hom_sup_inf_list
+            ) [] [(p_left_to_sup,sup,inf_to_left,inf,inf_to_right)]
+        in
+        try
+          let ext_ufresh =
+            let u_sup = Node.rename ((Graph.max_id sup)+1) u in
+            let hom_uu_sup = Hom.add u u_sup p_hom
+            in
+            let sup' =
+              List.fold_left
+                (fun sup' v ->
+                 try
+                   let v' = Hom.find v hom_uu_sup in
+                   Graph.add_edge ~weak:true u_sup v' sup'
+                 with
+                   Not_found -> sup'
+                ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
+            in
+            (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)
+          in
+          ext_ufresh::ext_uu' (*adding the choice where u is mapped to a fresh node in sup*)
+        with
+          Hom.Not_injective -> ext_uu'
+      in
+      List.fold_left
+        (fun hom_sup_inf_list (p_hom,sup,inf_to_left,inf,inf_to_right) ->
+         let ext_u =
+           Graph.fold_nodes
+             (fun u hom_sup_inf_list_ext_u ->
+              Printf.printf "%s in domain of --%s--\\ ?\n" (Node.to_string u) (Hom.to_string p_hom) ;
+              if Hom.mem u p_hom then hom_sup_inf_list_ext_u
               else
-                let l = extend u src hom sup inf in
+                let _ = Printf.printf "Trying to add %s to partial morphism\n" (Node.to_string u)
+                in
+                let l = extend u p_hom sup inf_to_left inf inf_to_right in
                 l@hom_sup_inf_list_ext_u
-            ) [] hom_sup_inf_list
-        ) src [(p_hom,sup,inf)]
+             ) left hom_sup_inf_list
+         in
+         ext_u@hom_sup_inf_list
+        ) [] [(p_left_to_sup,sup,inf_to_left,inf,inf_to_right)]
+
+    let hom_of_embeddings emb =
+      match emb.maps with
+        [hom] -> hom
+      | _ -> failwith "Invariant violation, not a flat embedding"
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
-    let share (inf_to_left,inf_to_right) =
+    let share2 (inf_to_left,inf_to_right) =
+      Printf.printf "Share2 of:\n %s\n" (string_of_span (inf_to_left,inf_to_right)) ;
       let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
       let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
       assert (part_left_to_sup.partial) ;
-      let l =
-        List.fold_left
-          (fun cont p_hom ->
-            List.fold_left
-              (fun cont (hom,sup,inf) ->
-                
-              ) [] (complete part_left_to_sup.src p_hom part_left_to_sup.trg inf_to_left.src)
-          ) [] part_left_to_sup.maps
-      in
-      
-
+      let inf = inf_to_left.src in
+      let left = inf_to_left.trg in
+      let right = inf_to_right.trg in
+      let sup = right_to_sup.trg in
+      let hom_p =  hom_of_embeddings part_left_to_sup in
+      let inf_to_right = hom_of_embeddings inf_to_right in
+      let inf_to_left = hom_of_embeddings inf_to_left in
+      List.fold_left
+        (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
+         let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
+         let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
+         let csp_opt =
+           if sup.Graph.coherent then
+             Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
+           else
+             None
+         in
+         let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
+         (identity inf inf',tile)::sharing_tiles
+        ) [] (complete left hom_p sup inf_to_left inf inf_to_right)
   end

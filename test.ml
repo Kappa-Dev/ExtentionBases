@@ -13,7 +13,7 @@ let test =
   match input with
     "kappa" ->
     begin
-      Shape.KappaShape.generate_tests debug ;
+      Shape.KappaShape.simple_tests debug ;
       print_string "done\n"
     end
   | "simple" ->

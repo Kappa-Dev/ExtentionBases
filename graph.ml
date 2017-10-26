@@ -139,6 +139,7 @@ module Make (Node:Node.NodeType) =
 		try add_edge u v diff with Incoherent -> failwith "Invariant violation"
 	     ) g empty
 
+    (*TODO: maintain max_id when adding a new node to the graph*)
     let max_id g =
       fold_nodes (fun u max -> if Node.id u > max then Node.id u else max) g 0
 
