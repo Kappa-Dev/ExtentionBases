@@ -154,6 +154,8 @@ module Make (Node:Node.NodeType) =
 
 
     let add_step i j emb_ij ext_base =
+      
+      Printf.printf "step %d |--> %d\n" i j ;
       let pi = find i ext_base in
       if Lib.IntSet.mem j pi.future then
         let _ = if db() then print_string (red (Printf.sprintf "Not adding step: %d is in the future of %d\n" j i))
@@ -353,7 +355,7 @@ module Make (Node:Node.NodeType) =
         let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) in
         let ext_base = add w (point ext_w.Cat.trg) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
-        List.fold_left (fun ext_base act -> act w ext_base) ext_base actions
+        List.fold_left (fun ext_base act -> act w ext_base) ext_base (List.rev actions)
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
