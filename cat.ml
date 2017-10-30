@@ -16,6 +16,8 @@ module Make (Node:Node.NodeType) =
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
 
+    let size emb =
+      Hom.size (List.hd emb.maps)
 
     let sup_of_tile tile =
       match tile.cospan with
@@ -377,104 +379,6 @@ module Make (Node:Node.NodeType) =
 	 mpos_for_h@tiles
 	) [] emb_h.maps
 
-    let glue g h span_option =
-      (*one_gluings: embeddings of one edge of h into g, partial_gluings: embeddings of n edges of h into g*)
-      let rec enumerate_gluings one_gluings partial_gluings complete_gluings already_done =
-	match partial_gluings with
-	  [] -> complete_gluings
-	| (n_gluing)::tl ->
-	   let succ_n_gluings,complete_gluings',already_done' =
-	     List.fold_left
-	       (fun (succ_n_gluings,complete_gluings,already_done) one_gluing ->
-		try
-		  if Graph.is_included one_gluing.src n_gluing.src then (succ_n_gluings,complete_gluings,already_done)
-		  else
-		    match try Some (horizontal_compose one_gluing n_gluing) with Undefined -> None
-		    with
-		      None -> (succ_n_gluings,complete_gluings,already_done)
-		    | Some succ_n_emb -> (*defines an n+1 gluing*)
-		       (*On verifie ici que succ_n_hset n'est pas deja dans succ_n_gluings*)
-		       if List.exists
-			    (fun emb ->
-			     Graph.is_equal emb.src succ_n_emb.src
-			    ) already_done
-		       then (succ_n_gluings,complete_gluings,already_done)
-		       else
-			 let complete_gluings' = succ_n_emb::complete_gluings in
-			 (succ_n_emb::succ_n_gluings,complete_gluings', succ_n_emb::already_done)
-		with
-		  Hom.Not_structure_preserving -> failwith "Invariant violation: not structure preserving"
-		| Hom.Not_injective -> (succ_n_gluings,complete_gluings,already_done)
-	       ) ([],complete_gluings,already_done) one_gluings
-	   in
-	   enumerate_gluings one_gluings (tl@succ_n_gluings) complete_gluings' already_done'
-      in
-      let subgraphs_of_edges graph inf =
-	try
-	  Graph.fold_edges
-	    (fun u v subgraphs ->
-	     let subg = Graph.add_node u (Graph.add_node v inf) in
-	     (Graph.add_edge u v subg)::subgraphs
-	    ) graph []
-	with
-	  Graph.Incoherent -> failwith "Invariant violation: graph is incoherent"
-      in
-      let one_gluings =
-	let cstr_edges =
-	  match span_option with
-	    None -> Graph.empty
-	  | Some (emb_to_g,_) ->
-             match co_domains emb_to_g with
-	       [cod] -> cod
-	     | _ -> failwith "Invariant violation: Gluing under constraint should use flat embeddings"
-	in
-        let sub_g = subgraphs_of_edges g cstr_edges in
-        List.fold_left
-	  (fun arr_list sub_g ->
-	   try
-             let embeddings = embed sub_g h
-	     in
-	     embeddings::arr_list
-	   with
-	     Undefined -> arr_list
-	  ) [] sub_g
-      in
-      let gluing_points = enumerate_gluings one_gluings one_gluings one_gluings [] in
-      let spans =
-	List.fold_left
-	  (fun spans inf_to_h ->
-	   let to_h = extension_class inf_to_h in
-	   let to_g =  identity inf_to_h.src g in (*Asymmetry is important here because all subparts of g are added edges*)
-	   (to_g,to_h)::spans
-	  ) [] gluing_points
-      in
-      let mpos =
-	List.fold_left
-	  (fun tiles span ->
-	   (mpo span)@tiles
-	  ) [] spans
-      in
-      List.fold_left
-	(fun cont tile ->
-	 let is_max infGH mpos = (*checks whether infGH is not included in the inf of another tile*)
-	   try
-	     (List.fold_left
-		(fun _ tile ->
-		 if (Graph.size_edge infGH < Graph.size_edge (inf_of_tile tile))
-		    && (Graph.is_included infGH (inf_of_tile tile))
-		 then raise Pervasives.Exit
-		) () mpos ; true)
-	   with
-	     Pervasives.Exit -> false
-	 in
-	 match sup_of_tile tile with
-	   None -> if is_max (inf_of_tile tile) mpos then tile::cont else cont
-	 | Some _ -> tile::cont
-	) [] mpos
-
-    let (><) g h = glue g h None
-
-
     let merge_embeddings emb emb' =
       assert (Graph.is_equal emb.src emb'.src && Graph.is_equal emb.trg emb'.trg) ;
       extension_class {src = emb.src ; trg = emb.trg ; maps = emb.maps@emb'.maps; partial = false}
@@ -494,83 +398,6 @@ module Make (Node:Node.NodeType) =
 
     let (@@) = vertical_compose
 
-    let pb (l_to_sup,r_to_sup) =
-      let im_l = match co_domains l_to_sup with [g] -> g | _ -> failwith "Not a flat embedding" in
-      let im_r = match co_domains r_to_sup with [g] -> g | _ -> failwith "Not a flat embedding" in
-      let inf' = Graph.meet im_l im_r in
-      let inf'_to_l = {src = inf' ; trg = l_to_sup.src ; maps = List.map Hom.invert l_to_sup.maps; partial = false} in
-      let inf'_to_r = {src = inf' ; trg = r_to_sup.src ; maps = List.map Hom.invert r_to_sup.maps; partial = false} in
-      (inf'_to_l,inf'_to_r)
-
-    let ipo span =
-      List.fold_left
-        (fun cont tile ->
-         match tile.cospan with
-           None -> {span = span ; cospan = None}::cont
-         | Some csp -> {span = pb csp ; cospan = Some csp}::cont
-        ) [] (mpo span)
-
-   (* let share span =
-      let emb_to_base,emb_to_wit = span in
-      let compare_tile tile tile' =
-	let src = inf_of_tile tile in
-	let src' = inf_of_tile tile' in
-	compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
-      in
-      let tiles = ipo span in
-      let ordered_gluings =
-	List.fast_sort compare_tile tiles
-      in
-      let sharings =
-        List.fold_left
-          (fun sharings tile ->
-           let sharing_emb = {emb_to_base with trg = inf_of_tile tile} in
-           let (emb_to_base',emb_to_wit') = tile.span in
-           if (emb_to_base === (emb_to_base' @@ sharing_emb)) && (emb_to_wit === (emb_to_wit' @@ sharing_emb))
-           then
-             (print_string "sharing found\n" ;
-              (sharing_emb,tile)::sharings)
-           else
-             (print_string "sharing does not commute\n" ;
-              sharings)
-          ) [] ordered_gluings
-      in
-      match sharings with hd::_ -> Some hd | [] -> None
-    *)
-
-    (*if [max] then only retains gluings with maximal size. May contain isomorphic gluings.*)
-    let share max = function
-	(emb_to_base,emb_to_wit) as span ->
-        assert (is_span span) ;
-
-	let compare_tile tile tile' =
-	  let src = inf_of_tile tile in
-	  let src' = inf_of_tile tile' in
-	  compare (Graph.size_edge src') (Graph.size_edge src) (*to have list sorted in increasing order*)
-	in
-
-	let gluings = glue emb_to_base.trg emb_to_wit.trg (Some span)
-        in
-        let ordered_gluings =
-	  List.fast_sort compare_tile gluings
-	in
-        let sharings =
-          List.fold_left
-            (fun sharings tile ->
-              let sharing_emb = {emb_to_base with trg = inf_of_tile tile} in
-              let (emb_to_base',emb_to_wit') = tile.span in
-              Printf.printf "trying %s\n" (string_of_span tile.span) ;
-              if (emb_to_base === (emb_to_base' @@ sharing_emb)) && (emb_to_wit === (emb_to_wit' @@ sharing_emb))
-              then
-                (print_string "sharing found\n" ;
-                (sharing_emb,tile)::sharings)
-              else
-                (print_string "sharing does not commute\n" ;
-                sharings)
-            ) [] ordered_gluings
-        in
-	match sharings with hd::_ -> Some hd | [] -> None
-
     let is_iso emb =
       List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)
 
@@ -582,58 +409,62 @@ module Make (Node:Node.NodeType) =
         emb'
       with Not_found -> {emb' with partial = true}
 
-    let complete left p_left_to_sup sup inf_to_left inf inf_to_right =
-      
-      Printf.printf "Completing %s --%s--\\ %s\n" (Graph.to_string left) (Hom.to_string p_left_to_sup) (Graph.to_string sup) ;
-
+    let complete left ls sup il inf ir =
+      let comp u u' h =
+        if Hom.mem_sub (Node.id u) h then
+          Hom.find_sub (Node.id u) h = Node.id u'
+        else
+          not (Hom.comem_sub (Node.id u') h)
+      in
+      let name_in_inf u il inf =
+        try
+          let i = Hom.cofind_sub (Node.id u) il in
+          Node.rename i u
+        with
+          Not_found ->
+          Node.rename ((Graph.max_id inf) + 1) u
+      in
       let extend u p_hom sup inf_to_left inf inf_to_right =
-        assert (not (Hom.mem u p_left_to_sup)) ;
-        let ext_uu' =
-          List.fold_left
-            (fun hom_sup_inf_list (p_hom,sup,inf_to_left,inf,inf_to_sup)  ->
-             let ext =
-               Graph.fold_nodes
-                 (fun u' hom_sup_inf_list  ->
-                  if Hom.comem u' p_hom then hom_sup_inf_list
-                  else
-                    try
-                      let hom_uu' = Hom.add u u' p_hom in
-                      Printf.printf "--%s--\\ \n" (Hom.to_string hom_uu') ;
-                      
-                      let sup',inf_to_left',inf',inf_to_right' =
-                        List.fold_left
-                          (fun (sup,inf_to_left,inf,inf_to_right) v ->
-                           try
-                             let v' = Hom.find v hom_uu' in
-                             let inf_to_left',inf',inf_to_right' =
-                               if Graph.has_edge u' v' sup then
-                                 let _ = print_string "Growing inf!\n" in
-                                 let u_inf =
-                                   Node.rename ((Graph.max_id inf)+1) u' in
-                                 let v_inf = Hom.cofind v' inf_to_right in
-                                 let inf' = Graph.add_edge u_inf v_inf (Graph.add_node u_inf inf) in
-                                 (Hom.add u_inf u inf_to_left,inf',Hom.add u_inf u' inf_to_right)
-                               else
-                                 (inf_to_left,inf,inf_to_right)
-                             in
-                             let sup' = Graph.add_edge ~weak:true u' v' sup
-                             in
-                             (sup',inf_to_left',inf',inf_to_right')
-                           with
-                             Not_found -> (sup,inf_to_left,inf,inf_to_right)
-                           | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
-                          ) (sup,inf_to_left,inf,inf_to_sup) (Graph.bound_to u left)
-                      in
-                      (hom_uu',sup',inf_to_left',inf',inf_to_right')::hom_sup_inf_list
-                    with
-                      Hom.Not_injective | Hom.Not_structure_preserving -> hom_sup_inf_list
-                 ) sup hom_sup_inf_list
-             in
-             ext@hom_sup_inf_list
-            ) [] [(p_left_to_sup,sup,inf_to_left,inf,inf_to_right)]
+        assert (not (Hom.mem u p_hom)) ;
+        let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
+          Graph.fold_nodes
+            (fun u' cont ->
+             if not (comp u u' p_hom) then cont
+             else
+               try
+                 let hom_uu' = Hom.add u u' p_hom in
+                 let sup',il',inf',ir' =
+                   List.fold_left
+                     (fun (sup,il,inf,ir) v ->
+                      try
+                        let v' = Hom.find v hom_uu' in
+                        let il',inf',ir' =
+                          if Graph.has_edge u' v' sup then
+                            let u_inf = name_in_inf u il inf in
+                            let inf = Graph.add_node u_inf inf in
+                            let v_inf = name_in_inf v il inf in
+                            let inf = Graph.add_node v_inf inf in
+                            let inf' = Graph.add_edge u_inf v_inf inf
+                            in
+                            (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir))
+                          else
+                            (il,inf,ir) (*unchanged*)
+                        in
+                        let sup' = Graph.add_edge ~weak:true u' v' sup
+                        in
+                        (sup',il',inf',ir')
+                      with
+                        Not_found -> (sup,il,inf,ir) (*v has no image by p_hom*)
+                      | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
+                     ) (sup,inf_to_left,inf,inf_to_right) (Graph.bound_to u left)
+                 in
+                 (hom_uu',sup',il',inf',ir')::cont
+               with
+                 Hom.Not_injective | Hom.Not_structure_preserving -> cont
+            ) sup []
         in
         try
-          let ext_ufresh =
+          let ext_ufresh = (*extension of p_hom to u |--> fresh *)
             let u_sup = Node.rename ((Graph.max_id sup)+1) u in
             let hom_uu_sup = Hom.add u u_sup p_hom
             in
@@ -653,22 +484,15 @@ module Make (Node:Node.NodeType) =
         with
           Hom.Not_injective -> ext_uu'
       in
-      List.fold_left
-        (fun hom_sup_inf_list (p_hom,sup,inf_to_left,inf,inf_to_right) ->
-         let ext_u =
-           Graph.fold_nodes
-             (fun u hom_sup_inf_list_ext_u ->
-              Printf.printf "%s in domain of --%s--\\ ?\n" (Node.to_string u) (Hom.to_string p_hom) ;
-              if Hom.mem u p_hom then hom_sup_inf_list_ext_u
-              else
-                let _ = Printf.printf "Trying to add %s to partial morphism\n" (Node.to_string u)
-                in
-                let l = extend u p_hom sup inf_to_left inf inf_to_right in
-                l@hom_sup_inf_list_ext_u
-             ) left hom_sup_inf_list
-         in
-         ext_u@hom_sup_inf_list
-        ) [] [(p_left_to_sup,sup,inf_to_left,inf,inf_to_right)]
+      Graph.fold_nodes
+        (fun u ext_list ->
+         List.fold_left
+           (fun cont (ls,sup,il,inf,ir) ->
+            if Hom.mem u ls then ext_list
+            else
+              (extend u ls sup il inf ir)@cont
+           ) [] ext_list
+        ) left [(ls,sup,il,inf,ir)]
 
     let hom_of_embeddings emb =
       match emb.maps with
@@ -676,11 +500,9 @@ module Make (Node:Node.NodeType) =
       | _ -> failwith "Invariant violation, not a flat embedding"
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
-    let share2 (inf_to_left,inf_to_right) =
-      Printf.printf "Share2 of:\n %s\n" (string_of_span (inf_to_left,inf_to_right)) ;
+    let ipo (inf_to_left,inf_to_right) =
       let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
       let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
-      assert (part_left_to_sup.partial) ;
       let inf = inf_to_left.src in
       let left = inf_to_left.trg in
       let right = inf_to_right.trg in
@@ -693,7 +515,7 @@ module Make (Node:Node.NodeType) =
          let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
          let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
          let csp_opt =
-           if sup.Graph.coherent then
+           if sup'.Graph.coherent then
              Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
            else
              None
@@ -701,4 +523,24 @@ module Make (Node:Node.NodeType) =
          let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
          (identity inf inf',tile)::sharing_tiles
         ) [] (complete left hom_p sup inf_to_left inf inf_to_right)
+
+    let glue g h =
+      let sh_tiles = ipo (embed Graph.empty g,embed Graph.empty h) in
+      List.fold_left
+        (fun cont (emb,tile) ->
+         if Graph.is_empty (inf_of_tile tile) then cont
+         else
+           tile::cont) [] sh_tiles
+
+    let share f g =
+      let compare_sharing (emb,_) (emb',_) =
+        compare (size emb) (size emb')
+      in
+      let sh_tiles = List.fast_sort compare_sharing (ipo (f,g))
+      in
+      match sh_tiles with
+        [] ->
+        Printf.printf "no ipo for %s\n" (string_of_span (f,g)) ;
+        None
+      | h::_ -> Some h
   end

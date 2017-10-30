@@ -97,7 +97,7 @@ module Make (Node:Node.NodeType) =
 	in
 	if is_coherent || weak then
 	  let edges' = NodeMap.add u (v::bu) (NodeMap.add v (u::bv) g.edges) in
-	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1 ; coherent = is_coherent}
+	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1 ; coherent = is_coherent && g.coherent}
 	else
 	  raise Incoherent
 

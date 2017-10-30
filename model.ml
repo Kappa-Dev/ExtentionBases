@@ -4,7 +4,7 @@ module Make (Node:Node.NodeType) =
     module Graph = Cat.Graph
     module Hom = Cat.Hom
 
-    let (><) = Cat.(><)
+    let (><) = Cat.glue
 
     type t = {rules : (Graph.t * Graph.t) Lib.IntMap.t ; obs : Graph.t Lib.IntMap.t ; dict : Lib.Dict.t}
     type effect = {neg : Cat.embeddings option ; pos : Cat.embeddings option}

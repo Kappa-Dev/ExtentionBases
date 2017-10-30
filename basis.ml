@@ -201,7 +201,7 @@ module Make (Node:Node.NodeType) =
                           (Cat.string_of_embeddings inf_to_w)
                           (Graph.to_string inf_to_w.Cat.trg)
         end;
-      match Cat.share ext_base.sharing.unique (inf_to_i,inf_to_w) with
+      match Cat.share inf_to_i inf_to_w with
         None -> Conflicting
       | Some (inf_to_sh,sharing_tile) ->
          let sh_to_base,sh_to_w = sharing_tile.Cat.span in

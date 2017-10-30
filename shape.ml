@@ -36,16 +36,18 @@ module Make (Node:Node.NodeType) =
 
     let simple_tests debug =
       if debug then debug_mode () ;
+      let one = graph_of_library "one" in
       let square = graph_of_library "square" in
       let dsquare = graph_of_library "dsquare" in
-      let one = graph_of_library "one" in
-
       let f = List.hd (Cat.flatten (Cat.extension_class (one => square))) in
       let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
-      let sharing = Cat.share2 (f,g) in
-      match sharing with
-        [] -> print_string "None"
-      | (_,tile)::_ -> print_string (Cat.string_of_tile tile)
+      let sharing = Cat.ipo (f,g) in
+      List.iter
+        (fun (_,tile) ->
+         print_string (Cat.string_of_tile tile) ;
+         print_newline() ;
+         print_newline()
+        ) sharing
 
 
     let generate_tests debug =

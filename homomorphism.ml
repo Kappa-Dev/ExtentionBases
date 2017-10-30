@@ -9,6 +9,7 @@ module Make (Node:Node.NodeType) =
 
     type t = {tot : NodeBij.t ; sub : IntBij.t }
 
+    let size hom = NodeBij.size hom.tot
 
     let is_equal hom hom' = NodeBij.is_equal (fun u v -> Node.compare u v = 0) hom.tot hom'.tot
 
@@ -89,7 +90,10 @@ module Make (Node:Node.NodeType) =
 
     let fold f hom = NodeBij.fold (fun u v cont -> f u v cont) hom.tot
 
-    let to_string hom =
+    let to_string ?(full=false) hom =
+      if full then
+        NodeBij.to_string hom.tot
+      else
       IntBij.to_string hom.sub
 
     (*[compose h h'] = (h o h') *)

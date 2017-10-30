@@ -189,6 +189,7 @@ module KappaNode =
 	  ]
 	in
 	let one = [([0;0;0],[1;0;0])] in
+        let two = [([0;0;0],[1;0;0]);([2;0;0],[1;1;0])] in
 	let tn = List.map (fun (l,l') -> (create l,create l'))
 	in
 	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
@@ -199,6 +200,7 @@ module KappaNode =
 	let lib = Lib.StringMap.add "dsquare" (tn dsquare) lib
 	in
 	let lib = Lib.StringMap.add "one" (tn one) lib in
+	let lib = Lib.StringMap.add "two" (tn two) lib in
 	Lib.StringMap.add "triangle" (tn triangle) lib
 
     end:NodeType)

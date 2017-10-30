@@ -9,6 +9,10 @@ module Make (Content:Lib.OrderedType) =
 
     let empty = I CSet.empty
 
+    let size = function
+        I s -> CSet.cardinal s
+      | B (m,_) -> CMap.cardinal m
+
     let invert = function
         I s -> I s
       | B (m,m') -> B (m',m)
