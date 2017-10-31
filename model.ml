@@ -45,8 +45,11 @@ module Make (Node:Node.NodeType) =
 	   | Some (_,h_eps_to_w) ->
               assert (List.tl (h_eps_to_w.Cat.maps) = []) ;
               (*Checking that w and pi_eps have a sup.*)
-              if Cat.mpo (h_eps_to_w,id_emb) = [] then tiles
-              else (obs_name,gluing_tile)::tiles
+              match Cat.ipo (h_eps_to_w,id_emb) with
+                [] -> tiles
+              | (sh_emb,tile)::_ ->
+                 if Cat.sup_of_tile tile = None then tiles
+                 else (obs_name,gluing_tile)::tiles
 	  ) [] (h_eps >< obs)
       in
       let build_witnesses effect observables =

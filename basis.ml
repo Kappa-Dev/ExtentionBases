@@ -154,7 +154,6 @@ module Make (Node:Node.NodeType) =
 
 
     let add_step i j emb_ij ext_base =
-      
       let pi = find i ext_base in
       if Lib.IntSet.mem j pi.future then
         let _ = if db() then print_string (red (Printf.sprintf "Not adding step: %d is in the future of %d\n" j i))
@@ -232,7 +231,7 @@ module Make (Node:Node.NodeType) =
       in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
-    let rec progress fresh_id ext_base actions compared next_layer todo =
+    let rec progress fresh_id ext_base actions visited next_layer todo =
       let _ = if db() then
                 begin
                   Printf.printf "stack: {%s}\n"
@@ -247,10 +246,10 @@ module Make (Node:Node.NodeType) =
                 end
       in
       match todo with
-        [] -> if next_layer = [] then actions else progress fresh_id ext_base actions compared [] next_layer
+        [] -> if next_layer = [] then actions else progress fresh_id ext_base actions visited [] next_layer
       | (inf,ext_inf_i,i,ext_inf_w)::todo ->
-         if Lib.IntSet.mem i compared then
-           progress fresh_id ext_base actions compared next_layer todo
+         if Lib.IntSet.mem i visited then
+           progress fresh_id ext_base actions visited next_layer todo
          else
            let _ = if db() then Printf.printf "Visiting (%d,%d)\n" inf i in
            begin
@@ -271,10 +270,10 @@ module Make (Node:Node.NodeType) =
                  else
                    (fun w ext_base -> add_conflict i w ext_base)::actions
                in
-               progress fresh_id ext_base actions' (Lib.IntSet.add i compared) next_layer' todo
+               progress fresh_id ext_base actions' (Lib.IntSet.add i visited) next_layer' todo
                | Below ext_w_i ->
                   if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
-                  progress fresh_id ext_base ((fun w ext_base -> add_step w i ext_w_i ext_base)::actions) (Lib.IntSet.add i compared) next_layer todo
+                  progress fresh_id ext_base ((fun w ext_base -> add_step w i ext_w_i ext_base)::actions) (Lib.IntSet.add i visited) next_layer todo
                | Above ext_i_w ->
                   if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
                   let todo',stop =
@@ -292,7 +291,7 @@ module Make (Node:Node.NodeType) =
                   progress fresh_id
                            ext_base
                            actions'
-                           (Lib.IntSet.add i compared)
+                           (Lib.IntSet.add i visited)
                            next_layer
                            todo'
                | Iso iso_w_i ->
@@ -320,7 +319,7 @@ module Make (Node:Node.NodeType) =
                       else
                         actions'
                     in
-                    progress fresh_id ext_base actions' (Lib.IntSet.add i compared) next_layer' todo
+                    progress fresh_id ext_base actions' (Lib.IntSet.add i visited) next_layer' todo
                   else
                     (*Not a trivial midpoint*)
                     let next_layer',stop =
@@ -342,7 +341,7 @@ module Make (Node:Node.NodeType) =
                        remove_step inf i (remove_step inf w ext_base) (*will remove steps only if they exists and they are direct*)
                       )::actions'
                     in
-                    progress (fresh_id+1) ext_base actions' (Lib.IntSet.add i compared) next_layer' todo
+                    progress (fresh_id+1) ext_base actions' (Lib.IntSet.add i visited) next_layer' todo
            end
 
     let insert ext_w obs_emb obs_id ext_base =

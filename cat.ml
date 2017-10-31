@@ -89,15 +89,15 @@ module Make (Node:Node.NodeType) =
     let images g emb =
       List.fold_left
         (fun images hom ->
-         let im =
-	   Graph.fold_edges
-	     (fun u v cod ->
-	      let (u',v') = Hom.find2 (u,v) hom in
-	      let cod = Graph.add_node u' (Graph.add_node v' cod) in
-	      Graph.add_edge u' v' cod
-	     ) g Graph.empty
-	 in
-	 im::images
+          let im =
+	    Graph.fold_edges
+	      (fun u v cod ->
+	        let (u',v') = Hom.find2 (u,v) hom in
+	        let cod = Graph.add_node u' (Graph.add_node v' cod) in
+	        Graph.add_edge u' v' cod
+	      ) g Graph.empty
+	  in
+	  im::images
         ) [] emb.maps
 
     let co_domains emb = images emb.src emb
@@ -107,10 +107,10 @@ module Make (Node:Node.NodeType) =
         try
           List.iter2
             (fun hom hom' ->
-             Hom.fold
-               (fun u v () ->
-                if v <> Hom.find u hom' then raise Exit
-               ) hom ()
+              Hom.fold
+                (fun u v () ->
+                  if v <> Hom.find u hom' then raise Exit
+                ) hom ()
             ) emb.maps emb'.maps ;
           true
         with
@@ -121,7 +121,7 @@ module Make (Node:Node.NodeType) =
         try
           List.iter2
             (fun cod cod' ->
-             if not (Graph.is_equal cod cod') then raise Exit
+              if not (Graph.is_equal cod cod') then raise Exit
             ) (co_domains emb) (co_domains emb') ;
           true
         with
@@ -142,11 +142,11 @@ module Make (Node:Node.NodeType) =
 	       let ext =
 		 List.fold_left
 		   (fun cont jH ->
-		    try
-		      let phi_ext = Hom.add jG jH phi in
-		      phi_ext::cont
-		    with
-		      Hom.Not_injective | Hom.Not_structure_preserving -> cont
+		     try
+		       let phi_ext = Hom.add jG jH phi in
+		       phi_ext::cont
+		     with
+		       Hom.Not_injective | Hom.Not_structure_preserving -> cont
 		   ) [] biH
 	       in
 	       extend tl iG jG (ext@acc)
@@ -158,44 +158,44 @@ module Make (Node:Node.NodeType) =
       let rec explore_cc i hom_list already_done =
 	List.fold_left
 	  (fun (hom_list,already_done) j ->
-	   let hom_list' = extend hom_list i j [] in
-	   if NodeSet.mem j already_done then
-	     (hom_list',already_done)
-	   else
-	     explore_cc j hom_list' (NodeSet.add j already_done)
+	    let hom_list' = extend hom_list i j [] in
+	    if NodeSet.mem j already_done then
+	      (hom_list',already_done)
+	    else
+	      explore_cc j hom_list' (NodeSet.add j already_done)
 	  ) (hom_list,already_done) (Graph.bound_to i g)
       in
       let extend_next_root u hom_list g h =
 	List.fold_left (fun hom_list hom ->
-			let fold_candidates_u =
-			  match Hom.id_image u hom with
-			    None -> (*if [Node.id u] is not yet constrained by [hom]*)
-			    (fun f -> Graph.fold_nodes f h)
-			  | Some i -> (*Looking for a candidate among those having [hom (Node.id u)] as id*)
-			     (fun f -> List.fold_right f (Graph.nodes_of_id i h))
-			in
-			let hom_extended_with_candidates_u =
-			  fold_candidates_u
-			    (fun u' cont ->
-			     if (Graph.degree u g) <= (Graph.degree u' h) then
-			       try
-				 (Hom.add u u' hom)::cont
-			       with
-				 Hom.Not_structure_preserving | Hom.Not_injective -> cont
-			     else
-			       cont
+	    let fold_candidates_u =
+	      match Hom.id_image u hom with
+		None -> (*if [Node.id u] is not yet constrained by [hom]*)
+		(fun f -> Graph.fold_nodes f h)
+	      | Some i -> (*Looking for a candidate among those having [hom (Node.id u)] as id*)
+		 (fun f -> List.fold_right f (Graph.nodes_of_id i h))
+	    in
+	    let hom_extended_with_candidates_u =
+	      fold_candidates_u
+		(fun u' cont ->
+		  if (Graph.degree u g) <= (Graph.degree u' h) then
+		    try
+		      (Hom.add u u' hom)::cont
+		    with
+		      Hom.Not_structure_preserving | Hom.Not_injective -> cont
+		  else
+		    cont
 
-			    ) []
-			in
-			hom_extended_with_candidates_u@hom_list
-		       ) [] hom_list
+		) []
+	    in
+	    hom_extended_with_candidates_u@hom_list
+	  ) [] hom_list
       in
       let cc_roots = Graph.connected_components g in
       List.fold_left
 	(fun hom_list u ->
-	 let hom_list_u = extend_next_root u hom_list g h in
-	 let hom_list_extended,_ = explore_cc u hom_list_u (NodeSet.singleton u) in
-	 hom_list_extended
+	  let hom_list_u = extend_next_root u hom_list g h in
+	  let hom_list_extended,_ = explore_cc u hom_list_u (NodeSet.singleton u) in
+	  hom_list_extended
 	) [Hom.empty] cc_roots
 
     let embed g h =
@@ -210,16 +210,16 @@ module Make (Node:Node.NodeType) =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
-	   let hom_added =
-	     List.fold_left
-	       (fun hom_added hom' ->
-		try
-		  (Hom.sum hom hom')::hom_added
-		with
-		  Hom.Not_structure_preserving | Hom.Not_injective -> hom_added
-	       ) [] emb'.maps
-	   in
-	   hom_added@maps
+	    let hom_added =
+	      List.fold_left
+	        (fun hom_added hom' ->
+		  try
+		    (Hom.sum hom hom')::hom_added
+		  with
+		    Hom.Not_structure_preserving | Hom.Not_injective -> hom_added
+	        ) [] emb'.maps
+	    in
+	    hom_added@maps
 	  ) [] emb.maps
       in
       if maps = [] then raise Undefined
@@ -232,16 +232,16 @@ module Make (Node:Node.NodeType) =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
-	   let hom_ext_list =
-	     List.fold_left
-	       (fun maps hom' ->
-		try
-		  (Hom.compose hom hom')::maps
-		with
-		  Hom.Not_injective -> maps
-	       ) maps emb'.maps
-	   in
-	   hom_ext_list@maps
+	    let hom_ext_list =
+	      List.fold_left
+	        (fun maps hom' ->
+		  try
+		    (Hom.compose hom hom')::maps
+		  with
+		    Hom.Not_injective -> maps
+	        ) maps emb'.maps
+	    in
+	    hom_ext_list@maps
 	  ) [] emb.maps
       in
       if maps = [] then raise Undefined
@@ -256,42 +256,42 @@ module Make (Node:Node.NodeType) =
       let close_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-		    assert (Hom.mem u hom') ;
-		    let v' = Hom.find u hom' in
-		    Hom.add v v' phi
-		   ) hom Hom.empty
+	      assert (Hom.mem u hom') ;
+	      let v' = Hom.find u hom' in
+	      Hom.add v v' phi
+	    ) hom Hom.empty
 	with
 	  Hom.Not_structure_preserving | Hom.Not_injective -> failwith "Invariant violation"
       in
       let close_co_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-		    assert (Hom.comem v hom') ;
-		    let u' = Hom.cofind v hom' in
-		    Hom.add u u' phi
-		   ) hom Hom.empty
+	      assert (Hom.comem v hom') ;
+	      let u' = Hom.cofind v hom' in
+	      Hom.add u u' phi
+	    ) hom Hom.empty
 	with
 	  Hom.Not_structure_preserving | Hom.Not_injective -> failwith "Invariant violation"
       in
       let reduced_maps =
 	List.fold_left
 	  (fun quotient hom ->
-	   if List.exists (fun hom' ->
-			   (Hom.is_equal hom hom') ||
-			     let phi =
-			       if matching then close_co_span hom hom'
-			       else close_span hom hom'
-			     in
-			     List.exists (fun psi -> Hom.is_sub phi psi) auto
-			  ) quotient
-	   then quotient
-	   else hom::quotient
+	    if List.exists (fun hom' ->
+		   (Hom.is_equal hom hom') ||
+		     let phi =
+		       if matching then close_co_span hom hom'
+		       else close_span hom hom'
+		     in
+		     List.exists (fun psi -> Hom.is_sub phi psi) auto
+		 ) quotient
+	    then quotient
+	    else hom::quotient
 	  ) []
 	  (List.fast_sort (*keeping identity morphisms if possible*)
 	     (fun hom hom' ->
-	      if Hom.is_identity hom then -1 else
-		if Hom.is_identity hom' then 1
-		else 0
+	       if Hom.is_identity hom then -1 else
+		 if Hom.is_identity hom' then 1
+		 else 0
 	     ) emb.maps
 	  )
       in
@@ -312,72 +312,8 @@ module Make (Node:Node.NodeType) =
       let trg = emb.trg in
       List.fold_left
 	(fun emb_list hom ->
-	 {src = src ; trg = trg ; maps = [hom]; partial = false}::emb_list
+	  {src = src ; trg = trg ; maps = [hom]; partial = false}::emb_list
 	) [] emb.maps
-
-    let mpo (emb_h,emb_g) =
-      let rename fresh h (to_h,inf_gh,to_g,g) =
-	Graph.fold_edges
-	  (fun u v (h',h_to_h',fresh) ->
-	   let map u h' h_to_h' fresh =
-	     try
-	       let u0 = Hom.cofind u to_h in (*u is in the inf*)
-	       let u' = Hom.find u0 to_g in
-	       (u',Graph.add_node u' h',Hom.add u u' h_to_h',fresh)
-	     with
-	       Hom.Not_injective -> failwith "Invariant violation"
-	     | Not_found -> (*u is not in the inf*)
-		begin
-		  try
-		    let i0 = Hom.cofind_sub (Node.id u) to_h in
-		    let j = Hom.find_sub i0 to_g in
-		    let u' = Node.rename j u in
-		    if Graph.has_node u' g then raise Graph.Incoherent (*Not a pullback*)
-		    else
-		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		  with Not_found -> (*id u is not in the inf*)
-		    if fresh < 0 then
-		      (u,Graph.add_node u h', Hom.add u u h_to_h',fresh)
-		    else
-		      let i,fresh = try (Hom.find_sub (Node.id u) h_to_h',fresh) with Not_found -> (fresh,fresh+1)
-		      in
-		      let u' = Node.rename i u in
-		      (u', Graph.add_node u' h', Hom.add u u' h_to_h',fresh)
-		end
-	   in
-	   let (u',h',h_to_h',fresh) = map u h' h_to_h' fresh in
-	   let (v',h',h_to_h',fresh) = map v h' h_to_h' fresh in
-	   (Graph.add_edge u' v' h',h_to_h',fresh)
-	  ) h (Graph.empty,Hom.empty,fresh)
-      in
-
-      let h,g = emb_h.trg,emb_g.trg in
-      let inf_gh = emb_h.src in
-      let fresh = (max (Graph.max_id g) (Graph.max_id h)) + 1 in
-      List.fold_left
-	(fun tiles to_h ->
-	 let mpos_for_h =
-	   List.fold_left
-	     (fun tiles to_g ->
-	      try
-		let g',g_to_g',fresh = rename fresh g (to_g,inf_gh,to_h,h) in
-		(*let h',h_to_h',_ = rename (-1) h (to_h,inf_gh,Hom.identity (Graph.nodes h),g) in*)
-
-		let sup_gh = Graph.join h g' in
-		let emb_h_to_sup = {src = h ; trg = sup_gh ; maps = [Hom.identity (Graph.nodes h)]; partial = false} in
-		let emb_g_to_sup = {src = g ; trg = sup_gh ; maps = [g_to_g']; partial = false} in
-		let emb_g =  {src = inf_gh ; trg = g ; maps = [to_g]; partial = false} in
-		let emb_h =  {src = inf_gh ; trg = h ; maps = [to_h]; partial = false} in
-		{span = (emb_h,emb_g) ; cospan = Some (emb_h_to_sup,emb_g_to_sup)}::tiles
-	      with
-		Graph.Incoherent ->
-		let emb_g = {src = inf_gh ; trg = g ; maps = [to_g]; partial = false} in
-		let emb_h = {src = inf_gh ; trg = h ; maps = [to_h]; partial = false} in
-		{span = (emb_h,emb_g) ; cospan = None}::tiles
-	     ) [] emb_g.maps
-	 in
-	 mpos_for_h@tiles
-	) [] emb_h.maps
 
     let merge_embeddings emb emb' =
       assert (Graph.is_equal emb.src emb'.src && Graph.is_equal emb.trg emb'.trg) ;
@@ -416,82 +352,91 @@ module Make (Node:Node.NodeType) =
         else
           not (Hom.comem_sub (Node.id u') h)
       in
-      let name_in_inf u il inf =
+      let name_in u to_g g =
         try
-          let i = Hom.cofind_sub (Node.id u) il in
+          let i = Hom.cofind_sub (Node.id u) to_g in
           Node.rename i u
         with
           Not_found ->
-          Node.rename ((Graph.max_id inf) + 1) u
+          Node.rename ((Graph.max_id g) + 1) u
       in
-      let extend u p_hom sup inf_to_left inf inf_to_right =
+      let extend u p_hom sup inf_to_left inf inf_to_right continuation =
         assert (not (Hom.mem u p_hom)) ;
         let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
           Graph.fold_nodes
             (fun u' cont ->
-             if not (comp u u' p_hom) then cont
-             else
-               try
-                 let hom_uu' = Hom.add u u' p_hom in
-                 let sup',il',inf',ir' =
-                   List.fold_left
-                     (fun (sup,il,inf,ir) v ->
-                      try
-                        let v' = Hom.find v hom_uu' in
-                        let il',inf',ir' =
-                          if Graph.has_edge u' v' sup then
-                            let u_inf = name_in_inf u il inf in
-                            let inf = Graph.add_node u_inf inf in
-                            let v_inf = name_in_inf v il inf in
-                            let inf = Graph.add_node v_inf inf in
-                            let inf' = Graph.add_edge u_inf v_inf inf
-                            in
-                            (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir))
-                          else
-                            (il,inf,ir) (*unchanged*)
-                        in
-                        let sup' = Graph.add_edge ~weak:true u' v' sup
-                        in
-                        (sup',il',inf',ir')
-                      with
-                        Not_found -> (sup,il,inf,ir) (*v has no image by p_hom*)
-                      | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
-                     ) (sup,inf_to_left,inf,inf_to_right) (Graph.bound_to u left)
-                 in
-                 (hom_uu',sup',il',inf',ir')::cont
-               with
-                 Hom.Not_injective | Hom.Not_structure_preserving -> cont
-            ) sup []
+              if not (comp u u' p_hom) then cont
+              else
+                try
+                  let hom_uu' = Hom.add u u' p_hom in
+                  let sup',il',inf',ir' =
+                    List.fold_left
+                      (fun (sup,il,inf,ir) v ->
+                        try
+                          let v' = Hom.find v hom_uu' in
+                          let il',inf',ir' =
+                            if Graph.has_edge u' v' sup then
+                              let u_inf = name_in u il inf in
+                              let inf = Graph.add_node u_inf inf in
+                              let v_inf = name_in v il inf in
+                              let inf = Graph.add_node v_inf inf in
+                              let inf' = Graph.add_edge u_inf v_inf inf
+                              in
+                              (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir))
+                            else
+                              (il,inf,ir) (*unchanged*)
+                          in
+                          let sup' = Graph.add_edge ~weak:true u' v' sup
+                          in
+                          (sup',il',inf',ir')
+                        with
+                          Not_found -> (sup,il,inf,ir) (*v has no image by p_hom*)
+                        | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
+                      ) (sup,inf_to_left,inf,inf_to_right) (Graph.bound_to u left)
+                  in
+                  (hom_uu',sup',il',inf',ir')::cont
+                with
+                  Hom.Not_injective | Hom.Not_structure_preserving -> cont
+            ) sup continuation
         in
+        (*Trying to add a fresh version of u in sup if possible*)
         try
-          let ext_ufresh = (*extension of p_hom to u |--> fresh *)
-            let u_sup = Node.rename ((Graph.max_id sup)+1) u in
-            let hom_uu_sup = Hom.add u u_sup p_hom
-            in
-            let sup' =
-              List.fold_left
-                (fun sup' v ->
-                 try
-                   let v' = Hom.find v hom_uu_sup in
-                   Graph.add_edge ~weak:true u_sup v' sup'
-                 with
-                   Not_found -> sup'
-                ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
-            in
-            (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)
+          let u_sup =
+            if Hom.mem_sub (Node.id u) p_hom then
+              if Graph.has_node (Node.rename (Hom.find_sub (Node.id u) p_hom) u) sup then raise Hom.Not_injective
+              else
+                (Node.rename (Hom.find_sub (Node.id u) p_hom) u)
+            else
+              Node.rename (Graph.max_id sup + 1) u
           in
-          ext_ufresh::ext_uu' (*adding the choice where u is mapped to a fresh node in sup*)
+          let hom_uu_sup = Hom.add u u_sup p_hom in
+          let sup' =
+            List.fold_left
+              (fun sup' v ->
+                try
+                  let v' = Hom.find v hom_uu_sup in
+                  Graph.add_edge ~weak:true u_sup v' sup'
+                with
+                  Not_found -> sup'
+              ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
+          in
+          (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)::ext_uu'
         with
-          Hom.Not_injective -> ext_uu'
+          Hom.Not_injective | Hom.Not_structure_preserving -> ext_uu'
       in
       Graph.fold_nodes
         (fun u ext_list ->
-         List.fold_left
-           (fun cont (ls,sup,il,inf,ir) ->
-            if Hom.mem u ls then ext_list
-            else
-              (extend u ls sup il inf ir)@cont
-           ) [] ext_list
+          (*Printf.printf "looking for an association for node %s\n" (Node.to_string u) ;*)
+          let all_ext_u =
+            List.fold_left
+              (fun cont (ls,sup,il,inf,ir) ->
+                if Hom.mem u ls then (ls,sup,il,inf,ir)::cont
+                else
+                  (*[extend u ls sup il inf ir cont] extends ls with all possible associations of u to u' in sup or fresh*)
+                  extend u ls sup il inf ir cont
+              ) [] ext_list
+          in
+          all_ext_u
         ) left [(ls,sup,il,inf,ir)]
 
     let hom_of_embeddings emb =
@@ -501,6 +446,7 @@ module Make (Node:Node.NodeType) =
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
     let ipo (inf_to_left,inf_to_right) =
+      (*Printf.printf "Computing ipo of %s\n" (string_of_span (inf_to_left,inf_to_right)) ;*)
       let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
       let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
       let inf = inf_to_left.src in
@@ -512,25 +458,45 @@ module Make (Node:Node.NodeType) =
       let inf_to_left = hom_of_embeddings inf_to_left in
       List.fold_left
         (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
-         let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
-         let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
-         let csp_opt =
-           if sup'.Graph.coherent then
-             Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
-           else
-             None
-         in
-         let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
-         (identity inf inf',tile)::sharing_tiles
+          let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
+          let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
+          let csp_opt =
+            if sup'.Graph.coherent then
+              Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
+            else
+              None
+          in
+          let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
+          (identity inf inf',tile)::sharing_tiles
         ) [] (complete left hom_p sup inf_to_left inf inf_to_right)
 
     let glue g h =
-      let sh_tiles = ipo (embed Graph.empty g,embed Graph.empty h) in
+      let subparts g h =
+        Graph.fold_edges
+          (fun u v cont ->
+            let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
+            in
+            let emb_list = flatten (extension_class (embed g1 h)) in
+            List.fold_left
+            (fun cont emb ->
+              (identity g1 g,emb)::cont
+            ) cont emb_list
+          ) g []
+      in
+      let sh_tiles =
+        List.fold_left
+        (fun cont (to_g,to_h) ->
+          (ipo (to_g,to_h))@cont
+        ) [] (subparts g h)
+      in
       List.fold_left
         (fun cont (emb,tile) ->
-         if Graph.is_empty (inf_of_tile tile) then cont
-         else
-           tile::cont) [] sh_tiles
+          if Graph.is_empty (inf_of_tile tile) then cont
+          else
+            match tile.cospan with
+              None -> cont
+            | Some _ -> tile::cont
+        ) [] sh_tiles
 
     let share f g =
       let compare_sharing (emb,_) (emb',_) =
@@ -540,7 +506,6 @@ module Make (Node:Node.NodeType) =
       in
       match sh_tiles with
         [] ->
-        Printf.printf "no ipo for %s\n" (string_of_span (f,g)) ;
         None
       | h::_ -> Some h
   end
