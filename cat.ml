@@ -16,9 +16,6 @@ module Make (Node:Node.NodeType) =
     let inf_of_tile tile =
       let (emb,_) = tile.span in emb.src
 
-    let size emb =
-      Hom.size (List.hd emb.maps)
-
     let sup_of_tile tile =
       match tile.cospan with
 	None -> None
@@ -429,7 +426,7 @@ module Make (Node:Node.NodeType) =
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
     let ipo (inf_to_left,inf_to_right) =
-      (*Printf.printf "Computing ipo of %s\n" (string_of_span (inf_to_left,inf_to_right)) ;*)
+      Printf.printf "Computing ipo of %s\n" (string_of_span (inf_to_left,inf_to_right)) ;
       let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
       let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
       let inf = inf_to_left.src in
@@ -548,6 +545,11 @@ module Make (Node:Node.NodeType) =
         ) [] sh_tiles
 
     let share f g =
+      let size emb =
+        let cod = List.hd (co_domains emb) in
+        let delta = Graph.minus emb.trg cod in
+        (Graph.size_edge delta, Graph.size_node delta)
+      in
       let compare_sharing (emb,_) (emb',_) =
         compare (size emb) (size emb')
       in
