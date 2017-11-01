@@ -37,18 +37,14 @@ module Make (Node:Node.NodeType) =
     let simple_tests debug =
       if debug then debug_mode () ;
       let one = graph_of_library "one" in
-      let square = graph_of_library "square" in
+      let house = graph_of_library "house" in
       let dsquare = graph_of_library "dsquare" in
-      let f = List.hd (Cat.flatten (Cat.extension_class (one => square))) in
+      let f = List.hd (Cat.flatten (Cat.extension_class (one => house))) in
       let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
-      let sharing = Cat.glue one dsquare in
-      List.iter
-        (fun tile ->
-         print_string (Cat.string_of_tile tile) ;
-         print_newline() ;
-         print_newline()
-        ) sharing
-
+      let sharing = Cat.share f g in
+      match sharing with
+        Some (_,tile) -> print_string (Cat.string_of_tile tile) 
+      | None -> print_string "None"
 
     let generate_tests debug =
       if debug then debug_mode () ;

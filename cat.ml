@@ -553,8 +553,7 @@ module Make (Node:Node.NodeType) =
       in
       let sh_tiles = List.fast_sort compare_sharing (ipo (f,g))
       in
-      match sh_tiles with
-        [] ->
-        None
+      match List.rev sh_tiles with
+        [] -> None
       | h::_ -> Some h
   end
