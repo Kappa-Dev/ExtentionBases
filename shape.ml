@@ -41,7 +41,7 @@ module Make (Node:Node.NodeType) =
       let dsquare = graph_of_library "dsquare" in
       let f = List.hd (Cat.flatten (Cat.extension_class (one => square))) in
       let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
-      let sharing = Cat.glue square square in
+      let sharing = Cat.glue one dsquare in
       List.iter
         (fun tile ->
          print_string (Cat.string_of_tile tile) ;
