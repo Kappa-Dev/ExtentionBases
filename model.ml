@@ -42,12 +42,12 @@ module Make (Node:Node.NodeType) =
 	  (fun tiles gluing_tile ->
 	   match gluing_tile.Cat.cospan with
 	     None -> tiles
-	   | Some (_,h_eps_to_w) ->
+	   | Some (h_eps_to_w,_) ->
               assert (List.tl (h_eps_to_w.Cat.maps) = []) ;
               (*Checking that w and pi_eps have a sup.*)
               match Cat.ipo (h_eps_to_w,id_emb) with
                 [] -> tiles
-              | (sh_emb,tile)::_ ->
+              | (_,tile)::_ ->
                  if Cat.sup_of_tile tile = None then tiles
                  else (obs_name,gluing_tile)::tiles
 	  ) [] (h_eps >< obs)

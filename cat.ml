@@ -63,11 +63,20 @@ module Make (Node:Node.NodeType) =
 
 
     let string_of_span (emb,emb') =
-      assert (is_span (emb,emb')) ;
-      let str = Printf.sprintf " %s " (Graph.to_string emb.src) in
-      let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
-      let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
-      str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''
+      if (is_span (emb,emb')) then
+        begin
+          let str = Printf.sprintf " %s " (Graph.to_string emb.src) in
+          let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
+          let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
+          str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''
+        end
+      else
+        let str0 = Printf.sprintf " %s " (Graph.to_string emb.src) in
+        let str1 = Printf.sprintf " %s " (Graph.to_string emb'.src) in
+        let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
+        let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
+        print_string (str'^"<-"^(string_of_embeddings emb)^"-"^str0^"<<>>"^str1^"-"^(string_of_embeddings emb')^"->"^str'') ;
+        failwith "Invalid argument"
 
 
     let string_of_co_span (emb,emb') =
@@ -426,7 +435,6 @@ module Make (Node:Node.NodeType) =
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
     let ipo (inf_to_left,inf_to_right) =
-      Printf.printf "Computing ipo of %s\n" (string_of_span (inf_to_left,inf_to_right)) ;
       let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
       let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
       let inf = inf_to_left.src in

@@ -53,7 +53,7 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (*(name = "triangle") || (name = "one") || *) (name = "dsquare") || (name = "house") then
+		     if (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") then
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty

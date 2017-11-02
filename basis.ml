@@ -284,7 +284,7 @@ module Make (Node:Node.NodeType) =
                   in
                   let actions' =
                     if stop then
-                      (fun w ext_base -> add_step i w ext_i_w ext_base)::actions
+                      (fun w ext_base -> add_step i w ext_i_w (remove_step inf w ext_base))::actions
                     else
                       actions
                   in
