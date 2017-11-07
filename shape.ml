@@ -49,8 +49,19 @@ module Make (Node:Node.NodeType) =
         | None -> print_string "None"
       end ;
       print_newline();
+      print_string "house >< square\n" ;
       let gluings = Cat.glue house square in
-      List.iter (fun tile -> Printf.printf "%s\n" (Cat.string_of_tile tile)) gluings
+      List.iter (fun tile -> 
+		 let emb = Cat.emb_of_tile tile in
+		 Printf.printf "%s\n" (Cat.string_of_embeddings emb)
+		) gluings ;
+      print_string "square >< house\n" ;
+      let gluings = Cat.glue square house in
+      List.iter (fun tile -> 
+		 let emb = Cat.emb_of_tile tile in
+		 Printf.printf "%s\n" (Cat.string_of_embeddings emb)
+		) gluings
+
     let generate_tests debug =
       if debug then debug_mode () ;
 
