@@ -233,15 +233,15 @@ module Make (Node:Node.NodeType) =
                                 (String.concat
                                    ","
                                    (List.map (fun (inf,_,i,_) -> "("^(string_of_int inf)^","^(string_of_int i)^")") next_layer)) ;
-                  Printf.printf "0 |--> {%s}\n" 
-				(String.concat "," 
-					       (List.map string_of_int 
+                  Printf.printf "0 |--> {%s}\n"
+				(String.concat ","
+					       (List.map string_of_int
 							 (Lib.IntMap.fold (fun i _ cont -> i::cont) (find 0 ext_base).next []))
 				)
                 end
       in
       (************* DEBUGING INFO ***************)
-      
+
       match todo with
         [] -> if next_layer = [] then actions
 	      else
@@ -311,9 +311,9 @@ module Make (Node:Node.NodeType) =
                   raise (Found_iso (iso_w_i,i))
 
                | Incomp sh_info ->
-                  if db() then print_string 
-				 (green (Printf.sprintf "I found a midpoint %s (%d)!\n" 
-							(Graph.to_string sh_info.to_midpoint.Cat.trg) 
+                  if db() then print_string
+				 (green (Printf.sprintf "I found a midpoint %s (%d)!\n"
+							(Graph.to_string sh_info.to_midpoint.Cat.trg)
 							fresh_id)
 				 );
 		  (*No better comparison with w exists*)

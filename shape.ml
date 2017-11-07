@@ -39,13 +39,18 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
       let dsquare = graph_of_library "dsquare" in
+      let square = graph_of_library "square" in
       let f = List.hd (Cat.flatten (Cat.extension_class (one => house))) in
       let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
       let sharing = Cat.share f g in
-      match sharing with
-        Some (_,tile) -> print_string (Cat.string_of_tile tile) 
-      | None -> print_string "None"
-
+      begin
+        match sharing with
+          Some (_,tile) -> print_string (Cat.string_of_tile tile)
+        | None -> print_string "None"
+      end ;
+      print_newline();
+      let gluings = Cat.glue house square in
+      List.iter (fun tile -> Printf.printf "%s\n" (Cat.string_of_tile tile)) gluings
     let generate_tests debug =
       if debug then debug_mode () ;
 
@@ -59,7 +64,7 @@ module Make (Node:Node.NodeType) =
                      else model
 		    ) Node.library Model.empty
       in
-      let nw,pw = Model.witnesses_of_rule (one,house) model in
+      let nw,pw = Model.witnesses_of_rule (Graph.empty,house) model in
       let get_seed = function
           (id_obs,tile)::_ -> Cat.left_of_tile tile
         | [] -> Graph.empty
@@ -71,8 +76,8 @@ module Make (Node:Node.NodeType) =
              None -> failwith "no witness"
            | Some (to_w,from_o) ->
               if db() then
-                Printf.printf "Inserting witness of observable \"%s\": %s\n" 
-			      (Lib.Dict.to_name id_obs model.Model.dict) 
+                Printf.printf "Inserting witness of observable \"%s\": %s\n"
+			      (Lib.Dict.to_name id_obs model.Model.dict)
 			      (Cat.string_of_co_span (to_w,from_o)) ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw

@@ -29,11 +29,13 @@ module Util =
 
     let ask_until str stop_cond =
       let inp = ref "" in
-      while not (stop_cond !inp) do
+      let init = ref true in
+      while (proj_left (stop_cond !inp)) && !init do
+        init := false ;
         print_string str ; flush stdout ;
         inp := Pervasives.input_line stdin ;
       done ;
-      !inp
+      proj_right (stop_cond !inp)
 
     let red str = "\027[91m"^str^"\027[0m"
     let green str = "\027[92m"^str^"\027[0m"
