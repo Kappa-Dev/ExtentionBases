@@ -33,6 +33,8 @@ module Make (Node:Node.NodeType) =
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
     let (=>) = Cat.embed
+    let (|>) = Cat.(|>)
+    let (<|) = fun x y -> (y |> x)
 
     let simple_tests debug =
       if debug then debug_mode () ;
@@ -49,18 +51,11 @@ module Make (Node:Node.NodeType) =
         | None -> print_string "None"
       end ;
       print_newline();
-      print_string "house >< square\n" ;
-      let gluings = Cat.glue house square in
-      List.iter (fun tile -> 
+      print_string "square |> square\n" ;
+      List.iter (fun tile ->
 		 let emb = Cat.emb_of_tile tile in
-		 Printf.printf "%s\n" (Cat.string_of_embeddings emb)
-		) gluings ;
-      print_string "square >< house\n" ;
-      let gluings = Cat.glue square house in
-      List.iter (fun tile -> 
-		 let emb = Cat.emb_of_tile tile in
-		 Printf.printf "%s\n" (Cat.string_of_embeddings emb)
-		) gluings
+		 Printf.printf "%s:\n %s\n" (Cat.string_of_embeddings emb) (Cat.string_of_tile tile)
+		) (square |> square)
 
     let generate_tests debug =
       if debug then debug_mode () ;
@@ -75,7 +70,7 @@ module Make (Node:Node.NodeType) =
                      else model
 		    ) Node.library Model.empty
       in
-      let nw,pw = Model.witnesses_of_rule (Graph.empty,house) model in
+      let nw,pw = Model.witnesses_of_rule (Graph.empty,one) model in
       let get_seed = function
           (id_obs,tile)::_ -> Cat.left_of_tile tile
         | [] -> Graph.empty

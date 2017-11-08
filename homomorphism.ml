@@ -46,19 +46,7 @@ module Make (Node:Node.NodeType) =
       {hom with sub = bij}
 
     let add u v hom =
-      let () =
-	Node.fold_prop (fun i u_i _ ->
-			assert (Node.arity > i) ;
-			try
-			  let v_i = Node.get_prop v i in
-			  let f = Node.prop.(i) in
-			  if List.mem v_i (f u_i) then ()
-			  else raise Not_structure_preserving
-			with
-			  Not_found -> raise Not_structure_preserving
-
-		       ) u ()
-      in
+      if (Node.compatible u v) then () else raise Not_structure_preserving ;
       let u_i,v_i = Node.id u,Node.id v in
       try
 	let hom' = add_sub u_i v_i hom

@@ -15,6 +15,7 @@ module type NodeType =
     val coh : (t*t) list -> (t*t) -> bool
     val rename : int -> t -> t
     val library : (t*t) list Lib.StringMap.t
+    val compatible : t -> t -> bool
   end
 
 
@@ -24,7 +25,7 @@ module SimpleNode =
       let arity = 0
       let rename i u = i
       let id u = u
-
+      let compatible = fun _ _ -> true
       let prop = [||]
 
       let get_prop _ i =
@@ -111,7 +112,6 @@ module KappaNode =
       let prop = [| (fun port_id -> [port_id]) ; (fun label -> [label]) |]
 
       let id u = u.ag_id
-
       let rename i u = {u with ag_id = i}
 
       let get_prop u = function
@@ -120,6 +120,22 @@ module KappaNode =
 	| _ -> raise Not_found
 
       let fold_prop f u cont = f 1 u.label (f 0 u.port_id cont)
+
+      let compatible u v =
+        try
+          fold_prop (fun i u_i b ->
+		     assert (arity > i) ;
+		     try
+		       let v_i = get_prop v i in
+		       let f = prop.(i) in
+		       if List.mem v_i (f u_i) then b
+		       else raise Exit
+		     with
+		       Not_found -> raise Exit
+		    ) u true
+        with
+          Exit -> false
+
 
       let compare u v = Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)
 
@@ -219,6 +235,22 @@ module DegreeNode =
       let get_prop = fun u i -> if i = 0 then u.max_degree else raise Not_found
 
       let fold_prop f u cont = f 0 u.max_degree cont
+
+      let compatible u v =
+        try
+          fold_prop (fun i u_i b ->
+		     assert (arity > i) ;
+		     try
+		       let v_i = get_prop v i in
+		       let f = prop.(i) in
+		       if List.mem v_i (f u_i) then b
+		       else raise Exit
+		     with
+		       Not_found -> raise Exit
+		    ) u true
+        with
+          Exit -> false
+
 
       let compare u v = Pervasives.compare u.id v.id
 

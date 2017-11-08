@@ -57,6 +57,19 @@ module Make (Node:Node.NodeType) =
 	   ) cont bu
 	) g.edges cont
 
+    let fold_edge_types f g cont =
+      let edge_types g =
+        fold_edges
+          (fun u v cont ->
+           if List.exists (fun (w,x) -> Node.compatible u w && Node.compatible v x) cont then cont
+           else
+             (u,v)::cont
+          ) g []
+      in
+      List.fold_left
+        (fun cont (u,v) -> f u v cont) cont (edge_types g)
+
+
     let fold_nodes f g cont =
       NodeSet.fold
 	(fun u cont ->

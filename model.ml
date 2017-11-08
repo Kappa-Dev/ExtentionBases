@@ -4,7 +4,7 @@ module Make (Node:Node.NodeType) =
     module Graph = Cat.Graph
     module Hom = Cat.Hom
 
-    let (><) = Cat.glue
+    let (|>) = Cat.(|>)
 
     type t = {rules : (Graph.t * Graph.t) Lib.IntMap.t ; obs : Graph.t Lib.IntMap.t ; dict : Lib.Dict.t}
     type effect = {neg : Cat.embeddings option ; pos : Cat.embeddings option}
@@ -50,7 +50,7 @@ module Make (Node:Node.NodeType) =
               | (_,tile)::_ ->
                  if Cat.sup_of_tile tile = None then tiles
                  else (obs_name,gluing_tile)::tiles
-	  ) [] (h_eps >< obs)
+	  ) [] (h_eps |> obs)
       in
       let build_witnesses effect observables =
 	Lib.IntMap.fold

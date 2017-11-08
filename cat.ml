@@ -435,28 +435,30 @@ module Make (Node:Node.NodeType) =
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
     let ipo (inf_to_left,inf_to_right) =
-      let right_to_sup = identity inf_to_right.trg inf_to_right.trg in
-      let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
-      let inf = inf_to_left.src in
-      let left = inf_to_left.trg in
-      let right = inf_to_right.trg in
-      let sup = right_to_sup.trg in
-      let hom_p =  hom_of_embeddings part_left_to_sup in
-      let inf_to_right = hom_of_embeddings inf_to_right in
-      let inf_to_left = hom_of_embeddings inf_to_left in
-      List.fold_left
-        (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
-          let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
-          let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
-          let csp_opt =
-            if sup'.Graph.coherent then
-              Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
-            else
-              None
-          in
-          let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
-          (identity inf inf',tile)::sharing_tiles
-        ) [] (complete left hom_p sup inf_to_left inf inf_to_right)
+      let close_rs right_to_sup cont =
+        let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
+        let inf = inf_to_left.src in
+        let left = inf_to_left.trg in
+        let right = inf_to_right.trg in
+        let sup = right_to_sup.trg in
+        let hom_p =  hom_of_embeddings part_left_to_sup in
+        let inf_to_right = hom_of_embeddings inf_to_right in
+        let inf_to_left = hom_of_embeddings inf_to_left in
+        List.fold_left
+          (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
+           let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
+           let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
+           let csp_opt =
+             if sup'.Graph.coherent then
+               Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
+             else
+               None
+           in
+           let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
+           (identity inf inf',tile)::sharing_tiles
+          ) cont (complete left hom_p sup inf_to_left inf inf_to_right)
+      in
+      close_rs (identity inf_to_right.trg inf_to_right.trg) []
 
     let emb_of_tile tile =
       match tile.cospan with
@@ -468,90 +470,6 @@ module Make (Node:Node.NodeType) =
     let merge_embeddings emb emb' =
       assert (Graph.is_equal emb.src emb'.src && Graph.is_equal emb.trg emb'.trg) ;
       extension_class {src = emb.src ; trg = emb.trg ; maps = emb.maps@emb'.maps; partial = false}
-
-    let eq_tile tile tile' =
-      (*optim*)
-      match sup_of_tile tile,sup_of_tile tile' with
-        None,_ -> raise Undefined
-      | _,None -> raise Undefined
-      | Some sup,Some sup' ->
-         if ((Graph.size_node (inf_of_tile tile),Graph.size_edge (inf_of_tile tile))
-             <> (Graph.size_node (inf_of_tile tile'),Graph.size_edge (inf_of_tile tile')))
-            &&
-              ((Graph.size_node sup,Graph.size_edge sup)
-               <> (Graph.size_node sup',Graph.size_edge sup'))
-         then false
-         else
-           let emb = emb_of_tile tile in
-           let emb'= emb_of_tile tile' in
-           try
-             let phi_src = List.hd (flatten (embed emb.src emb'.src)) in
-             if not (is_iso phi_src) then false
-             else
-               let phi_trg = List.hd (flatten (embed emb'.trg emb.trg)) in
-               if not (is_iso phi_trg) then false
-               else
-                 let composite = merge_embeddings emb (phi_trg @@ (emb' @@ phi_src)) in
-                 match composite.maps with
-                   [_] -> true
-                 | _ -> false
-           with
-             Undefined -> false
-
-    let glue g h =
-      (*returns spans of the form g <-id- g1 -f-> h where g1 is an edge of g*)
-      (*both branches of the spans are up to eq class*)
-      let subparts g h =
-        let auto_g = g => g in
-        let equated_under_iso e1 e2 auto =
-          try
-            List.fold_left
-              (fun b phi ->
-                if e2 = Hom.find2 e1 phi then raise Exit
-                else b
-              ) false auto
-          with Exit -> true
-        in
-        let subs,_ =
-          Graph.fold_edges
-            (fun u v (cont,added) ->
-              if List.exists (fun e -> equated_under_iso (u,v) e auto_g) added
-              then (cont,added)
-              else
-                let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
-                in
-                let emb_list = try flatten (extension_class (embed g1 h)) with Undefined -> []
-		in
-                let cont =
-                  List.fold_left
-                    (fun cont emb ->
-                      (identity g1 g,emb)::cont
-                    ) cont emb_list
-                in
-                (cont,(u,v)::added)
-            ) g ([],[])
-        in
-        subs
-      in
-      let sh_tiles =
-        List.fold_left
-        (fun cont (to_g,to_h) ->
-          (ipo (to_g,to_h))@cont
-        ) [] (subparts g h)
-      in
-      List.fold_left
-        (fun cont (emb,tile) ->
-          if Graph.is_empty (inf_of_tile tile) then cont
-          else
-            match tile.cospan with
-              None -> cont
-            | Some _ ->
-               if List.exists
-                    (fun tile' ->
-                      eq_tile tile tile'
-                    ) cont then cont
-               else tile::cont
-        ) [] sh_tiles
 
     let share f g =
       let size emb =
@@ -567,4 +485,71 @@ module Make (Node:Node.NodeType) =
       match List.rev sh_tiles with
         [] -> None
       | h::_ -> Some h
+
+    let glue g h =
+      (*returns spans of the form g <-id- g1 -f-> h where g1 is an edge of g*)
+      (*both branches of the spans are up to eq class*)
+      let subparts g h =
+        let subs =
+          Graph.fold_edge_types
+            (fun u v cont ->
+             let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
+             in
+             (flatten (extension_class (embed g1 g)))@cont
+            ) g []
+        in
+        List.fold_left
+          (fun cont emb_g1_g ->
+           let g1 = emb_g1_g.src in
+           let emb_g1_h_list = try flatten (extension_class (embed g1 h)) with Undefined -> [] in
+           List.fold_left
+             (fun cont emb_g1_h ->
+              (emb_g1_g,emb_g1_h)::cont
+             ) cont emb_g1_h_list
+          ) [] subs
+      in
+      List.fold_left
+        (fun cont (to_g,to_h) ->
+         (ipo (to_g,to_h))@cont
+        ) [] (subparts g h)
+
+    let (|>) h obs =
+      let eq_tile obs_right tile tile' =
+        try
+          match tile.cospan,tile'.cospan with
+            None,_ -> raise Undefined
+          | _,None -> raise Undefined
+          | Some (left_to_sup,right_to_sup),Some (left_to_sup',right_to_sup') ->
+             assert (Graph.is_equal left_to_sup.src left_to_sup'.src
+                     && Graph.is_equal right_to_sup.src right_to_sup'.src) ;
+             let ext,ext' = if obs_right then (left_to_sup,left_to_sup') else (right_to_sup,right_to_sup') in
+             (*optim*)
+             let sup,sup' = left_to_sup.trg,left_to_sup'.trg in
+             if (Graph.size_node sup <> Graph.size_edge sup')
+                && (Graph.size_edge sup <> Graph.size_edge sup)
+             then false
+             else
+               match share ext ext' with
+                 None -> false
+               | Some (_,sh_tile) ->
+                  let (inf_to_left,inf_to_right) = sh_tile.span in
+                  (is_iso inf_to_left) && is_iso (inf_to_right)
+        with
+          Undefined -> false
+      in
+      List.fold_left
+        (fun cont (emb,tile) ->
+         if Graph.is_empty (inf_of_tile tile) then cont
+         else
+           match tile.cospan with
+             None -> cont
+           | Some _ ->
+              if List.exists
+                   (fun tile' ->
+                    eq_tile true tile tile'
+                   ) cont then cont
+              else tile::cont
+        ) [] (glue h obs)
+
+
   end
