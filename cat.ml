@@ -449,7 +449,7 @@ module Make (Node:Node.NodeType) =
            let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
            let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
            let csp_opt =
-             if sup'.Graph.coherent then
+             if Graph.is_coherent sup' then
                Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
              else
                None

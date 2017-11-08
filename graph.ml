@@ -1,12 +1,56 @@
+module type GraphType =
+  sig
+    type t
+    type node
+
+    (**Constructors*)
+    val empty : t
+    val add_node : node -> t -> t
+    val add_edge : ?weak:bool -> node -> node -> t -> t
+
+    (**Pretty printing*)
+    val to_string : t -> string
+    val to_dot_cluster : t -> int -> int -> string * string * int
+
+    (**Iterators*)
+    val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
+    val fold_edge_types : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
+    val fold_nodes : (node -> 'a -> 'a) -> t -> 'a -> 'a
+
+    (**Properties*)
+    val bound_to : node -> t -> node list
+    val has_edge : node -> node -> t -> bool
+    val has_node : node -> t -> bool
+    val nodes_of_id : int -> t -> node list
+    val degree : node -> t -> int
+    val nodes : t -> node list
+    val connected_components : t -> node list
+    val max_id : t -> int
+    val size_edge : t -> int
+    val size_node : t -> int
+    val is_empty : t -> bool
+    val is_equal : t -> t -> bool
+
+    (**Operators*)
+    val join : ?weak:bool -> t -> t -> t
+    val meet : t -> t -> t
+    val sum : t -> t -> t
+    val minus : t -> t -> t
+
+    exception Incoherent
+    val is_coherent : t -> bool
+  end
+
 
 module Make (Node:Node.NodeType) =
-  struct
+  (struct
 
     exception Incoherent
 
     module NodeSet = Set.Make(struct type t = Node.t let compare = Node.compare end)
     module NodeMap = Map.Make(struct type t = Node.t let compare = Node.compare end)
 
+    type node = Node.t
     type t =
       {nodes : NodeSet.t ;
        edges : (Node.t list) NodeMap.t ;
@@ -14,6 +58,8 @@ module Make (Node:Node.NodeType) =
        size : int ;
        coherent : bool
       }
+
+    let is_coherent g = g.coherent
 
     module EdgeSet = Set.Make(struct type t = Node.t * Node.t let compare = compare end)
 
@@ -261,6 +307,15 @@ module Make (Node:Node.NodeType) =
       in
       (Printf.sprintf "subgraph %s { \n %s \n %s \n }\n" name nodes edges,name,fresh)
 
-
-  end
+    let sum g h =
+      let shift g d =
+        fold_edges
+          (fun u v g' ->
+           let u',v' = Node.rename (d+(Node.id u)) u,Node.rename (d+(Node.id v)) v in
+           let g' = add_node u' (add_node v' g') in
+           add_edge u' v' g'
+          ) h empty
+      in
+      join h (shift g ((max_id h)+1))
+  end:GraphType with type node = Node.t)
 

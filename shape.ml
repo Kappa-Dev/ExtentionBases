@@ -51,11 +51,11 @@ module Make (Node:Node.NodeType) =
         | None -> print_string "None"
       end ;
       print_newline();
-      print_string "square |> square\n" ;
+      print_string "square |> one one\n" ;
       List.iter (fun tile ->
 		 let emb = Cat.emb_of_tile tile in
 		 Printf.printf "%s:\n %s\n" (Cat.string_of_embeddings emb) (Cat.string_of_tile tile)
-		) (square |> square)
+		) (square |> (Graph.sum one one))
 
     let generate_tests debug =
       if debug then debug_mode () ;
