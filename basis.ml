@@ -5,8 +5,8 @@ module Make (Node:Node.NodeType) =
     open Lib.Util
 
     type point = {value : Graph.t ;
-                  next : Cat.embeddings Lib.IntMap.t ;
-                  obs : (Cat.embeddings * int) list ;
+                  next : Cat.arrows Lib.IntMap.t ;
+                  obs : (Cat.arrows * int) list ;
                   conflict : Lib.IntSet.t ;
                   future : Lib.IntSet.t ;
                  }
@@ -16,7 +16,7 @@ module Make (Node:Node.NodeType) =
     type t = {points : point Lib.IntMap.t ; (*corresp int -> point *)
               sharing : param ; (*various tuning params*)
               witnesses : Lib.IntSet.t ; (*set of points that are witnesses (not midpoints) *)
-              extensions : Cat.embeddings Lib.IntMap.t (* i |-->  (0 -->i) --extension from root to i*)
+              extensions : Cat.arrows Lib.IntMap.t (* i |-->  (0 -->i) --extension from root to i*)
              }
 
 
@@ -39,7 +39,7 @@ module Make (Node:Node.NodeType) =
                                        [] -> ""
                                      | ol -> String.concat ","
                                                            (List.map (fun (emb,x) ->
-                                                                      (Cat.string_of_embeddings ~nocolor:true emb)
+                                                                      (Cat.string_of_arrows ~nocolor:true emb)
                                                                       ^","^(Lib.Dict.to_name x dict)
                                                                      ) ol))
                                     (String.concat "," (List.map string_of_int (to_list Lib.IntSet.fold p.future)))
@@ -97,7 +97,7 @@ module Make (Node:Node.NodeType) =
 
     let find i ext_base = Lib.IntMap.find i ext_base.points
 
-    let (@@) = Cat.vertical_compose
+    let (@@) = Cat.(@@)
 
     let leaf i ext_base =
       Lib.IntMap.is_empty (find i ext_base).next
@@ -113,7 +113,7 @@ module Make (Node:Node.NodeType) =
       else
         Lib.IntMap.find i ext_base.extensions
 
-    exception Found of Cat.embeddings list
+    exception Found of Cat.arrows list
 
     let delta i j ext_base =
       let rec compose emb_list acc =
@@ -162,9 +162,9 @@ module Make (Node:Node.NodeType) =
       else
         let pj = find j ext_base in
         if db() then Printf.printf "Add Step %d |-> %d = %s-%s->%s\n" i j
-                                   (Graph.to_string emb_ij.Cat.src)
-                                   (Cat.string_of_embeddings emb_ij)
-                                   (Graph.to_string emb_ij.Cat.trg) ;
+                                   (Graph.to_string (Cat.src emb_ij))
+                                   (Cat.string_of_arrows emb_ij)
+                                   (Graph.to_string (Cat.trg emb_ij)) ;
         replace i {pi with next = Lib.IntMap.add j emb_ij pi.next;
                            future = Lib.IntSet.add j (Lib.IntSet.union pi.future pj.future)
                   } ext_base
@@ -185,8 +185,8 @@ module Make (Node:Node.NodeType) =
       replace i pi ext_base
 
 
-    type sharing_info = {to_w : Cat.embeddings ; to_base : Cat.embeddings ; to_midpoint : Cat.embeddings ; has_sup : bool}
-    type comparison = Iso of Cat.embeddings | Below of Cat.embeddings | Above of Cat.embeddings | Incomp of sharing_info | Conflicting
+    type sharing_info = {to_w : Cat.arrows ; to_base : Cat.arrows ; to_midpoint : Cat.arrows ; has_sup : bool}
+    type comparison = Iso of Cat.arrows | Below of Cat.arrows | Above of Cat.arrows | Incomp of sharing_info | Conflicting
 
     let compare inf_to_i inf_to_w ext_base =
       if db() then
@@ -194,7 +194,7 @@ module Make (Node:Node.NodeType) =
       match Cat.share inf_to_i inf_to_w with
         None -> Conflicting
       | Some (inf_to_sh,sharing_tile) ->
-         let sh_to_base,sh_to_w = sharing_tile.Cat.span in
+         let sh_to_base,sh_to_w = Cat.lower_bound sharing_tile in
          let _ = if db() then Printf.printf "Sharing is %s\n" (Cat.string_of_span (sh_to_base,sh_to_w)) in
          let iso_to_w = Cat.is_iso sh_to_w in
          let iso_to_base = Cat.is_iso sh_to_base in
@@ -207,12 +207,12 @@ module Make (Node:Node.NodeType) =
            if iso_to_base then
              Above (sh_to_w @@ (Cat.invert sh_to_base) ) (*Above i -> wit *)
            else
-             match sharing_tile.Cat.cospan with
+             match Cat.upper_bound sharing_tile with
                None -> Incomp {to_w = sh_to_w ; to_base = sh_to_base ; to_midpoint = inf_to_sh ; has_sup = false}
              | Some _ -> Incomp {to_w = sh_to_w ; to_base = sh_to_base ; to_midpoint = inf_to_sh ; has_sup = true}
 
 
-    exception Found_iso of (Cat.embeddings * int)
+    exception Found_iso of (Cat.arrows * int)
 
     let remove_step i j ext_base =
       let pi = find i ext_base in
@@ -331,7 +331,7 @@ module Make (Node:Node.NodeType) =
                | Incomp sh_info ->
                   if db() then print_string
 				 (green (Printf.sprintf "I found a midpoint %s (%d)!\n"
-							(Graph.to_string sh_info.to_midpoint.Cat.trg)
+							(Graph.to_string (Cat.trg sh_info.to_midpoint))
 							fresh_id)
 				 );
 		  (*No better comparison with w exists*)
@@ -381,14 +381,14 @@ module Make (Node:Node.NodeType) =
                          match Cat.share (find_extension id ext_base) (sh_info.to_midpoint @@ (find_extension inf ext_base)) with
                            None -> failwith "Both best predecessors should be isomorphic"
                          | Some (_,tile) ->
-                            let left,right = tile.Cat.span in
+                            let left,right = Cat.lower_bound tile in
                             let ext_base = add_step inf id ((left @@ (Cat.invert right)) @@ sh_info.to_midpoint) ext_base in
                             remove_step inf i (remove_step inf w ext_base)
 
                        else
                          (*this new midpoint is the current best predecessor*)
                          let _ = if db() then Printf.printf "new midpoint %d is the best predecessor of witness %d\n" id w in
-                         let mp = point sh_info.to_midpoint.Cat.trg in
+                         let mp = point (Cat.trg sh_info.to_midpoint) in
                          let ext_base = add id mp (sh_info.to_midpoint @@ (find_extension inf ext_base)) ext_base in
                          let ext_base =
                            if stop then (add_step id w sh_info.to_w ext_base)
@@ -419,7 +419,7 @@ module Make (Node:Node.NodeType) =
 	let next_midpoint = w+1 in
         let best_inf,actions = progress next_midpoint ext_base [] Lib.IntSet.empty Lib.IntMap.empty [] [(0,id_0,0,ext_w)] in
         let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) in
-        let ext_base = add w (point ext_w.Cat.trg) ext_w ext_base in
+        let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
         List.fold_left (fun ext_base act -> act w ext_base best_inf) ext_base (List.rev actions)
       with

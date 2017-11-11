@@ -1,98 +1,149 @@
+module type Category =
+  sig
+    type arrows
+    type tile
+    type obj
+
+    (**Constructors*)
+    val identity : obj -> obj -> arrows
+    val (=>) : obj -> obj -> arrows
+    val (|>) : obj -> obj -> tile list
+
+
+    (**Pretty printing*)
+    val string_of_arrows : ?full:bool -> ?nocolor:bool -> arrows -> string
+    val string_of_tile : tile -> string
+    val string_of_span : arrows * arrows -> string
+    val string_of_cospan : arrows * arrows -> string
+
+    val arrows_of_tile : tile -> arrows
+    val left_of_tile : tile -> obj
+    val right_of_tile : tile -> obj
+    val lower_bound : tile -> (arrows * arrows)
+    val upper_bound : tile -> (arrows * arrows) option
+
+    val src : arrows -> obj
+    val trg : arrows -> obj
+
+    val share : arrows -> arrows -> (arrows * tile) option
+    val is_iso : arrows -> bool
+    val invert : arrows -> arrows
+    val flatten : arrows -> arrows list
+    val extension_class : arrows -> arrows
+    val matching_class : arrows -> arrows
+
+    (**Operators*)
+    val (@@) : arrows -> arrows -> arrows
+    val (^^) : arrows -> arrows -> (arrows * tile) list
+    val (===) : arrows -> arrows -> bool
+
+  end
+
 module Make (Node:Node.NodeType) =
-  struct
+  (struct
     module Hom = Homomorphism.Make (Node)
     module Graph = Graph.Make (Node)
+
+    type obj = Graph.t
 
     module NodeSet = Set.Make (Node)
     open Lib.Util
 
     exception Undefined
-    type embeddings = {src : Graph.t ; trg : Graph.t ; maps : Hom.t list ; partial : bool}
-    type tile = {span : embeddings * embeddings ; cospan : (embeddings * embeddings) option}
 
-    let is_domain_identity emb =
-      List.for_all Hom.is_identity emb.maps
+    type arrows = {src : obj ; trg : obj ; maps : Hom.t list ; partial : bool}
+
+    type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
+
+    let lower_bound tile = tile.span
+    let upper_bound tile = tile.cospan
+
+    let src f = f.src
+    let trg f = f.trg
+
+    let is_domain_identity f =
+      List.for_all Hom.is_identity f.maps
 
     let inf_of_tile tile =
-      let (emb,_) = tile.span in emb.src
+      let (f,_) = tile.span in f.src
 
     let sup_of_tile tile =
       match tile.cospan with
 	None -> None
-      | Some (emb,_) -> Some emb.trg
+      | Some (f,_) -> Some f.trg
 
     let left_of_tile tile =
-      let (emb,_) = tile.span in
-      emb.trg
+      let (f,_) = tile.span in
+      f.trg
 
     let right_of_tile tile =
-      let (_,emb') = tile.span in
-      emb'.trg
+      let (_,f') = tile.span in
+      f'.trg
 
-    let is_span (emb1,emb2) =
-      Graph.is_equal emb1.src emb2.src
+    let is_span (f1,f2) =
+      Graph.is_equal f1.src f2.src
 
-    let is_co_span (emb1,emb2) =
-      Graph.is_equal emb1.trg emb2.trg
+    let is_cospan (f1,f2) =
+      Graph.is_equal f1.trg f2.trg
 
-    let string_of_embeddings ?(full=false) ?(nocolor=false) emb =
+    let string_of_arrows ?(full=false) ?(nocolor=false) f =
       let str0 =
         if full then
-          Printf.sprintf "%s -" (Graph.to_string emb.src)
+          Printf.sprintf "%s -" (Graph.to_string f.src)
         else
           ""
       in
       let str1 =
         if full then
-          Printf.sprintf "-> %s" (Graph.to_string emb.trg)
+          Printf.sprintf "-> %s" (Graph.to_string f.trg)
         else
           ""
       in
       let col = if nocolor then fun x -> x else red
       in
-      str0^(col (String.concat "+" (List.map Hom.to_string emb.maps)))^str1
+      str0^(col (String.concat "+" (List.map Hom.to_string f.maps)))^str1
 
-    let dot_of_embeddings emb =
-      let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster emb.src 0 0 in
-      let cluster1,ref_cluster1,_ = Graph.to_dot_cluster emb.trg 1 fresh in
+    let dot_of_arrows f =
+      let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster f.src 0 0 in
+      let cluster1,ref_cluster1,_ = Graph.to_dot_cluster f.trg 1 fresh in
       let arrows =
 	String.concat ";\n"
-		      (List.map (fun hom -> ref_cluster0^"->"^ref_cluster1^(Hom.to_dot_label hom)) emb.maps)
+		      (List.map (fun hom -> ref_cluster0^"->"^ref_cluster1^(Hom.to_dot_label hom)) f.maps)
       in
       String.concat "\n" ["digraph G {\n";cluster0;cluster1;arrows;"}"]
 
 
-    let string_of_span (emb,emb') =
-      if (is_span (emb,emb')) then
+    let string_of_span (f,f') =
+      if (is_span (f,f')) then
         begin
-          let str = Printf.sprintf " %s " (Graph.to_string emb.src) in
-          let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
-          let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
-          str'^"<-"^(string_of_embeddings emb)^"-"^str^"-"^(string_of_embeddings emb')^"->"^str''
+          let str = Printf.sprintf " %s " (Graph.to_string f.src) in
+          let str' = Printf.sprintf " %s " (Graph.to_string f.trg) in
+          let str'' = Printf.sprintf " %s " (Graph.to_string f'.trg) in
+          str'^"<-"^(string_of_arrows f)^"-"^str^"-"^(string_of_arrows f')^"->"^str''
         end
       else
-        let str0 = Printf.sprintf " %s " (Graph.to_string emb.src) in
-        let str1 = Printf.sprintf " %s " (Graph.to_string emb'.src) in
-        let str' = Printf.sprintf " %s " (Graph.to_string emb.trg) in
-        let str'' = Printf.sprintf " %s " (Graph.to_string emb'.trg) in
-        print_string (str'^"<-"^(string_of_embeddings emb)^"-"^str0^"<<>>"^str1^"-"^(string_of_embeddings emb')^"->"^str'') ;
+        let str0 = Printf.sprintf " %s " (Graph.to_string f.src) in
+        let str1 = Printf.sprintf " %s " (Graph.to_string f'.src) in
+        let str' = Printf.sprintf " %s " (Graph.to_string f.trg) in
+        let str'' = Printf.sprintf " %s " (Graph.to_string f'.trg) in
+        print_string (str'^"<-"^(string_of_arrows f)^"-"^str0^"<<>>"^str1^"-"^(string_of_arrows f')^"->"^str'') ;
         failwith "Invalid argument"
 
 
-    let string_of_co_span (emb,emb') =
-      assert (is_co_span (emb,emb')) ;
-      let str = Printf.sprintf " %s " (Graph.to_string emb.trg) in
-      let str' = Printf.sprintf " %s " (Graph.to_string emb.src) in
-      let str'' = Printf.sprintf " %s " (Graph.to_string emb'.src) in
-      str'^"-"^(string_of_embeddings emb)^"->"^str^"<-"^(string_of_embeddings emb')^"-"^str''
+    let string_of_cospan (f,f') =
+      assert (is_cospan (f,f')) ;
+      let str = Printf.sprintf " %s " (Graph.to_string f.trg) in
+      let str' = Printf.sprintf " %s " (Graph.to_string f.src) in
+      let str'' = Printf.sprintf " %s " (Graph.to_string f'.src) in
+      str'^"-"^(string_of_arrows f)^"->"^str^"<-"^(string_of_arrows f')^"-"^str''
 
     let string_of_tile tile =
       match tile.cospan with
 	None -> (string_of_span tile.span)^"\n[NO_SUP]"
       | Some co_span ->
-	 (string_of_co_span co_span)^"\n"^(string_of_span tile.span)
+	 (string_of_cospan co_span)^"\n"^(string_of_span tile.span)
 
-    let images g emb =
+    let images g f =
       List.fold_left
         (fun images hom ->
           let im =
@@ -104,11 +155,11 @@ module Make (Node:Node.NodeType) =
 	      ) g Graph.empty
 	  in
 	  im::images
-        ) [] emb.maps
+        ) [] f.maps
 
-    let co_domains emb = images emb.src emb
+    let co_domains f = images f.src f
 
-    let (===) emb emb' =
+    let (===) f f' =
       let commute =
         try
           List.iter2
@@ -117,7 +168,7 @@ module Make (Node:Node.NodeType) =
                 (fun u v () ->
                   if v <> Hom.find u hom' then raise Exit
                 ) hom ()
-            ) emb.maps emb'.maps ;
+            ) f.maps f'.maps ;
           true
         with
           Exit -> false
@@ -128,13 +179,13 @@ module Make (Node:Node.NodeType) =
           List.iter2
             (fun cod cod' ->
               if not (Graph.is_equal cod cod') then raise Exit
-            ) (co_domains emb) (co_domains emb') ;
+            ) (co_domains f) (co_domains f') ;
           true
         with
           Exit -> false
 
 
-    let (=>) g h =
+    let embed _G _H =
       let rec extend hom_list iG jG acc =
 	match hom_list with
 	  [] -> acc
@@ -144,7 +195,7 @@ module Make (Node:Node.NodeType) =
 	     let opt = try Some (Hom.find jG phi) with Not_found -> None in
 	     match opt with
 	       None ->
-	       let biH = Graph.bound_to iH h in
+	       let biH = Graph.bound_to iH _H in
 	       let ext =
 		 List.fold_left
 		   (fun cont jH ->
@@ -157,7 +208,7 @@ module Make (Node:Node.NodeType) =
 	       in
 	       extend tl iG jG (ext@acc)
 	     | Some jH ->
-		if Graph.has_edge iH jH h then extend tl iG jG (phi::acc)
+		if Graph.has_edge iH jH _H then extend tl iG jG (phi::acc)
 		else extend tl iG jG acc
 	   with Not_found -> failwith "Invariant violation"
       in
@@ -169,7 +220,7 @@ module Make (Node:Node.NodeType) =
 	      (hom_list',already_done)
 	    else
 	      explore_cc j hom_list' (NodeSet.add j already_done)
-	  ) (hom_list,already_done) (Graph.bound_to i g)
+	  ) (hom_list,already_done) (Graph.bound_to i _G)
       in
       let extend_next_root u hom_list g h =
 	List.fold_left (fun hom_list hom ->
@@ -196,23 +247,23 @@ module Make (Node:Node.NodeType) =
 	    hom_extended_with_candidates_u@hom_list
 	  ) [] hom_list
       in
-      let cc_roots = Graph.connected_components g in
+      let cc_roots = Graph.connected_components _G in
       List.fold_left
 	(fun hom_list u ->
-	  let hom_list_u = extend_next_root u hom_list g h in
+	  let hom_list_u = extend_next_root u hom_list _G _H in
 	  let hom_list_extended,_ = explore_cc u hom_list_u (NodeSet.singleton u) in
 	  hom_list_extended
 	) [Hom.empty] cc_roots
 
-    let embed g h =
-      match g=>h with
+    let (=>) _G _H =
+      match embed _G _H with
 	[] -> raise Undefined
-      | maps -> {src = g ; trg = h ; maps = maps ; partial = false}
+      | maps -> {src = _G ; trg = _H ; maps = maps ; partial = false}
 
-    let identity g h =
-      {src = g ; trg = h ; maps = [Hom.identity (Graph.nodes g)] ; partial = false}
+    let identity _G _H =
+      {src = _G ; trg = _H ; maps = [Hom.identity (Graph.nodes _G)] ; partial = false}
 
-    let horizontal_compose emb emb' =
+    let tensor f f' =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
@@ -223,18 +274,18 @@ module Make (Node:Node.NodeType) =
 		    (Hom.sum hom hom')::hom_added
 		  with
 		    Hom.Not_structure_preserving | Hom.Not_injective -> hom_added
-	        ) [] emb'.maps
+	        ) [] f'.maps
 	    in
 	    hom_added@maps
-	  ) [] emb.maps
+	  ) [] f.maps
       in
       if maps = [] then raise Undefined
       else
-	let src = Graph.join emb.src emb'.src in
-	let trg = Graph.join emb.trg emb'.trg in
-	{src = src ; trg = trg ; maps = maps ; partial = emb.partial || emb'.partial}
+	let src = Graph.join f.src f'.src in
+	let trg = Graph.join f.trg f'.trg in
+	{src = src ; trg = trg ; maps = maps ; partial = f.partial || f'.partial}
 
-    let vertical_compose emb emb' =
+    let compose f f' =
       let maps =
 	List.fold_left
 	  (fun maps hom ->
@@ -245,20 +296,20 @@ module Make (Node:Node.NodeType) =
 		    (Hom.compose hom hom')::maps
 		  with
 		    Hom.Not_injective -> maps
-	        ) maps emb'.maps
+	        ) maps f'.maps
 	    in
 	    hom_ext_list@maps
-	  ) [] emb.maps
+	  ) [] f.maps
       in
       if maps = [] then raise Undefined
       else
-	{src = emb'.src ;
-	 trg = emb.trg ;
+	{src = f'.src ;
+	 trg = f.trg ;
 	 maps = maps;
-         partial = emb.partial || emb'.partial}
+         partial = f.partial || f'.partial}
 
 
-    let eq_class matching emb auto =
+    let eq_class matching f auto =
       let close_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
@@ -298,41 +349,41 @@ module Make (Node:Node.NodeType) =
 	       if Hom.is_identity hom then -1 else
 		 if Hom.is_identity hom' then 1
 		 else 0
-	     ) emb.maps
+	     ) f.maps
 	  )
       in
       assert (reduced_maps <> []) ;
-      {emb with maps = reduced_maps}
+      {f with maps = reduced_maps}
 
-    let extension_class emb =
-      let auto = (emb.trg => emb.trg) in
-      eq_class false emb auto
+    let extension_class f =
+      let auto = (embed f.trg f.trg) in
+      eq_class false f auto
 
-    let matching_class emb =
-      let auto = (emb.src => emb.src) in
-      eq_class true emb auto
+    let matching_class f =
+      let auto = (embed f.src f.src) in
+      eq_class true f auto
 
 
-    let flatten emb =
-      let src = emb.src in
-      let trg = emb.trg in
+    let flatten f =
+      let src = f.src in
+      let trg = f.trg in
       List.fold_left
 	(fun emb_list hom ->
 	  {src = src ; trg = trg ; maps = [hom]; partial = false}::emb_list
-	) [] emb.maps
+	) [] f.maps
 
-    let (@@) = vertical_compose
+    let (@@) = compose
 
-    let is_iso emb =
-      List.for_all (fun trg -> Graph.is_equal trg emb.trg) (images emb.src emb)
+    let is_iso f =
+      List.for_all (fun trg -> Graph.is_equal trg f.trg) (images f.src f)
 
-    let invert emb =
-      let emb' = {src = emb.trg ; trg = emb.src ; maps = List.map Hom.invert emb.maps ; partial = false}
+    let invert f =
+      let f' = {src = f.trg ; trg = f.src ; maps = List.map Hom.invert f.maps ; partial = false}
       in
       try
-        let _ = co_domains emb' in
-        emb'
-      with Not_found -> {emb' with partial = true}
+        let _ = co_domains f' in
+        f'
+      with Not_found -> {f' with partial = true}
 
     let complete left ls sup il inf ir =
       let comp u u' h =
@@ -428,22 +479,22 @@ module Make (Node:Node.NodeType) =
           all_ext_u
         ) left [(ls,sup,il,inf,ir)]
 
-    let hom_of_embeddings emb =
-      match emb.maps with
+    let hom_of_arrows f =
+      match f.maps with
         [hom] -> hom
       | _ -> failwith "Invariant violation, not a flat embedding"
 
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
-    let ipo (inf_to_left,inf_to_right) =
+    let (^^) inf_to_left inf_to_right =
       let close_rs right_to_sup cont =
         let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
         let inf = inf_to_left.src in
         let left = inf_to_left.trg in
         let right = inf_to_right.trg in
         let sup = right_to_sup.trg in
-        let hom_p =  hom_of_embeddings part_left_to_sup in
-        let inf_to_right = hom_of_embeddings inf_to_right in
-        let inf_to_left = hom_of_embeddings inf_to_left in
+        let hom_p =  hom_of_arrows part_left_to_sup in
+        let inf_to_right = hom_of_arrows inf_to_right in
+        let inf_to_left = hom_of_arrows inf_to_left in
         List.fold_left
           (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
            let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
@@ -460,27 +511,27 @@ module Make (Node:Node.NodeType) =
       in
       close_rs (identity inf_to_right.trg inf_to_right.trg) []
 
-    let emb_of_tile tile =
+    let arrows_of_tile tile =
       match tile.cospan with
         None -> raise Undefined
       | Some (ls,_) ->
          let (il,_) = tile.span in
          ls @@ il
 
-    let merge_embeddings emb emb' =
-      assert (Graph.is_equal emb.src emb'.src && Graph.is_equal emb.trg emb'.trg) ;
-      extension_class {src = emb.src ; trg = emb.trg ; maps = emb.maps@emb'.maps; partial = false}
+    let merge_arrows f f' =
+      assert (Graph.is_equal f.src f'.src && Graph.is_equal f.trg f'.trg) ;
+      extension_class {src = f.src ; trg = f.trg ; maps = f.maps@f'.maps; partial = false}
 
     let share f g =
-      let size emb =
-        let cod = List.hd (co_domains emb) in
-        let delta = Graph.minus emb.trg cod in
+      let size f =
+        let cod = List.hd (co_domains f) in
+        let delta = Graph.minus f.trg cod in
         (Graph.size_edge delta, Graph.size_node delta)
       in
-      let compare_sharing (emb,_) (emb',_) =
-        compare (size emb) (size emb')
+      let compare_sharing (f,_) (f',_) =
+        compare (size f) (size f')
       in
-      let sh_tiles = List.fast_sort compare_sharing (ipo (f,g))
+      let sh_tiles = List.fast_sort compare_sharing (f ^^ g)
       in
       match List.rev sh_tiles with
         [] -> None
@@ -495,13 +546,13 @@ module Make (Node:Node.NodeType) =
             (fun u v cont ->
              let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
              in
-             (flatten (extension_class (embed g1 g)))@cont
+             (flatten (extension_class (g1 => g)))@cont
             ) g []
         in
         List.fold_left
           (fun cont emb_g1_g ->
            let g1 = emb_g1_g.src in
-           let emb_g1_h_list = try flatten (extension_class (embed g1 h)) with Undefined -> [] in
+           let emb_g1_h_list = try flatten (extension_class (g1 => h)) with Undefined -> [] in
            List.fold_left
              (fun cont emb_g1_h ->
               (emb_g1_g,emb_g1_h)::cont
@@ -510,7 +561,7 @@ module Make (Node:Node.NodeType) =
       in
       List.fold_left
         (fun cont (to_g,to_h) ->
-         (ipo (to_g,to_h))@cont
+         (to_g ^^ to_h)@cont
         ) [] (subparts g h)
 
     let (|>) h obs =
@@ -538,7 +589,7 @@ module Make (Node:Node.NodeType) =
           Undefined -> false
       in
       List.fold_left
-        (fun cont (emb,tile) ->
+        (fun cont (f,tile) ->
          if Graph.is_empty (inf_of_tile tile) then cont
          else
            match tile.cospan with
@@ -552,4 +603,4 @@ module Make (Node:Node.NodeType) =
         ) [] (glue h obs)
 
 
-  end
+  end:Category with type obj = Graph.Make(Node).t)

@@ -1,8 +1,8 @@
 module Make (Node:Node.NodeType) =
   struct
     module Cat = Cat.Make (Node)
-    module Graph = Cat.Graph
-    module Hom = Cat.Hom
+    module Graph = Graph.Make (Node)
+    module Hom = Homomorphism.Make (Node)
 
     module Model = Model.Make (Node)
     module EB = Basis.Make (Node)
@@ -32,7 +32,7 @@ module Make (Node:Node.NodeType) =
       with
 	Graph.Incoherent -> failwith (name^" is not a coherent graph!")
 
-    let (=>) = Cat.embed
+    let (=>) = Cat.(=>)
     let (|>) = Cat.(|>)
     let (<|) = fun x y -> (y |> x)
 
@@ -53,8 +53,8 @@ module Make (Node:Node.NodeType) =
       print_newline();
       print_string "square |> one one\n" ;
       List.iter (fun tile ->
-		 let emb = Cat.emb_of_tile tile in
-		 Printf.printf "%s:\n %s\n" (Cat.string_of_embeddings emb) (Cat.string_of_tile tile)
+		 let emb = Cat.arrows_of_tile tile in
+		 Printf.printf "%s:\n %s\n" (Cat.string_of_arrows emb) (Cat.string_of_tile tile)
 		) (square |> (Graph.sum one one))
 
     let generate_tests debug =
@@ -78,26 +78,26 @@ module Make (Node:Node.NodeType) =
       let neg_ext_base =
         List.fold_left
           (fun ext_base (id_obs,tile) ->
-           match tile.Cat.cospan with
+           match Cat.upper_bound tile with
              None -> failwith "no witness"
            | Some (to_w,from_o) ->
               if db() then
                 Printf.printf "Inserting witness of observable \"%s\": %s\n"
 			      (Lib.Dict.to_name id_obs model.Model.dict)
-			      (Cat.string_of_co_span (to_w,from_o)) ;
+			      (Cat.string_of_cospan (to_w,from_o)) ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw
       in
       let pos_ext_base =
         List.fold_left
           (fun ext_base (id_obs,tile) ->
-           match tile.Cat.cospan with
+           match Cat.upper_bound tile with
              None -> failwith "no witness"
            | Some (to_w,from_o) ->
               if db() then
                 Printf.printf "Inserting witness of observable '%s': %s\n"
 			      (Lib.Dict.to_name id_obs model.Model.dict)
-			      (Cat.string_of_co_span (to_w,from_o)) ;
+			      (Cat.string_of_cospan (to_w,from_o)) ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed pw)) pw
       in

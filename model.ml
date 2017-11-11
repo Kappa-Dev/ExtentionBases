@@ -1,13 +1,14 @@
 module Make (Node:Node.NodeType) =
   struct
     module Cat = Cat.Make (Node)
-    module Graph = Cat.Graph
-    module Hom = Cat.Hom
+    module Graph = Graph.Make (Node)
+    module Hom = Homomorphism.Make (Node)
 
     let (|>) = Cat.(|>)
+    let (^^) = Cat.(^^)
 
     type t = {rules : (Graph.t * Graph.t) Lib.IntMap.t ; obs : Graph.t Lib.IntMap.t ; dict : Lib.Dict.t}
-    type effect = {neg : Cat.embeddings option ; pos : Cat.embeddings option}
+    type effect = {neg : Cat.arrows option ; pos : Cat.arrows option}
 
     let add_rule name (l,r) m =
       let id,dict = Lib.Dict.fresh m.dict in
@@ -37,18 +38,17 @@ module Make (Node:Node.NodeType) =
     (** witnesses_of_model : model -> (r_id -> obs_id -> cospan list) where the [cospan] is always the identity for obs_id*)
     let witnesses_of_rule r m =
       let enum_witnesses obs_name id_emb obs =
-	let h_eps = id_emb.Cat.src in
+	let h_eps = Cat.src id_emb in
 	List.fold_left
 	  (fun tiles gluing_tile ->
-	   match gluing_tile.Cat.cospan with
+	   match Cat.upper_bound gluing_tile with
 	     None -> tiles
 	   | Some (h_eps_to_w,_) ->
-              assert (List.tl (h_eps_to_w.Cat.maps) = []) ;
               (*Checking that w and pi_eps have a sup.*)
-              match Cat.ipo (h_eps_to_w,id_emb) with
+              match (h_eps_to_w ^^ id_emb) with
                 [] -> tiles
               | (_,tile)::_ ->
-                 if Cat.sup_of_tile tile = None then tiles
+                 if Cat.upper_bound tile = None then tiles
                  else (obs_name,gluing_tile)::tiles
 	  ) [] (h_eps |> obs)
       in
