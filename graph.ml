@@ -272,12 +272,15 @@ module Make (Node:Node.NodeType) =
 	Pervasives.Exit -> false
 
     let to_string g =
-      "{"^String.concat ","
+      let str = String.concat ","
 		    (fold_edges
 		       (fun u v cont ->
 			(Printf.sprintf "(%s,%s)" (Node.to_string u) (Node.to_string v))::cont
-		       ) g []
-		    )^"}"
+		       ) g [])
+      in
+      if is_coherent g then "{"^str^"}"
+      else
+        "{!!"^str^"!!}"
 
     let to_dot_cluster g n fresh =
       let name = "cluster_"^(string_of_int n) in

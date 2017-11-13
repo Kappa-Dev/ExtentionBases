@@ -42,14 +42,20 @@ module Make (Node:Node.NodeType) =
       let house = graph_of_library "house" in
       let dsquare = graph_of_library "dsquare" in
       let square = graph_of_library "square" in
-      let f = List.hd (Cat.flatten (Cat.extension_class (one => house))) in
-      let g = List.hd (Cat.flatten (Cat.extension_class (one => dsquare))) in
-      let sharing = Cat.share f g in
-      begin
-        match sharing with
-          Some (_,tile) -> print_string (Cat.string_of_tile tile)
-        | None -> print_string "None"
-      end ;
+      let f_list = Cat.flatten (Cat.extension_class (one => house)) in
+      let g_list = Cat.flatten (Cat.extension_class (one => house)) in
+      List.iter
+        (fun f ->
+         List.iter (fun g ->
+                    let sharing = Cat.share f g in
+                    begin
+                      match sharing with
+                        Some (_,tile) -> print_string (Cat.string_of_tile tile)
+                      | None -> print_string "None"
+                    end ;
+                    print_newline() 
+                   ) g_list
+        ) f_list ;
       print_newline();
       print_string "square |> one one\n" ;
       List.iter (fun tile ->
@@ -65,7 +71,7 @@ module Make (Node:Node.NodeType) =
       let house = graph_of_library "house" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") then
+		     if (*(name = "one") || (name = "triangle") ||*) (name = "square") (*|| (name = "dsquare")*) || (name = "house") then
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty

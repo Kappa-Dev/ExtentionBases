@@ -139,7 +139,7 @@ module Make (Node:Node.NodeType) =
 
     let string_of_tile tile =
       match tile.cospan with
-	None -> (string_of_span tile.span)^"\n[NO_SUP]"
+	None -> "[No SUP]\n"^(string_of_span tile.span)
       | Some co_span ->
 	 (string_of_cospan co_span)^"\n"^(string_of_span tile.span)
 
@@ -443,9 +443,10 @@ module Make (Node:Node.NodeType) =
         try
           let u_sup =
             if Hom.mem_sub (Node.id u) p_hom then
-              if Graph.has_node (Node.rename (Hom.find_sub (Node.id u) p_hom) u) sup then raise Hom.Not_injective
+              let u_sup = Node.rename (Hom.find_sub (Node.id u) p_hom) u in
+              if Graph.has_node u_sup sup then raise Hom.Not_injective
               else
-                (Node.rename (Hom.find_sub (Node.id u) p_hom) u)
+                u_sup
             else
               Node.rename (Graph.max_id sup + 1) u
           in
@@ -528,8 +529,12 @@ module Make (Node:Node.NodeType) =
         let delta = Graph.minus f.trg cod in
         (Graph.size_edge delta, Graph.size_node delta)
       in
-      let compare_sharing (f,_) (f',_) =
-        compare (size f) (size f')
+      let compare_sharing (f,tile) (f',tile') =
+        match upper_bound tile,upper_bound tile' with
+          None,Some _ -> (-1)
+        | Some _ ,None -> +1
+        | _ ->
+           compare (size f) (size f')
       in
       let sh_tiles = List.fast_sort compare_sharing (f ^^ g)
       in
