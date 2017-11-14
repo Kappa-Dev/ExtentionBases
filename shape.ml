@@ -53,7 +53,7 @@ module Make (Node:Node.NodeType) =
                         Some (_,tile) -> print_string (Cat.string_of_tile tile)
                       | None -> print_string "None"
                     end ;
-                    print_newline() 
+                    print_newline()
                    ) g_list
         ) f_list ;
       print_newline();
@@ -71,8 +71,8 @@ module Make (Node:Node.NodeType) =
       let house = graph_of_library "house" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (*(name = "one") || (name = "triangle") ||*) (name = "square") (*|| (name = "dsquare")*) || (name = "house") then
-                       Model.add_obs name (graph_of_library name) model
+		     if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") then
+                       Model.add_obs name (graph_of_library name) (Model.add_obs name (graph_of_library name) model)
                      else model
 		    ) Node.library Model.empty
       in

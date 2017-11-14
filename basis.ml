@@ -34,7 +34,7 @@ module Make (Node:Node.NodeType) =
           (fun i p dot_string ->
            let str =
              match p.obs with
-               [] -> Printf.sprintf "%d [label=\".\", shape = none] ;" i
+               [] -> Printf.sprintf "%d [shape = none] ;" i
              | ol ->
                 Printf.sprintf "%d [label=\"%d [obs: %s]\" , shape = \"%s\"];" i
                                i
@@ -181,16 +181,39 @@ module Make (Node:Node.NodeType) =
       in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
-    let add_step i j emb_ij ext_base =
+    let is_below i j ext_base =
+      let rec search ext_base = function
+          [] -> false
+        | i::cont ->
+           let pi = find i ext_base in
+           if Lib.IntMap.mem j pi.next then raise Exit
+           else
+             let pj = find j ext_base in
+             let cont' =
+               Lib.IntMap.fold (fun k _ cont -> k::cont) pj.next cont
+             in
+             search ext_base cont'
+      in
+      try
+        let pi = find i ext_base in
+        let next = Lib.IntMap.fold (fun j _ cont -> j::cont) pi.next [] 
+        in
+        search ext_base next
+      with
+        Exit -> true
+
+    let add_step ?(check=false) i j emb_ij ext_base =
       try
         let ext_base = if i <> 0 then remove_step 0 j ext_base else ext_base
         in
-        let pi = find i ext_base in
-        if db() then Printf.printf "Add Step %d |-> %d = %s-%s->%s\n" i j
-                                   (Graph.to_string (Cat.src emb_ij))
-                                   (Cat.string_of_arrows emb_ij)
-                                   (Graph.to_string (Cat.trg emb_ij)) ;
-        replace i {pi with next = Lib.IntMap.add j emb_ij pi.next} {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
+        if check && is_below i j ext_base then ext_base
+        else
+          let pi = find i ext_base in
+          if db() then Printf.printf "Add Step %d |-> %d = %s-%s->%s\n" i j
+                                     (Graph.to_string (Cat.src emb_ij))
+                                     (Cat.string_of_arrows emb_ij)
+                                     (Graph.to_string (Cat.trg emb_ij)) ;
+          replace i {pi with next = Lib.IntMap.add j emb_ij pi.next} {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
       with
         Not_found -> failwith "Invariant violation"
 
@@ -426,7 +449,7 @@ module Make (Node:Node.NodeType) =
                           let inf,inf_to_w = Lib.IntMap.find i best_inf in
                               if db() then print_string (blue (Printf.sprintf "Adding best inf %d for %d and witness %d\n" inf i w)) ;
                               if inf <> 0 || not added then
-                                (add_step inf w inf_to_w ext_base,true)
+                                (add_step ~check:true inf w inf_to_w ext_base,true)
                               else
                                 (ext_base,added)
                             with
