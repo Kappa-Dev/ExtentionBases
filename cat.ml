@@ -531,14 +531,14 @@ module Make (Node:Node.NodeType) =
       in
       let compare_sharing (f,tile) (f',tile') =
         match upper_bound tile,upper_bound tile' with
-          None,Some _ -> (-1)
-        | Some _ ,None -> +1
+          None,Some _ -> 1
+        | Some _ ,None -> -1
         | _ ->
-           compare (size f) (size f')
+           -(compare (size f) (size f'))
       in
       let sh_tiles = List.fast_sort compare_sharing (f ^^ g)
       in
-      match List.rev sh_tiles with
+      match sh_tiles with
         [] -> None
       | h::_ -> Some h
 

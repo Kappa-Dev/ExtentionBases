@@ -50,7 +50,7 @@ module Make (Node:Node.NodeType) =
                     let sharing = Cat.share f g in
                     begin
                       match sharing with
-                        Some (_,tile) -> print_string (Cat.string_of_tile tile)
+                        Some (sh,tile) -> Printf.printf "%s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
                       | None -> print_string "None"
                     end ;
                     print_newline()
