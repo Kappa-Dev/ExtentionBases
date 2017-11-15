@@ -387,21 +387,24 @@ module Make (Node:Node.NodeType) =
 
     let complete left ls sup il inf ir =
       let comp u u' h =
-        if Hom.mem_sub (Node.id u) h then
-          Hom.find_sub (Node.id u) h = Node.id u'
+        if Hom.mem u h then u' = Hom.find u h
         else
-          not (Hom.comem_sub (Node.id u') h)
+          if Hom.mem_sub (Node.id u) h then
+            Hom.find_sub (Node.id u) h = Node.id u'
+          else
+            not (Hom.comem_sub (Node.id u') h)
       in
-      let name_in u to_g g =
+      let name_in_inf u to_inf inf =
         try
-          let i = Hom.cofind_sub (Node.id u) to_g in
-          Node.rename i u
+          if Hom.comem u to_inf then Hom.cofind u to_inf
+          else
+            let i = Hom.cofind_sub (Node.id u) to_inf in
+            Node.rename i u
         with
           Not_found ->
-          Node.rename ((Graph.max_id g) + 1) u
+          Node.rename ((Graph.max_id inf) + 1) u
       in
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
-        assert (not (Hom.mem u p_hom)) ;
         let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
           Graph.fold_nodes
             (fun u' cont ->
@@ -416,9 +419,9 @@ module Make (Node:Node.NodeType) =
                           let v' = Hom.find v hom_uu' in
                           let il',inf',ir' =
                             if Graph.has_edge u' v' sup then
-                              let u_inf = name_in u il inf in
+                              let u_inf = name_in_inf u il inf in
                               let inf = Graph.add_node u_inf inf in
-                              let v_inf = name_in v il inf in
+                              let v_inf = name_in_inf v il inf in
                               let inf = Graph.add_node v_inf inf in
                               let inf' = Graph.add_edge u_inf v_inf inf
                               in
@@ -441,27 +444,29 @@ module Make (Node:Node.NodeType) =
         in
         (*Trying to add a fresh version of u in sup if possible*)
         try
-          let u_sup =
-            if Hom.mem_sub (Node.id u) p_hom then
-              let u_sup = Node.rename (Hom.find_sub (Node.id u) p_hom) u in
-              if Graph.has_node u_sup sup then raise Hom.Not_injective
+          if Hom.mem u p_hom then raise Hom.Not_injective
+          else
+            let u_sup =
+              if Hom.mem_sub (Node.id u) p_hom then
+                let u_sup = Node.rename (Hom.find_sub (Node.id u) p_hom) u in
+                if Graph.has_node u_sup sup then raise Hom.Not_injective
+                else
+                  u_sup
               else
-                u_sup
-            else
-              Node.rename (Graph.max_id sup + 1) u
-          in
-          let hom_uu_sup = Hom.add u u_sup p_hom in
-          let sup' =
-            List.fold_left
-              (fun sup' v ->
-                try
-                  let v' = Hom.find v hom_uu_sup in
-                  Graph.add_edge ~weak:true u_sup v' sup'
-                with
-                  Not_found -> sup'
-              ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
-          in
-          (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)::ext_uu'
+                Node.rename (Graph.max_id sup + 1) u
+            in
+            let hom_uu_sup = Hom.add u u_sup p_hom in
+            let sup' =
+              List.fold_left
+                (fun sup' v ->
+                  try
+                    let v' = Hom.find v hom_uu_sup in
+                    Graph.add_edge ~weak:true u_sup v' sup'
+                  with
+                    Not_found -> sup'
+                ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
+            in
+            (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)::ext_uu'
         with
           Hom.Not_injective | Hom.Not_structure_preserving -> ext_uu'
       in
