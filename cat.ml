@@ -394,27 +394,26 @@ module Make (Node:Node.NodeType) =
           else
             not (Hom.comem_sub (Node.id u') h)
       in
-      let name_in_inf u to_inf inf =
+      let name_in_inf u from_inf inf =
         try
-          if Hom.comem u to_inf then Hom.cofind u to_inf
+          if Hom.comem u from_inf then Hom.cofind u from_inf
           else
-            let i = Hom.cofind_sub (Node.id u) to_inf in
+            let i = Hom.cofind_sub (Node.id u) from_inf in
             Node.rename i u
         with
-          Not_found ->
-          Node.rename ((Graph.max_id inf) + 1) u
+          Not_found -> Node.rename ((Graph.max_id inf) + 1) u (*Make u fresh in inf*)
       in
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
         let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
           Graph.fold_nodes
-            (fun u' cont ->
+            (fun u' cont -> (*for all u' in sup*)
               if not (comp u u' p_hom) then cont
               else
                 try
                   let hom_uu' = Hom.add u u' p_hom in
                   let sup',il',inf',ir' =
                     List.fold_left
-                      (fun (sup,il,inf,ir) v ->
+                      (fun (sup,il,inf,ir) v -> (*for all v bound to u in left*)
                         try
                           let v' = Hom.find v hom_uu' in
                           let il',inf',ir' =
@@ -423,8 +422,7 @@ module Make (Node:Node.NodeType) =
                               let inf = Graph.add_node u_inf inf in
                               let v_inf = name_in_inf v il inf in
                               let inf = Graph.add_node v_inf inf in
-                              let inf' = Graph.add_edge u_inf v_inf inf
-                              in
+                              let inf' = Graph.add_edge u_inf v_inf inf in
                               (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir))
                             else
                               (il,inf,ir) (*unchanged*)
@@ -476,8 +474,8 @@ module Make (Node:Node.NodeType) =
           let all_ext_u =
             List.fold_left
               (fun cont (ls,sup,il,inf,ir) ->
-                if Hom.mem u ls then (ls,sup,il,inf,ir)::cont
-                else
+                (*if Hom.mem u ls then (ls,sup,il,inf,ir)::cont
+                else*)
                   (*[extend u ls sup il inf ir cont] extends ls with all possible associations of u to u' in sup or fresh*)
                   extend u ls sup il inf ir cont
               ) [] ext_list
