@@ -73,6 +73,16 @@ module Make (Node:Node.NodeType) =
     let cofind2_sub (u,v) hom = (cofind_sub u hom, cofind_sub v hom)
 
 
+    let (-->) l1 l2 =
+      let n1 = List.length l1 in
+      let n2 = List.length l2 in
+      if n2 < n1 then raise Not_injective
+      else
+        let hom,_ =
+          List.fold_left (fun (hom,i) u -> (add u (List.nth l2 i) hom,i+1)) (empty,0) l1
+        in
+        hom
+
     let id_image u hom =
       try Some (IntBij.find (Node.id u) hom.sub) with Not_found -> None
 

@@ -34,6 +34,7 @@ module Make (Node:Node.NodeType) =
 
     let (=>) = Cat.(=>)
     let (|>) = Cat.(|>)
+    let (-->) = Cat.(-->)
     let (<|) = fun x y -> (y |> x)
 
     let simple_tests debug =
@@ -42,20 +43,15 @@ module Make (Node:Node.NodeType) =
       let house = graph_of_library "house" in
       let dsquare = graph_of_library "dsquare" in
       let square = graph_of_library "square" in
-      let f_list = Cat.flatten (Cat.extension_class (one => house)) in
-      let g_list = Cat.flatten (Cat.extension_class (one => house)) in
-      List.iter
-        (fun f ->
-         List.iter (fun g ->
-                    let sharing = Cat.share f g in
-                    begin
-                      match sharing with
-                        Some (sh,tile) -> Printf.printf "%s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
-                      | None -> print_string "None"
-                    end ;
-                    print_newline()
-                   ) g_list
-        ) f_list ;
+      let open_square = graph_of_library "osquare" in
+      let f = (one,[0;1]) --> (square,[0;1]) in
+      let g = (one,[0;1]) --> (open_square,[0;1]) in
+      let sharing = Cat.share f g in
+      begin
+        match sharing with
+          Some (sh,tile) -> Printf.printf "(square <-- one --> osquare) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
+        | None -> print_string "None"
+      end ;
       print_newline();
       print_string "square |> one one\n" ;
       List.iter (fun tile ->

@@ -8,6 +8,7 @@ module type Category =
     val identity : obj -> obj -> arrows
     val (=>) : obj -> obj -> arrows
     val (|>) : obj -> obj -> tile list
+    val (-->) : (obj*int list) -> (obj*int list) -> arrows
 
 
     (**Pretty printing*)
@@ -158,6 +159,13 @@ module Make (Node:Node.NodeType) =
         ) [] f.maps
 
     let co_domains f = images f.src f
+
+    let (-->) (_G,lG) (_H,lH) =
+      let nodes_G = List.fold_left (fun cont i -> (Graph.nodes_of_id i _G)@cont) []  lG in
+      let nodes_H = List.fold_left (fun cont i -> (Graph.nodes_of_id i _H)@cont) [] lH in
+      let fGH = Hom.(-->) nodes_G nodes_H in
+      let is_part = (List.length nodes_G = Graph.size_node _G) in
+      {src = _G ; trg = _H ; partial = is_part ; maps = [fGH]}
 
     let (===) f f' =
       let commute =

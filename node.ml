@@ -83,6 +83,14 @@ module SimpleNode =
 	    ([0],[2]) ;
 	  ]
 	in
+        let osquare =
+	  [
+	    ([0],[1]) ;
+	    ([1],[2]) ;
+	    ([2],[3]) ;
+	    ([0],[2]) ;
+	  ]
+	in
 	let triangle =
 	  [
 	    ([0],[1]) ;
@@ -98,6 +106,7 @@ module SimpleNode =
 	let lib = Lib.StringMap.add "one" (tn one) lib in
 	let lib = Lib.StringMap.add "two" (tn two) lib in
 	let lib = Lib.StringMap.add "dsquare" (tn dsquare) lib in
+        let lib = Lib.StringMap.add "osquare" (tn osquare) lib in
 	Lib.StringMap.add "house" (tn house)
 			  (Lib.StringMap.add "square" (tn square)
 					     (Lib.StringMap.add "triangle" (tn triangle) lib))
@@ -188,6 +197,13 @@ module KappaNode =
 	    ([3;1;0],[0;1;0])
 	  ]
 	in
+	let osquare =
+	  [
+	    ([0;0;0],[1;0;0]) ;
+	    ([1;1;0],[2;1;0]) ;
+	    ([2;0;0],[3;0;0]) ;
+	  ]
+	in
         let dsquare =
 	  [
 	    ([0;0;0],[1;0;0]) ;
@@ -212,6 +228,8 @@ module KappaNode =
 	let lib = Lib.StringMap.add "house" (tn house) lib
 	in
 	let lib = Lib.StringMap.add "square" (tn square) lib
+	in
+        let lib = Lib.StringMap.add "osquare" (tn osquare) lib
 	in
 	let lib = Lib.StringMap.add "dsquare" (tn dsquare) lib
 	in
