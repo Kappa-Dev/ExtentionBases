@@ -8,8 +8,7 @@ module type Category =
     val identity : obj -> obj -> arrows
     val (=>) : obj -> obj -> arrows
     val (|>) : obj -> obj -> tile list
-    val (-->) : (obj*int list) -> (obj*int list) -> arrows
-
+   
 
     (**Pretty printing*)
     val string_of_arrows : ?full:bool -> ?nocolor:bool -> arrows -> string
@@ -28,6 +27,7 @@ module type Category =
 
     val share : arrows -> arrows -> (arrows * tile) option
     val is_iso : arrows -> bool
+    val is_identity : arrows -> bool
     val invert : arrows -> arrows
     val flatten : arrows -> arrows list
     val extension_class : arrows -> arrows
@@ -56,6 +56,8 @@ module Make (Node:Node.NodeType) =
 
     type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
 
+
+    let is_identity f = List.for_all (fun h -> Hom.is_identity h) f.maps
     let lower_bound tile = tile.span
     let upper_bound tile = tile.cospan
 
@@ -159,13 +161,6 @@ module Make (Node:Node.NodeType) =
         ) [] f.maps
 
     let co_domains f = images f.src f
-
-    let (-->) (_G,lG) (_H,lH) =
-      let nodes_G = List.fold_left (fun cont i -> (Graph.nodes_of_id i _G)@cont) []  lG in
-      let nodes_H = List.fold_left (fun cont i -> (Graph.nodes_of_id i _H)@cont) [] lH in
-      let fGH = Hom.(-->) nodes_G nodes_H in
-      let is_part = (List.length nodes_G = Graph.size_node _G) in
-      {src = _G ; trg = _H ; partial = is_part ; maps = [fGH]}
 
     let (===) f f' =
       let commute =
@@ -412,11 +407,14 @@ module Make (Node:Node.NodeType) =
           Not_found -> Node.rename ((Graph.max_id inf) + 1) u (*Make u fresh in inf*)
       in
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
+        Printf.printf "%s + %s\n" (Hom.to_string p_hom) (Node.to_string u) ;
         let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
           Graph.fold_nodes
             (fun u' cont -> (*for all u' in sup*)
               if not (comp u u' p_hom) then cont
               else
+                let () = Printf.printf "? %s\n" (Node.to_string u') 
+                in
                 try
                   let hom_uu' = Hom.add u u' p_hom in
                   let sup',il',inf',ir' =
@@ -460,6 +458,8 @@ module Make (Node:Node.NodeType) =
                   u_sup
               else
                 Node.rename (Graph.max_id sup + 1) u
+            in
+            let () = Printf.printf "? %s\n" (Node.to_string u_sup) 
             in
             let hom_uu_sup = Hom.add u u_sup p_hom in
             let sup' =
@@ -544,8 +544,9 @@ module Make (Node:Node.NodeType) =
         match upper_bound tile,upper_bound tile' with
           None,Some _ -> 1
         | Some _ ,None -> -1
-        | _ ->
-           -(compare (size f) (size f'))
+        | Some (f,_), Some (g,_) ->
+           compare (Graph.size_node f.trg,Graph.size_edge f.trg) (Graph.size_node g.trg,Graph.size_edge g.trg)
+        | _ -> 0
       in
       let sh_tiles = List.fast_sort compare_sharing (f ^^ g)
       in
