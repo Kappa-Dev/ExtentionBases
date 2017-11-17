@@ -474,9 +474,7 @@ module Make (Node:Node.NodeType) =
           let all_ext_u =
             List.fold_left
               (fun cont (ls,sup,il,inf,ir) ->
-                (*if Hom.mem u ls then (ls,sup,il,inf,ir)::cont
-                else*)
-                  (*[extend u ls sup il inf ir cont] extends ls with all possible associations of u to u' in sup or fresh*)
+                (*[extend u ls sup il inf ir cont] extends ls with all possible associations of u to u' in sup or fresh*)
                   extend u ls sup il inf ir cont
               ) [] ext_list
           in
