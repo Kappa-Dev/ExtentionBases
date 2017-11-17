@@ -101,15 +101,7 @@ module Make (Node:Node.NodeType) =
 
     let (@@) = Cat.(@@)
 
-(*    let leaf i ext_base =
-      Lib.IntMap.is_empty (find i ext_base).next*)
-
     let find_extension i ext_base =
-      if db() then
-        begin
-          print_string ("find_extension "^(string_of_int i)^": ") ;
-        end ;
-
       if not (mem i ext_base) then
         failwith ("Unkown point "^(string_of_int i)^" in extension base")
       else
@@ -156,7 +148,7 @@ module Make (Node:Node.NodeType) =
 
 
     let add_conflict i j ext_base =
-      if db() then Printf.printf "%d...#...%d\n" i j ;
+      if db() then Printf.printf "\t %d...#...%d\n" i j ;
       let pi = find i ext_base in
       let pj = find j ext_base in
       replace i {pi with conflict = Lib.IntSet.add j pi.conflict}
@@ -177,7 +169,7 @@ module Make (Node:Node.NodeType) =
     let remove_step i j ext_base =
       let pi = find i ext_base in
       let _ = if db() then
-                if Lib.IntMap.mem j pi.next then print_string (red (Printf.sprintf "Removing step %d |-x-> %d\n" i j))
+                if Lib.IntMap.mem j pi.next then print_string (red (Printf.sprintf "\t Removing step %d |-x-> %d\n" i j))
       in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
@@ -196,7 +188,7 @@ module Make (Node:Node.NodeType) =
       in
       try
         let pi = find i ext_base in
-        let next = Lib.IntMap.fold (fun j _ cont -> j::cont) pi.next [] 
+        let next = Lib.IntMap.fold (fun k _ cont -> if k=j then raise Exit else k::cont) pi.next []
         in
         search ext_base next
       with
@@ -209,7 +201,7 @@ module Make (Node:Node.NodeType) =
         if check && is_below i j ext_base then ext_base
         else
           let pi = find i ext_base in
-          if db() then Printf.printf "Add Step %d |-> %d = %s-%s->%s\n" i j
+          if db() then Printf.printf "\t Add Step %d |-> %d = %s-%s->%s\n" i j
                                      (Graph.to_string (Cat.src emb_ij))
                                      (Cat.string_of_arrows emb_ij)
                                      (Graph.to_string (Cat.trg emb_ij)) ;
@@ -268,7 +260,8 @@ module Make (Node:Node.NodeType) =
 				(String.concat ","
 					       (List.map string_of_int
 							 (Lib.IntMap.fold (fun i _ cont -> i::cont) (find 0 ext_base).next []))
-				)
+				) ;
+                  flush stdout
                 end
       in
       (************* DEBUGING INFO ***************)
@@ -280,7 +273,7 @@ module Make (Node:Node.NodeType) =
             if (mem p ext_base) || (mem j ext_base) then (* j ~ p detected*)
               failwith (Printf.sprintf "Malformed extension based, points %d and %d should be incomparable" p j)
             else
-              let () = if db() then Printf.printf "Found two isomorphic midpoints %d and %d\n" j p
+              let () = if db() then Printf.printf "Found two isomorphic midpoints %d and %d\n" j p ; flush stdout ;
               in
               Lib.IntMap.add i (j,f) m
         with
@@ -292,7 +285,7 @@ module Make (Node:Node.NodeType) =
 	      else
 		progress fresh_id ext_base actions visited best_inf [] next_layer
       | (inf,ext_inf_i,i,ext_inf_w)::todo ->
-	 (*When there are cycles in the extension base, a point may already have been compared with w*)
+         (*When there are cycles in the extension base, a point may already have been compared with w*)
          if Lib.IntSet.mem i visited then
            progress fresh_id ext_base actions visited best_inf next_layer todo
          else
@@ -307,7 +300,6 @@ module Make (Node:Node.NodeType) =
                let next_layer',stop =
                  Lib.IntMap.fold
                    (fun j ext_ij (cont,b) ->
-                    print_int i ; print_string "|-->" ; print_int j ; print_newline ();
                     ((inf,ext_ij @@ ext_inf_i,j,ext_inf_w)::cont,false)
                    ) (find i ext_base).next (next_layer,true)
                in
@@ -407,7 +399,7 @@ module Make (Node:Node.NodeType) =
 
                        else
                          (*this new midpoint is the current best predecessor*)
-                         let _ = if db() then Printf.printf "new midpoint %d is the best predecessor of witness %d\n" id w in
+                         let _ = if db() then Printf.printf "\t new midpoint %d is the best predecessor of witness %d\n" id w in
                          let mp = point (Cat.trg sh_info.to_midpoint) in
                          let ext_base = add id mp (sh_info.to_midpoint @@ (find_extension inf ext_base)) ext_base in
                          let ext_base =
@@ -433,21 +425,24 @@ module Make (Node:Node.NodeType) =
            end
 
     let insert ext_w obs_emb obs_id ext_base =
+      print_string "Building extension base...\n" ;
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       try
         let w = Lib.IntMap.cardinal ext_base.points in
 	let next_midpoint = w+1 in
         let best_inf,actions = progress next_midpoint ext_base [] Lib.IntSet.empty Lib.IntMap.empty [] [(0,id_0,0,ext_w)] in
-        let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) in
+        print_string "Done!\n" ; flush stdout ;
+        let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) ; flush stdout in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
+        print_string "Perfoming insertion after dry run... \n"; flush stdout ;
         let ext_base = List.fold_left (fun ext_base act -> act w ext_base best_inf) ext_base (List.rev actions) in
         let ext_base,_ = Lib.IntSet.fold
                        (fun i (ext_base,added) ->
                         try
                           let inf,inf_to_w = Lib.IntMap.find i best_inf in
-                              if db() then print_string (blue (Printf.sprintf "Adding best inf %d for %d and witness %d\n" inf i w)) ;
+                              if db() then print_string (blue (Printf.sprintf "\t Adding best inf %d for %d and witness %d\n" inf i w)) ; flush stdout ;
                               if inf <> 0 || not added then
                                 (add_step ~check:true inf w inf_to_w ext_base,true)
                               else

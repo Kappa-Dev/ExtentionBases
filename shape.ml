@@ -50,7 +50,7 @@ module Make (Node:Node.NodeType) =
       let sharing = Cat.share f g in
       begin
         match sharing with
-          Some (sh,tile) -> Printf.printf "(square <-- one --> osquare) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
+          Some (sh,tile) -> Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
         | None -> print_string "None"
       end ;
       print_newline()
@@ -70,11 +70,13 @@ module Make (Node:Node.NodeType) =
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
 		     if (name = "one") || (* (name = "triangle") || (name = "square") || *) (name = "dsquare") (*|| (name = "house")*) then
-                       Model.add_obs name (graph_of_library name) (Model.add_obs name (graph_of_library name) model)
+                       Model.add_obs name (graph_of_library name) model 
                      else model
 		    ) Node.library Model.empty
       in
+      print_string "Building witnesses...\n" ; flush stdout ;
       let nw,pw = Model.witnesses_of_rule (Graph.empty,one) model in
+      print_string "Done\n" ; flush stdout ;
       let get_seed = function
           (id_obs,tile)::_ -> Cat.left_of_tile tile
         | [] -> Graph.empty
@@ -88,7 +90,7 @@ module Make (Node:Node.NodeType) =
               if db() then
                 Printf.printf "Inserting witness of observable \"%s\": %s\n"
 			      (Lib.Dict.to_name id_obs model.Model.dict)
-			      (Cat.string_of_cospan (to_w,from_o)) ;
+			      (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw
       in
@@ -101,7 +103,7 @@ module Make (Node:Node.NodeType) =
               if db() then
                 Printf.printf "Inserting witness of observable '%s': %s\n"
 			      (Lib.Dict.to_name id_obs model.Model.dict)
-			      (Cat.string_of_cospan (to_w,from_o)) ;
+			      (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed pw)) pw
       in

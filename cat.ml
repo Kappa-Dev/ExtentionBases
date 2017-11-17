@@ -413,33 +413,28 @@ module Make (Node:Node.NodeType) =
             (fun u' cont -> (*for all u' in sup*)
               if not (comp u u' p_hom) then cont
               else
-                let () = Printf.printf "? %s\n" (Node.to_string u') 
-                in
                 try
                   let hom_uu' = Hom.add u u' p_hom in
-                  let sup',il',inf',ir' =
+                  let il',inf',ir',to_add =
                     List.fold_left
-                      (fun (sup,il,inf,ir) v -> (*for all v bound to u in left*)
+                      (fun (il,inf,ir,l) v -> (*for all v bound to u in left*)
                         try
                           let v' = Hom.find v hom_uu' in
-                          let il',inf',ir' =
-                            if Graph.has_edge u' v' sup then
-                              let u_inf = name_in_inf u il inf in
-                              let inf = Graph.add_node u_inf inf in
-                              let v_inf = name_in_inf v il inf in
-                              let inf = Graph.add_node v_inf inf in
-                              let inf' = Graph.add_edge u_inf v_inf inf in
-                              (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir))
-                            else
-                              (il,inf,ir) (*unchanged*)
-                          in
-                          let sup' = Graph.add_edge ~weak:true u' v' sup
-                          in
-                          (sup',il',inf',ir')
+                          if Graph.has_edge u' v' sup then
+                            let u_inf = name_in_inf u il inf in
+                            let inf = Graph.add_node u_inf inf in
+                            let v_inf = name_in_inf v il inf in
+                            let inf = Graph.add_node v_inf inf in
+                            let inf' = Graph.add_edge u_inf v_inf inf in
+                            (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir),l)
+                          else
+                            (il,inf,ir,v'::l) (*unchanged*)
                         with
-                          Not_found -> (sup,il,inf,ir) (*v has no image by p_hom*)
+                          Not_found -> (il,inf,ir,l) (*v has no image by p_hom*)
                         | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
-                      ) (sup,inf_to_left,inf,inf_to_right) (Graph.bound_to u left)
+                      ) (inf_to_left,inf,inf_to_right,[]) (Graph.bound_to u left)
+                  in
+                  let sup' = List.fold_left (fun sup v' -> Graph.add_edge ~weak:true u' v' sup) sup to_add
                   in
                   (hom_uu',sup',il',inf',ir')::cont
                 with
@@ -459,8 +454,6 @@ module Make (Node:Node.NodeType) =
               else
                 Node.rename (Graph.max_id sup + 1) u
             in
-            let () = Printf.printf "? %s\n" (Node.to_string u_sup) 
-            in
             let hom_uu_sup = Hom.add u u_sup p_hom in
             let sup' =
               List.fold_left
@@ -472,6 +465,8 @@ module Make (Node:Node.NodeType) =
                     Not_found -> sup'
                 ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
             in
+            (*let () = Printf.printf "%s\n" (Hom.to_string hom_uu_sup)
+            in*)
             (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)::ext_uu'
         with
           Hom.Not_injective | Hom.Not_structure_preserving -> ext_uu'
