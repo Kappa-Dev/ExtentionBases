@@ -39,8 +39,6 @@ module Make (Node:Node.NodeType) =
     let simple_tests debug =
       if debug then debug_mode () ;
       let one = graph_of_library "one" in
-      let house = graph_of_library "house" in
-      let dsquare = graph_of_library "dsquare" in
       let square = graph_of_library "square" in
       let open_square = graph_of_library "osquare" in
       let f_list = Cat.flatten (Cat.extension_class (one => open_square)) in
@@ -66,10 +64,10 @@ module Make (Node:Node.NodeType) =
 
       if db() then Printexc.record_backtrace true ;
       let one = graph_of_library "one" in
-      let house = graph_of_library "house" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") then
+		     if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
+                     then
                        Model.add_obs name (graph_of_library name) (Model.add_obs name (graph_of_library name) model)
                      else model
 		    ) Node.library Model.empty

@@ -30,6 +30,7 @@ module type GraphType =
     val size_node : t -> int
     val is_empty : t -> bool
     val is_equal : t -> t -> bool
+    val is_connex : t -> bool
 
     (**Operators*)
     val join : ?weak:bool -> t -> t -> t
