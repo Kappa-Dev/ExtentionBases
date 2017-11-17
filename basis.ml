@@ -425,18 +425,15 @@ module Make (Node:Node.NodeType) =
            end
 
     let insert ext_w obs_emb obs_id ext_base =
-      print_string "Building extension base...\n" ;
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       try
         let w = Lib.IntMap.cardinal ext_base.points in
 	let next_midpoint = w+1 in
         let best_inf,actions = progress next_midpoint ext_base [] Lib.IntSet.empty Lib.IntMap.empty [] [(0,id_0,0,ext_w)] in
-        print_string "Done!\n" ; flush stdout ;
-        let _ = if db() then print_string (blue (Printf.sprintf "Adding witness with id %d\n" w)) ; flush stdout in
+        let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ; flush stdout in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
-        print_string "Perfoming insertion after dry run... \n"; flush stdout ;
         let ext_base = List.fold_left (fun ext_base act -> act w ext_base best_inf) ext_base (List.rev actions) in
         let ext_base,_ = Lib.IntSet.fold
                        (fun i (ext_base,added) ->

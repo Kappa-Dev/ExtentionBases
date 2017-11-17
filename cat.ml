@@ -388,7 +388,7 @@ module Make (Node:Node.NodeType) =
         f'
       with Not_found -> {f' with partial = true}
 
-    let complete left ls sup il inf ir =
+    let complete left ls sup0 il inf ir =
       let comp u u' h =
         if Hom.mem u h then u' = Hom.find u h
         else
@@ -407,7 +407,6 @@ module Make (Node:Node.NodeType) =
           Not_found -> Node.rename ((Graph.max_id inf) + 1) u (*Make u fresh in inf*)
       in
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
-        Printf.printf "%s + %s\n" (Hom.to_string p_hom) (Node.to_string u) ;
         let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
           Graph.fold_nodes
             (fun u' cont -> (*for all u' in sup*)
@@ -415,26 +414,24 @@ module Make (Node:Node.NodeType) =
               else
                 try
                   let hom_uu' = Hom.add u u' p_hom in
-                  let il',inf',ir',to_add =
+                  let il',inf',ir',sup' =
                     List.fold_left
-                      (fun (il,inf,ir,l) v -> (*for all v bound to u in left*)
+                      (fun (il,inf,ir,sup) v -> (*for all v bound to u in left*)
                         try
                           let v' = Hom.find v hom_uu' in
-                          if Graph.has_edge u' v' sup then
+                          if Graph.has_edge u' v' sup0 then
                             let u_inf = name_in_inf u il inf in
                             let inf = Graph.add_node u_inf inf in
                             let v_inf = name_in_inf v il inf in
                             let inf = Graph.add_node v_inf inf in
                             let inf' = Graph.add_edge u_inf v_inf inf in
-                            (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir),l)
+                            (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir),sup)
                           else
-                            (il,inf,ir,v'::l) (*unchanged*)
+                            (il,inf,ir,Graph.add_edge ~weak:true u' v' sup)
                         with
-                          Not_found -> (il,inf,ir,l) (*v has no image by p_hom*)
+                          Not_found -> (il,inf,ir,sup) (*v has no image by p_hom*)
                         | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
-                      ) (inf_to_left,inf,inf_to_right,[]) (Graph.bound_to u left)
-                  in
-                  let sup' = List.fold_left (fun sup v' -> Graph.add_edge ~weak:true u' v' sup) sup to_add
+                      ) (inf_to_left,inf,inf_to_right,sup) (Graph.bound_to u left)
                   in
                   (hom_uu',sup',il',inf',ir')::cont
                 with
@@ -484,7 +481,7 @@ module Make (Node:Node.NodeType) =
               ) [] ext_list
           in
           all_ext_u
-        ) left [(ls,sup,il,inf,ir)]
+        ) left [(ls,sup0,il,inf,ir)]
 
     let hom_of_arrows f =
       match f.maps with
@@ -530,11 +527,6 @@ module Make (Node:Node.NodeType) =
       extension_class {src = f.src ; trg = f.trg ; maps = f.maps@f'.maps; partial = false}
 
     let share f g =
-      let size f =
-        let cod = List.hd (co_domains f) in
-        let delta = Graph.minus f.trg cod in
-        (Graph.size_edge delta, Graph.size_node delta)
-      in
       let compare_sharing (f,tile) (f',tile') =
         match upper_bound tile,upper_bound tile' with
           None,Some _ -> 1
