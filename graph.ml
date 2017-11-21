@@ -10,7 +10,7 @@ module type GraphType =
 
     (**Pretty printing*)
     val to_string : t -> string
-    val to_dot_cluster : t -> int -> int -> string * string * int
+    val to_dot_cluster : ?sub:t -> t -> int -> int -> string * string * int
 
     (**Iterators*)
     val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
@@ -245,6 +245,11 @@ module Make (Node:Node.NodeType) =
       in
       cc
 
+    let is_connex g =
+      match connected_components g with
+        [_] -> true
+      | _ -> false
+
     let subparts g =
       let rec enum edges subs =
 	match edges with
@@ -283,7 +288,7 @@ module Make (Node:Node.NodeType) =
       else
         "{!!"^str^"!!}"
 
-    let to_dot_cluster g n fresh =
+    let to_dot_cluster ?(sub=empty) g n fresh =
       let name = "cluster_"^(string_of_int n) in
       let nodes,fresh,map =
 	fold_nodes
@@ -300,16 +305,19 @@ module Make (Node:Node.NodeType) =
 	String.concat "\n"
 		      (fold_edges
 			 (fun u v cont ->
-			  let edge_str =
+                          let edge_style =
+                            if has_edge u v sub then "[color = red]" else ""
+                          in
+                          let edge_str =
 			    let i = Lib.IntMap.find (Node.id u) map in
 			    let j = Lib.IntMap.find (Node.id v) map in
 			    Node.dot_of_edge u i v j
 			  in
-			  edge_str::cont
+			  (edge_str^edge_style)::cont
 			 ) g []
 		      )
       in
-      (Printf.sprintf "subgraph %s { \n %s \n %s \n }\n" name nodes edges,name,fresh)
+      (Printf.sprintf "subgraph %s { \n label = \"%s\" %s \n %s \n }\n" name name nodes edges,name,fresh)
 
     let sum g h =
       let shift g d =

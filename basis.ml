@@ -180,9 +180,8 @@ module Make (Node:Node.NodeType) =
            let pi = find i ext_base in
            if Lib.IntMap.mem j pi.next then raise Exit
            else
-             let pj = find j ext_base in
              let cont' =
-               Lib.IntMap.fold (fun k _ cont -> k::cont) pj.next cont
+               Lib.IntMap.fold (fun k _ cont -> k::cont) pi.next cont
              in
              search ext_base cont'
       in
