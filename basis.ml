@@ -264,19 +264,11 @@ module Make (Node:Node.NodeType) =
                 end
       in
       (************* DEBUGING INFO ***************)
-      let update_best_inf i (j,f) m =
-        try
-          let p,f' = Lib.IntMap.find i m in
-          if p = j then m
-          else
-            if (mem p ext_base) || (mem j ext_base) then (* j ~ p detected*)
-              failwith (Printf.sprintf "Malformed extension based, points %d and %d should be incomparable" p j)
-            else
-              let () = if db() then Printf.printf "Found two isomorphic midpoints %d and %d\n" j p ; flush stdout ;
-              in
-              Lib.IntMap.add i (j,f) m
-        with
-          Not_found -> Lib.IntMap.add i (j,f) m
+      let update_best_inf ?(force=true) i (j,f) m =
+        if force || not (Lib.IntMap.mem i m) then
+          Lib.IntMap.add i (j,f) m
+        else
+          m
       in
 
       match todo with
@@ -284,6 +276,7 @@ module Make (Node:Node.NodeType) =
 	      else
 		progress fresh_id ext_base actions visited best_inf [] next_layer
       | (inf,ext_inf_i,i,ext_inf_w)::todo ->
+         let best_inf = update_best_inf i (inf,ext_inf_w) best_inf in
          (*When there are cycles in the extension base, a point may already have been compared with w*)
          if Lib.IntSet.mem i visited then
            progress fresh_id ext_base actions visited best_inf next_layer todo
@@ -305,7 +298,7 @@ module Make (Node:Node.NodeType) =
                let actions' =
                  (fun w ext_base best_inf -> add_conflict i w ext_base)::actions
                in
-               let best_inf' = update_best_inf i (Lib.IntMap.find inf best_inf) best_inf in
+               let best_inf' = update_best_inf i (inf,ext_inf_w) best_inf in
                progress fresh_id ext_base actions' (Lib.IntSet.add i visited) best_inf' next_layer' todo
 
                | Below ext_w_i -> (* w --ext_w_i--> i *)
@@ -314,10 +307,10 @@ module Make (Node:Node.NodeType) =
 		    fresh_id
 		    ext_base
 		    ((fun w ext_base best_inf ->
-                      remove_step inf i (add_step w i ext_w_i (add_step inf w ext_inf_w ext_base))
+                      remove_step inf i (add_step w i ext_w_i ext_base)
                      )::actions)
 		    (Lib.IntSet.add i visited)
-                    best_inf
+                    (update_best_inf i (inf,ext_inf_w) best_inf)
 		    next_layer
 		    todo
 
@@ -364,8 +357,7 @@ module Make (Node:Node.NodeType) =
                         actions
 		    in
                     let best_inf' =
-                      update_best_inf i
-                                      (try Lib.IntMap.find inf best_inf with Not_found -> failwith (Printf.sprintf "%d has not been compared\n" inf)) best_inf
+                      update_best_inf i (inf,ext_inf_w) best_inf
                     in
                     progress
 		      fresh_id
@@ -376,43 +368,31 @@ module Make (Node:Node.NodeType) =
 		      todo
                   else
                     (*Not a trivial midpoint*)
-                    let next_layer',stop =
+                    let next_layer' =
                       Lib.IntMap.fold
-                        (fun j ext_ij (cont,b) ->
-                         ((fresh_id,ext_ij @@ sh_info.to_base,j,sh_info.to_w)::cont,false)
-                        ) (find i ext_base).next (next_layer,true)
+                        (fun j ext_ij cont ->
+                         (fresh_id,ext_ij @@ sh_info.to_base,j,sh_info.to_w)::cont
+                        ) (find i ext_base).next next_layer
                     in
+                    let best_inf' = update_best_inf ~force:false i (fresh_id,sh_info.to_w) best_inf in
                     let actions' =
-                      (fun w ext_base best_inf ->
-                       let id,id_to_w = try Lib.IntMap.find i best_inf with Not_found -> failwith "Invariant violation"
+                      (fun w ext_base best_inf_final ->
+                       let id,id_to_w = try Lib.IntMap.find i best_inf_final with Not_found -> (fresh_id,sh_info.to_w)
                        in
-
-                       (*if best predecessor has been already added to the ext_base*)
-                       if mem id ext_base then
-                         match Cat.share (find_extension id ext_base) (sh_info.to_midpoint @@ (find_extension inf ext_base)) with
-                           None -> failwith "Both best predecessors should be isomorphic"
-                         | Some (_,tile) ->
-                            let left,right = Cat.lower_bound tile in
-                            let ext_base = add_step inf id ((left @@ (Cat.invert right)) @@ sh_info.to_midpoint) ext_base in
-                            remove_step inf i ext_base
-
-                       else
+                       if id = fresh_id then
                          (*this new midpoint is the current best predecessor*)
-                         let _ = if db() then Printf.printf "\t new midpoint %d is the best predecessor of witness %d\n" id w in
+                         let _ = if db() then Printf.printf "\t midpoint %d is still the best predecessor of witness %d\n" id w in
                          let mp = point (Cat.trg sh_info.to_midpoint) in
                          let ext_base = add id mp (sh_info.to_midpoint @@ (find_extension inf ext_base)) ext_base in
-                         let ext_base =
-                           if stop then (add_step id w sh_info.to_w ext_base)
-                           else ext_base
-                         in
                          let ext_base = add_step inf id sh_info.to_midpoint ext_base in
                          let ext_base = add_step id i sh_info.to_base ext_base in
 		         let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
                          remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
+                       else
+                         let _ = if db() then Printf.printf "\t midpoint %d is no longer the best predecessor of witness %d\n" id w in
+                         ext_base
                       )::actions
                     in
-                    let best_inf = update_best_inf i (fresh_id,sh_info.to_w) best_inf in
-                    let best_inf' = update_best_inf fresh_id (fresh_id,sh_info.to_w) best_inf in
                     progress
 		      (fresh_id+1)
 		      ext_base
@@ -430,6 +410,7 @@ module Make (Node:Node.NodeType) =
         let w = Lib.IntMap.cardinal ext_base.points in
 	let next_midpoint = w+1 in
         let best_inf,actions = progress next_midpoint ext_base [] Lib.IntSet.empty Lib.IntMap.empty [] [(0,id_0,0,ext_w)] in
+        (*let best_inf = Lib.IntMap.filter (fun i (p,f) -> Lib.IntMap.for_all (fun j (q,g) -> i!=j || not (is_below p q ext_base)) best_inf) best_inf in*)
         let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ; flush stdout in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
