@@ -451,5 +451,19 @@ module Make (Node:Node.NodeType) =
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
+    let to_dot_corresp ext_base =
+      let str_list,_ =
+        Lib.IntMap.fold
+          (fun i p (str_list,fresh) ->
+           let f = find_extension i ext_base in
+           let _G = List.hd (Cat.images (Cat.src f) f) in
+           match p.obs with
+             [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
+                   (str::str_list,fresh)
+           | _ -> (str_list,fresh)
+          ) ext_base.points ([],0)
+      in
+      "digraph G{\n"^(String.concat "\n" str_list)^"\n}"
+
 
   end

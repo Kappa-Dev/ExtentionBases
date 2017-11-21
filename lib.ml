@@ -21,6 +21,7 @@ module Util =
   struct
     let db_mode = ref false
     let db () = !db_mode
+    let flush_string = fun x -> print_string x ; flush stdout
     let debug_mode () =
       (print_string "Entering debug mode\n" ; db_mode := true)
 

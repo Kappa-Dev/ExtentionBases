@@ -8,7 +8,6 @@ module type Category =
     val identity : obj -> obj -> arrows
     val (=>) : obj -> obj -> arrows
     val (|>) : obj -> obj -> tile list
-   
 
     (**Pretty printing*)
     val string_of_arrows : ?full:bool -> ?nocolor:bool -> arrows -> string
@@ -32,6 +31,7 @@ module type Category =
     val flatten : arrows -> arrows list
     val extension_class : arrows -> arrows
     val matching_class : arrows -> arrows
+    val images : obj -> arrows -> obj list
 
     (**Operators*)
     val (@@) : arrows -> arrows -> arrows
@@ -533,7 +533,10 @@ module Make (Node:Node.NodeType) =
            compare (Graph.size_node f.trg,Graph.size_edge f.trg) (Graph.size_node g.trg,Graph.size_edge g.trg)
         | _ -> 0
       in
-      let sh_tiles = List.fast_sort compare_sharing (f ^^ g)
+      let ipos =
+        List.filter (fun (f,tile) -> Graph.is_connex f.trg) (f ^^ g)
+      in
+      let sh_tiles = List.fast_sort compare_sharing ipos
       in
       match sh_tiles with
         [] -> None
@@ -566,6 +569,7 @@ module Make (Node:Node.NodeType) =
          (to_g ^^ to_h)@cont
         ) [] (subparts g h)
 
+    (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =
       let eq_tile obs_right tile tile' =
         try
