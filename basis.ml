@@ -221,8 +221,8 @@ module Make (Node:Node.NodeType) =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ;
       match Cat.share inf_to_i inf_to_w with
-        None -> Conflicting
-      | Some (inf_to_sh,sharing_tile) ->
+        [] -> Conflicting
+      | (inf_to_sh,sharing_tile)::_ -> (*TODO: use all sharings!*)
          let sh_to_base,sh_to_w = Cat.lower_bound sharing_tile in
          let _ =
            if db() then

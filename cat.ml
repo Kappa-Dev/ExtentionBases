@@ -24,7 +24,7 @@ module type Category =
     val src : arrows -> obj
     val trg : arrows -> obj
 
-    val share : arrows -> arrows -> (arrows * tile) option
+    val share : arrows -> arrows -> (arrows * tile) list
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
     val invert : arrows -> arrows
@@ -541,8 +541,14 @@ module Make (Node:Node.NodeType) =
       let sh_tiles = List.fast_sort compare_sharing ipos
       in
       match sh_tiles with
-        [] -> None
-      | h::_ -> Some h
+        [] -> []
+      | h::_ -> List.fold_left
+                  (fun cont sh ->
+                   let hd = List.hd cont in
+                   if (compare_sharing hd sh) = 0 then sh::cont
+                   else
+                     cont
+                  ) [List.hd sh_tiles] (List.rev sh_tiles)
 
     let glue g h =
       (*returns spans of the form g <-id- g1 -f-> h where g1 is an edge of g*)
@@ -589,8 +595,8 @@ module Make (Node:Node.NodeType) =
              then false
              else
                match share ext ext' with
-                 None -> false
-               | Some (_,sh_tile) ->
+                 [] -> false
+               | (_,sh_tile)::_ ->
                   let (inf_to_left,inf_to_right) = sh_tile.span in
                   (is_iso inf_to_left) && is_iso (inf_to_right)
         with
