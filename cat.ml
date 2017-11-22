@@ -38,6 +38,8 @@ module type Category =
     val (^^) : arrows -> arrows -> (arrows * tile) list
     val (===) : arrows -> arrows -> bool
 
+    (**Exceptions*)
+    exception Undefined
   end
 
 module Make (Node:Node.NodeType) =
