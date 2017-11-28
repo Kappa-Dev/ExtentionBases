@@ -157,7 +157,10 @@ module Make (Node:Node.NodeType) =
 	in
 	if is_coherent || weak then
 	  let edges' = NodeMap.add u (v::bu) (NodeMap.add v (u::bv) g.edges) in
-	  {g with edges = edges' ; nodes = g.nodes ; size = g.size+1 ; coherent = is_coherent && g.coherent}
+	  {g with edges = edges' ;
+                  nodes = g.nodes ;
+                  size = g.size+1 ;
+                  coherent = is_coherent && g.coherent}
 	else
 	  raise Incoherent
 
@@ -217,7 +220,7 @@ module Make (Node:Node.NodeType) =
 	   (NodeMap.add u u ccmap,NodeMap.add u 1 ccsize)
 	  ) g (NodeMap.empty, NodeMap.empty)
       in
-      let cc_map,_ =
+      let cc_map,cc_size =
 	fold_edges
 	  (fun i j (ccmap,ccsize) ->
 	   let rep_i = NodeMap.find i ccmap in
@@ -246,9 +249,22 @@ module Make (Node:Node.NodeType) =
       cc
 
     let is_connex g =
-      match connected_components g with
-        [_] -> true
-      | _ -> false
+      let rec iter cc = function
+          [] -> cc
+        | u::todo ->
+           let cc',todo' =
+             List.fold_left (fun (cc,todo) v ->
+                 List.fold_left
+                   (fun (cc,todo) v' ->
+                     if NodeSet.mem v' cc then (cc,todo)
+                     else (NodeSet.add v' cc,v'::todo)
+                   ) (NodeSet.add v cc,if NodeSet.mem v cc then todo else v::todo)
+                   (nodes_of_id (Node.id v) g)
+               ) (NodeSet.add u cc,todo) (bound_to u g)
+           in
+           iter cc' todo'
+      in
+      NodeSet.cardinal (iter NodeSet.empty (nodes_of_id (max_id g) g)) = size_node g
 
     let subparts g =
       let rec enum edges subs =

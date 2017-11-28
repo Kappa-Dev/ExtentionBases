@@ -41,6 +41,7 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let square = graph_of_library "square" in
       let open_square = graph_of_library "osquare" in
+      List.iter (fun g -> if Graph.is_connex g then print_string "true\n" else print_string "false\n") [one;square;open_square; Graph.sum one one] ;
       let f_list = Cat.flatten (Cat.extension_class (one => open_square)) in
       let g_list = Cat.flatten (Cat.extension_class (one => square)) in
       let f = List.hd (List.filter (fun f -> Cat.is_identity f) f_list) in
@@ -48,7 +49,8 @@ module Make (Node:Node.NodeType) =
       let sharing = Cat.share f g in
       List.iter
         (fun (sh,tile) ->
-          Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile) ;
+          Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ;
+          print_string (Cat.string_of_tile tile) ;
           print_newline() ;
         ) sharing
       (*print_string "square |> one one\n" ;
@@ -65,10 +67,10 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     (*if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
-                     then*)
-                     if (name = "one") || (name = "triangle") || (name = "house")
+		      if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
                      then
+                       (*if (name = "one") || (name = "triangle") || (name = "house")
+                     then*) 
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty

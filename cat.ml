@@ -411,15 +411,9 @@ module Make (Node:Node.NodeType) =
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
         (*list of all possible extensions of p_hom to the association
           u |--> u' (for some u' in sup)*)
-        
-        let () = Printf.printf "(%s) + %s|-> ...\n"  (Hom.to_string p_hom) (Node.to_string u) in
-        
         let ext_uu' =
           Graph.fold_nodes
             (fun u' cont -> (*for all u' in sup*)
-              
-              let () = Printf.printf "%s\n" (Node.to_string u') in
-              
               if not (comp u u' p_hom) then cont
               else
                 try
@@ -452,9 +446,6 @@ module Make (Node:Node.NodeType) =
                       (inf_to_left,inf,inf_to_right,sup)
                       (Graph.bound_to u left)
                   in
-                  
-                  let () = Printf.printf "%s\n" (Hom.to_string hom_uu') in
-                  
                   (hom_uu',sup',il',inf',ir')::cont
                 with
                   Hom.Not_injective | Hom.Not_structure_preserving -> cont
@@ -484,19 +475,12 @@ module Make (Node:Node.NodeType) =
                     Not_found -> sup'
                 ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
             in
-            
-            let () = Printf.printf "%s\n" (Hom.to_string hom_uu_sup)
-            in
-            
             (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)::ext_uu'
         with
           Hom.Not_injective | Hom.Not_structure_preserving -> ext_uu'
       in
       Graph.fold_nodes
         (fun u ext_list ->
-          
-          let () = Printf.printf "looking for an association for node %s\n" (Node.to_string u) in
-          
           let all_ext_u =
             List.fold_left
               (fun cont (ls,sup,il,inf,ir) ->
@@ -525,11 +509,23 @@ module Make (Node:Node.NodeType) =
         let inf_to_left = hom_of_arrows inf_to_left in
         List.fold_left
           (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
-           let emb_inf_left = {src = inf' ; trg = left ; maps = [inf_to_left'] ; partial = false} in
-           let emb_inf_right = {src = inf' ; trg = right ; maps = [inf_to_right']; partial = false} in
+           let emb_inf_left = {src = inf' ;
+                               trg = left ;
+                               maps = [inf_to_left'] ;
+                               partial = false}
+           in
+           let emb_inf_right = {src = inf' ;
+                                trg = right ;
+                                maps = [inf_to_right'];
+                                partial = false}
+           in
            let csp_opt =
              if Graph.is_coherent sup' then
-               Some ({src = left ; trg = sup' ; maps = [left_to_sup'] ; partial = false},identity right sup')
+               Some ({src = left ;
+                      trg = sup' ;
+                      maps = [left_to_sup'] ;
+                      partial = false
+                     },identity right sup')
              else
                None
            in
@@ -556,11 +552,15 @@ module Make (Node:Node.NodeType) =
           None,Some _ -> 1
         | Some _ ,None -> -1
         | Some (f,_), Some (g,_) ->
-           compare (Graph.size_node f.trg,Graph.size_edge f.trg) (Graph.size_node g.trg,Graph.size_edge g.trg)
+           compare (Graph.size_node f.trg,Graph.size_edge f.trg)
+                   (Graph.size_node g.trg,Graph.size_edge g.trg)
         | _ -> 0
       in
       let ipos =
-        List.filter (fun (f,tile) -> Graph.is_connex f.trg) (f ^^ g)
+        List.filter
+          (fun (f,tile) ->
+            Graph.is_connex f.trg
+          ) (f ^^ g)
       in
       let sh_tiles = List.fast_sort compare_sharing ipos
       in
