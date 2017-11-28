@@ -48,8 +48,8 @@ module Make (Node:Node.NodeType) =
       let sharing = Cat.share f g in
       begin
         match sharing with
-          Some (sh,tile) -> Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
-        | None -> print_string "None"
+          (sh,tile)::_ -> Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
+        | [] -> print_string "None"
       end ;
       print_newline()
       (*print_string "square |> one one\n" ;
@@ -66,10 +66,10 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		     if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
+		     (*if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
+                     then*)
+                     if (name = "one") || (name = "triangle") || (name = "house")
                      then
-                       (*if (name = "one") || (name = "triangle") || (name = "house")
-                       then *)
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty
