@@ -46,12 +46,11 @@ module Make (Node:Node.NodeType) =
       let f = List.hd (List.filter (fun f -> Cat.is_identity f) f_list) in
       let g = List.hd (List.filter (fun f -> Cat.is_identity f) g_list) in
       let sharing = Cat.share f g in
-      begin
-        match sharing with
-          (sh,tile)::_ -> Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile)
-        | [] -> print_string "None"
-      end ;
-      print_newline()
+      List.iter
+        (fun (sh,tile) ->
+          Printf.printf "(osquare <-- one --> square) %s:\n" (Cat.string_of_arrows sh) ; print_string (Cat.string_of_tile tile) ;
+          print_newline() ;
+        ) sharing
       (*print_string "square |> one one\n" ;
       List.iter (fun tile ->
 		 let emb = Cat.arrows_of_tile tile in

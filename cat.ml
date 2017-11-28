@@ -409,16 +409,25 @@ module Make (Node:Node.NodeType) =
           Not_found -> Node.rename ((Graph.max_id inf) + 1) u (*Make u fresh in inf*)
       in
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
-        let ext_uu' = (*list of all possible extensions of p_hom to the association u |--> u' (for some u' in sup)*)
+        (*list of all possible extensions of p_hom to the association
+          u |--> u' (for some u' in sup)*)
+        
+        let () = Printf.printf "(%s) + %s|-> ...\n"  (Hom.to_string p_hom) (Node.to_string u) in
+        
+        let ext_uu' =
           Graph.fold_nodes
             (fun u' cont -> (*for all u' in sup*)
+              
+              let () = Printf.printf "%s\n" (Node.to_string u') in
+              
               if not (comp u u' p_hom) then cont
               else
                 try
                   let hom_uu' = Hom.add u u' p_hom in
                   let il',inf',ir',sup' =
                     List.fold_left
-                      (fun (il,inf,ir,sup) v -> (*for all v bound to u in left*)
+                      (*for all v bound to u in left*)
+                      (fun (il,inf,ir,sup) v ->
                         try
                           let v' = Hom.find v hom_uu' in
                           if Graph.has_edge u' v' sup0 then
@@ -427,14 +436,25 @@ module Make (Node:Node.NodeType) =
                             let v_inf = name_in_inf v il inf in
                             let inf = Graph.add_node v_inf inf in
                             let inf' = Graph.add_edge u_inf v_inf inf in
-                            (Hom.add u_inf u (Hom.add v_inf v il),inf',Hom.add u_inf u' (Hom.add v_inf v' ir),sup)
+                            (Hom.add u_inf u (Hom.add v_inf v il),
+                             inf',Hom.add u_inf u' (Hom.add v_inf v' ir),
+                             sup)
                           else
                             (il,inf,ir,Graph.add_edge ~weak:true u' v' sup)
                         with
-                          Not_found -> (il,inf,ir,sup) (*v has no image by p_hom*)
-                        | Graph.Incoherent -> failwith "Invariant violation (inf should be a coherent graph)"
-                      ) (inf_to_left,inf,inf_to_right,sup) (Graph.bound_to u left)
+                          (*v has no image by p_hom*)
+                          Not_found -> (il,inf,ir,sup)
+                        | Graph.Incoherent ->
+                           failwith
+                             "Invariant violation
+                              (inf should be a coherent graph)"
+                      )
+                      (inf_to_left,inf,inf_to_right,sup)
+                      (Graph.bound_to u left)
                   in
+                  
+                  let () = Printf.printf "%s\n" (Hom.to_string hom_uu') in
+                  
                   (hom_uu',sup',il',inf',ir')::cont
                 with
                   Hom.Not_injective | Hom.Not_structure_preserving -> cont
@@ -464,15 +484,19 @@ module Make (Node:Node.NodeType) =
                     Not_found -> sup'
                 ) (Graph.add_node u_sup sup) (Graph.bound_to u left)
             in
-            (*let () = Printf.printf "%s\n" (Hom.to_string hom_uu_sup)
-            in*)
+            
+            let () = Printf.printf "%s\n" (Hom.to_string hom_uu_sup)
+            in
+            
             (hom_uu_sup,sup',inf_to_left,inf,inf_to_right)::ext_uu'
         with
           Hom.Not_injective | Hom.Not_structure_preserving -> ext_uu'
       in
       Graph.fold_nodes
         (fun u ext_list ->
-          (*Printf.printf "looking for an association for node %s\n" (Node.to_string u) ;*)
+          
+          let () = Printf.printf "looking for an association for node %s\n" (Node.to_string u) in
+          
           let all_ext_u =
             List.fold_left
               (fun cont (ls,sup,il,inf,ir) ->
