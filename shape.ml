@@ -41,7 +41,8 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let square = graph_of_library "square" in
       let open_square = graph_of_library "osquare" in
-      List.iter (fun g -> if Graph.is_connex g then print_string "true\n" else print_string "false\n") [one;square;open_square; Graph.sum one one] ;
+      List.iter (fun g -> if Graph.is_connex g then print_string "true\n" else print_string "false\n")
+                [one;square;open_square; Graph.sum one one] ;
       let f_list = Cat.flatten (Cat.extension_class (one => open_square)) in
       let g_list = Cat.flatten (Cat.extension_class (one => square)) in
       let f = List.hd (List.filter (fun f -> Cat.is_identity f) f_list) in
@@ -70,7 +71,7 @@ module Make (Node:Node.NodeType) =
 		      if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
                      then
                        (*if (name = "one") || (name = "triangle") || (name = "house")
-                     then*) 
+                     then*)
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty
