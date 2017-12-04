@@ -65,18 +65,20 @@ module Make (Node:Node.NodeType) =
 
       if db() then Printexc.record_backtrace true ;
       let one = graph_of_library "one" in
+      let triangle = graph_of_library "triangle" in
+      let square = graph_of_library "square" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		      if (name = "one") || (name = "triangle") || (name = "square") || (name = "dsquare") || (name = "house") || (name = "osquare")
+		      if (name = "one") || (name = "triangle") (*|| (name = "square")*) || (name = "dsquare") || (name = "house") || (name = "osquare")
                      then
                        (*if (name = "one") || (name = "triangle") || (name = "house")
-                     then*) 
+                     then*)
                        Model.add_obs name (graph_of_library name) model
                      else model
 		    ) Node.library Model.empty
       in
       print_string "Building witnesses...\n" ; flush stdout ;
-      let nw,pw = Model.witnesses_of_rule (Graph.empty,one) model in
+      let nw,pw = Model.witnesses_of_rule (one,Graph.empty) model in
       print_string "Done\n" ; flush stdout ;
       let get_seed = function
           (id_obs,tile)::_ -> Cat.left_of_tile tile
