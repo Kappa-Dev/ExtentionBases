@@ -5,7 +5,7 @@ module Make (Node:Node.NodeType) =
     module Hom = Homomorphism.Make (Node)
 
     let (|>) = Cat.(|>)
-    let (^^) = Cat.(^^)
+    let (/|) = Cat.(/|)
 
     type t = {rules : (Graph.t * Graph.t) Lib.IntMap.t ; obs : Graph.t Lib.IntMap.t ; dict : Lib.Dict.t}
     type effect = {neg : Cat.arrows option ; pos : Cat.arrows option}
@@ -35,9 +35,9 @@ module Make (Node:Node.NodeType) =
        pos = minus r l
       }
 
-    (** witnesses_of_model : model -> (r_id -> obs_id -> cospan list) where the [cospan] is always the identity for obs_id*)
     let witnesses_of_rule r m =
       let enum_witnesses obs_name id_emb obs =
+
 	let h_eps = Cat.src id_emb in
 	List.fold_left
 	  (fun tiles gluing_tile ->
@@ -45,7 +45,7 @@ module Make (Node:Node.NodeType) =
 	     None -> tiles
 	   | Some (h_eps_to_w,_) ->
               (*Checking that w and pi_eps have a sup.*)
-              match (h_eps_to_w ^^ id_emb) with
+              match Cat.share h_eps_to_w id_emb with
                 [] -> tiles
               | (_,tile)::_ ->
                  if Cat.upper_bound tile = None then tiles

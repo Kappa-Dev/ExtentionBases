@@ -1,4 +1,4 @@
-SOURCES := lib.ml bijection.ml node.ml graph.ml state.ml homomorphism.ml cat.ml basis.ml model.ml shape.ml
+SOURCES := lib.ml bijection.ml node.ml homomorphism.ml graph.ml state.ml cat.ml basis.ml model.ml shape.ml test.ml
 RESULT := ExtentionBases
 LIBINSTALL_FILES := $(RESULT).cma $(RESULT).cmxa $(RESULT).a $(SOURCES:.ml=.cmi) $(SOURCES:.ml=.cmx)
 
@@ -16,6 +16,7 @@ all: native-code-library test
 debug: debug-code test-debug
 
 clean::
-	rm -f test
+	rm -f test test-debug *.dot
+
 
 -include OCamlMakefile

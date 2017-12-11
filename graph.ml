@@ -2,6 +2,7 @@ module type GraphType =
   sig
     type t
     type node
+    type hom
 
     (**Constructors*)
     val empty : t
@@ -16,6 +17,7 @@ module type GraphType =
     val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
     val fold_edge_types : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
     val fold_nodes : (node -> 'a -> 'a) -> t -> 'a -> 'a
+    val fold_ids : (int -> 'a -> 'a) -> t -> 'a -> 'a
 
     (**Properties*)
     val bound_to : node -> t -> node list
@@ -37,6 +39,7 @@ module type GraphType =
     val meet : t -> t -> t
     val sum : t -> t -> t
     val minus : t -> t -> t
+    val image : hom -> t -> t
 
     exception Incoherent
     val is_coherent : t -> bool
@@ -50,7 +53,8 @@ module Make (Node:Node.NodeType) =
 
     module NodeSet = Set.Make(struct type t = Node.t let compare = Node.compare end)
     module NodeMap = Map.Make(struct type t = Node.t let compare = Node.compare end)
-
+    module Hom = Homomorphism.Make (Node)
+    type hom = Hom.t
     type node = Node.t
     type t =
       {nodes : NodeSet.t ;
@@ -116,15 +120,15 @@ module Make (Node:Node.NodeType) =
       List.fold_left
         (fun cont (u,v) -> f u v cont) cont (edge_types g)
 
-
     let fold_nodes f g cont =
       NodeSet.fold
 	(fun u cont ->
 	 f u cont
 	) g.nodes cont
 
-    let bound_to u g =
-      try NodeMap.find u g.edges with Not_found -> []
+    let fold_ids f g = Lib.IntMap.fold (fun id _ cont -> f id cont) g.idmap
+
+    let bound_to u g = try NodeMap.find u g.edges with Not_found -> []
 
     let has_edge u v g =
       let bu = bound_to u g in
@@ -345,5 +349,14 @@ module Make (Node:Node.NodeType) =
           ) h empty
       in
       join h (shift g ((max_id h)+1))
-  end:GraphType with type node = Node.t)
+
+    let image hom g =
+      fold_edges
+	(fun u v cod ->
+	  let (u',v') = Hom.find2 (u,v) hom in
+	  let cod = add_node u' (add_node v' cod) in
+	  add_edge u' v' cod
+	) g empty
+
+  end:GraphType with type node = Node.t and type hom = Homomorphism.Make(Node).t)
 

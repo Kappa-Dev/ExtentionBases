@@ -88,7 +88,7 @@ module Make (Node:Node.NodeType) =
 
     let fold f hom = NodeBij.fold (fun u v cont -> f u v cont) hom.tot
 
-    let to_string ?(full=false) hom =
+    let to_string ?(full=false) ?(sub=false) hom =
       if full then
         NodeBij.to_string hom.tot
       else

@@ -31,12 +31,13 @@ module type Category =
     val flatten : arrows -> arrows list
     val extension_class : arrows -> arrows
     val matching_class : arrows -> arrows
-    val images : obj -> arrows -> obj list
 
     (**Operators*)
     val (@@) : arrows -> arrows -> arrows
-    val (^^) : arrows -> arrows -> (arrows * tile) list
+    val (/|) : arrows -> arrows -> (arrows * tile) list
+    val (|/) : arrows -> arrows -> (arrows * arrows) list
     val (===) : arrows -> arrows -> bool
+    val (-->) : obj -> arrows -> obj list
 
     (**Exceptions*)
     exception Undefined
@@ -113,7 +114,11 @@ module Make (Node:Node.NodeType) =
       let cluster1,ref_cluster1,_ = Graph.to_dot_cluster f.trg 1 fresh in
       let arrows =
 	String.concat ";\n"
-		      (List.map (fun hom -> ref_cluster0^"->"^ref_cluster1^(Hom.to_dot_label hom)) f.maps)
+		      (List.map
+                         (fun hom ->
+                           ref_cluster0^"->"^ref_cluster1^(Hom.to_dot_label hom)
+                         ) f.maps
+                      )
       in
       String.concat "\n" ["digraph G {\n";cluster0;cluster1;arrows;"}"]
 
@@ -131,7 +136,9 @@ module Make (Node:Node.NodeType) =
         let str1 = Printf.sprintf " %s " (Graph.to_string f'.src) in
         let str' = Printf.sprintf " %s " (Graph.to_string f.trg) in
         let str'' = Printf.sprintf " %s " (Graph.to_string f'.trg) in
-        print_string (str'^"<-"^(string_of_arrows f)^"-"^str0^"<<>>"^str1^"-"^(string_of_arrows f')^"->"^str'') ;
+        print_string
+          (str'^"<-"^(string_of_arrows f)^"-"^str0^"<<>>"^str1^"-"
+           ^(string_of_arrows f')^"->"^str'') ;
         failwith "Invalid argument"
 
 
@@ -148,21 +155,13 @@ module Make (Node:Node.NodeType) =
       | Some co_span ->
 	 (string_of_cospan co_span)^"\n"^(string_of_span tile.span)
 
-    let images g f =
+    let (-->) _G f =
       List.fold_left
         (fun images hom ->
-          let im =
-	    Graph.fold_edges
-	      (fun u v cod ->
-	        let (u',v') = Hom.find2 (u,v) hom in
-	        let cod = Graph.add_node u' (Graph.add_node v' cod) in
-	        Graph.add_edge u' v' cod
-	      ) g Graph.empty
-	  in
-	  im::images
+          (Graph.image hom _G)::images
         ) [] f.maps
 
-    let co_domains f = images f.src f
+    let co_domains f = f.src --> f
 
     let (===) f f' =
       let commute =
@@ -233,7 +232,8 @@ module Make (Node:Node.NodeType) =
 	      match Hom.id_image u hom with
 		None -> (*if [Node.id u] is not yet constrained by [hom]*)
 		(fun f -> Graph.fold_nodes f h)
-	      | Some i -> (*Looking for a candidate among those having [hom (Node.id u)] as id*)
+	      | Some i ->
+                 (*Looking for a candidate among those having [hom (Node.id u)] as id*)
 		 (fun f -> List.fold_right f (Graph.nodes_of_id i h))
 	    in
 	    let hom_extended_with_candidates_u =
@@ -380,10 +380,13 @@ module Make (Node:Node.NodeType) =
     let (@@) = compose
 
     let is_iso f =
-      List.for_all (fun trg -> Graph.is_equal trg f.trg) (images f.src f)
+      List.for_all (fun trg -> Graph.is_equal trg f.trg) (f.src --> f)
 
     let invert f =
-      let f' = {src = f.trg ; trg = f.src ; maps = List.map Hom.invert f.maps ; partial = false}
+      let f' = {src = f.trg ;
+                trg = f.src ;
+                maps = List.map Hom.invert f.maps ;
+                partial = false}
       in
       try
         let _ = co_domains f' in
@@ -411,9 +414,12 @@ module Make (Node:Node.NodeType) =
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
         (*list of all possible extensions of p_hom to the association
           u |--> u' (for some u' in sup)*)
+        (*let () = Printf.printf "%s\n" (Hom.to_string ~sub:true p_hom) in*)
         let ext_uu' =
-          Graph.fold_nodes
-            (fun u' cont -> (*for all u' in sup*)
+          Graph.fold_ids
+            (fun id' cont -> (*for all id' in sup*)
+              let u' = Node.rename id' u in
+              (*let from_sup = Graph.has_node u' sup in*)
               if not (comp u u' p_hom) then cont
               else
                 try
@@ -484,8 +490,9 @@ module Make (Node:Node.NodeType) =
           let all_ext_u =
             List.fold_left
               (fun cont (ls,sup,il,inf,ir) ->
-                (*[extend u ls sup il inf ir cont] extends ls with all possible associations of u to u' in sup or fresh*)
-                  extend u ls sup il inf ir cont
+                (*[extend u ls sup il inf ir cont]
+                  extends ls with all possible associations of u to u' in sup or fresh*)
+                extend u ls sup il inf ir cont
               ) [] ext_list
           in
           all_ext_u
@@ -496,8 +503,32 @@ module Make (Node:Node.NodeType) =
         [hom] -> hom
       | _ -> failwith "Invariant violation, not a flat embedding"
 
+    let (|/) left_to_sup right_to_sup =
+      List.fold_left
+        (fun pb f ->
+          let sup_l = Graph.image f left_to_sup.src in
+          List.fold_left
+            (fun pb g ->
+              let sup_r =  Graph.image g right_to_sup.src in
+              let inf = Graph.meet sup_l sup_r in
+              let inf_to_left =
+                {src = inf ;
+                 trg = left_to_sup.src ;
+                 maps = [Hom.invert f] ;
+                 partial = false}
+              in
+              let inf_to_right =
+                {src = inf ;
+                 trg = right_to_sup.src ;
+                 maps = [Hom.invert g] ;
+                 partial = false}
+              in
+              (inf_to_left,inf_to_right)::pb
+            ) pb right_to_sup.maps
+        ) [] left_to_sup.maps
+
     (*given a span, returns a cospan where the left upper map is a partial morphism*)
-    let (^^) inf_to_left inf_to_right =
+    let (/|) inf_to_left inf_to_right =
       let close_rs right_to_sup cont =
         let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
         let inf = inf_to_left.src in
@@ -509,28 +540,28 @@ module Make (Node:Node.NodeType) =
         let inf_to_left = hom_of_arrows inf_to_left in
         List.fold_left
           (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
-           let emb_inf_left = {src = inf' ;
-                               trg = left ;
-                               maps = [inf_to_left'] ;
-                               partial = false}
-           in
-           let emb_inf_right = {src = inf' ;
-                                trg = right ;
-                                maps = [inf_to_right'];
+            let emb_inf_left = {src = inf' ;
+                                trg = left ;
+                                maps = [inf_to_left'] ;
                                 partial = false}
-           in
-           let csp_opt =
-             if Graph.is_coherent sup' then
-               Some ({src = left ;
-                      trg = sup' ;
-                      maps = [left_to_sup'] ;
-                      partial = false
-                     },identity right sup')
-             else
-               None
-           in
-           let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
-           (identity inf inf',tile)::sharing_tiles
+            in
+            let emb_inf_right = {src = inf' ;
+                                 trg = right ;
+                                 maps = [inf_to_right'];
+                                 partial = false}
+            in
+            let csp_opt =
+              if Graph.is_coherent sup' then
+                Some ({src = left ;
+                       trg = sup' ;
+                       maps = [left_to_sup'] ;
+                       partial = false
+                      },identity right sup')
+              else
+                None
+            in
+            let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
+            (identity inf inf',tile)::sharing_tiles
           ) cont (complete left hom_p sup inf_to_left inf inf_to_right)
       in
       close_rs (identity inf_to_right.trg inf_to_right.trg) []
@@ -560,7 +591,7 @@ module Make (Node:Node.NodeType) =
         List.filter
           (fun (f,tile) ->
             Graph.is_connex f.trg
-          ) (f ^^ g)
+          ) (f /| g)
       in
       let sh_tiles = List.fast_sort compare_sharing ipos
       in
@@ -568,10 +599,10 @@ module Make (Node:Node.NodeType) =
         [] -> []
       | h::_ -> List.fold_left
                   (fun cont sh ->
-                   let hd = List.hd cont in
-                   if (compare_sharing hd sh) = 0 then sh::cont
-                   else
-                     cont
+                    let hd = List.hd cont in
+                    if (compare_sharing hd sh) = 0 then sh::cont
+                    else
+                      cont
                   ) [List.hd sh_tiles] (List.rev sh_tiles)
 
     let glue g h =
@@ -581,24 +612,24 @@ module Make (Node:Node.NodeType) =
         let subs =
           Graph.fold_edge_types
             (fun u v cont ->
-             let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
-             in
-             (flatten (extension_class (g1 => g)))@cont
+              let g1 = Graph.add_edge u v (Graph.add_node u (Graph.add_node v Graph.empty))
+              in
+              (flatten (extension_class (g1 => g)))@cont
             ) g []
         in
         List.fold_left
           (fun cont emb_g1_g ->
-           let g1 = emb_g1_g.src in
-           let emb_g1_h_list = try flatten (extension_class (g1 => h)) with Undefined -> [] in
-           List.fold_left
-             (fun cont emb_g1_h ->
-              (emb_g1_g,emb_g1_h)::cont
-             ) cont emb_g1_h_list
+            let g1 = emb_g1_g.src in
+            let emb_g1_h_list = try flatten (extension_class (g1 => h)) with Undefined -> [] in
+            List.fold_left
+              (fun cont emb_g1_h ->
+                (emb_g1_g,emb_g1_h)::cont
+              ) cont emb_g1_h_list
           ) [] subs
       in
       List.fold_left
         (fun cont (to_g,to_h) ->
-         (to_g ^^ to_h)@cont
+          (to_g /| to_h)@cont
         ) [] (subparts g h)
 
     (** [h |> obs] [h] may create/destroy an instance of obs*)
@@ -628,17 +659,17 @@ module Make (Node:Node.NodeType) =
       in
       List.fold_left
         (fun cont (f,tile) ->
-         if Graph.is_empty (inf_of_tile tile) then cont
-         else
-           match tile.cospan with
-             None -> cont
-           | Some _ ->
-              if List.exists
-                   (fun tile' ->
-                    eq_tile true tile tile'
-                   ) cont then cont
-              else tile::cont
+          if Graph.is_empty (inf_of_tile tile) then cont
+          else
+            match tile.cospan with
+              None -> cont
+            | Some _ ->
+               if List.exists
+                    (fun tile' ->
+                      eq_tile true tile tile'
+                    ) cont then cont
+               else tile::cont
         ) [] (glue h obs)
 
 
-  end:Category with type obj = Graph.Make(Node).t)
+        end:Category with type obj = Graph.Make(Node).t)
