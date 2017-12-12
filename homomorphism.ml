@@ -58,7 +58,7 @@ module Make (Node:Node.NodeType) =
 	  ) ;
 	{hom' with tot = NodeBij.add u v hom.tot}
       with
-	IntBij.Not_bijective _ -> raise Not_injective
+	NodeBij.Not_bijective _ | IntBij.Not_bijective _ -> raise Not_injective
 
     let find u hom = NodeBij.find u hom.tot
     let cofind u hom = NodeBij.cofind u hom.tot

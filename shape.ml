@@ -41,9 +41,10 @@ module Make (Node:Node.NodeType) =
       let one = graph_of_library "one" in
       let square = graph_of_library "square" in
       let open_square = graph_of_library "osquare" in
-      List.iter (fun g -> if Graph.is_connex g then print_string "true\n" else print_string "false\n") [one;square;open_square; Graph.sum one one] ;
-      let f_list = Cat.flatten (Cat.extension_class (one => square)) in
-      let g_list = Cat.flatten (Cat.extension_class (one => open_square)) in
+      List.iter (fun g -> if Graph.is_connex g then print_string "true\n" else print_string "false\n")
+                [one;square;open_square; Graph.sum one one] ;
+      let f_list = Cat.flatten (Cat.extension_class (one => open_square)) in
+      let g_list = Cat.flatten (Cat.extension_class (one => square)) in
       let f = List.hd (List.filter (fun f -> Cat.is_identity f) f_list) in
       let g = List.hd (List.filter (fun f -> Cat.is_identity f) g_list) in
       let sharing = Cat.share f g in
