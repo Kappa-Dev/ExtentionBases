@@ -254,40 +254,53 @@ module Make (Node:Node.NodeType) =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ;
       match Cat.share inf_to_i inf_to_w with
-        [] -> Conflicting
-      | (inf_to_sh,sharing_tile)::_ -> (*TODO: use all sharings!*)
-         let sh_to_base,sh_to_w = Cat.lower_bound sharing_tile in
-         let _ =
-           if db() then
-             let sup_info = match Cat.upper_bound sharing_tile with
-                 Some (ext,_) -> Graph.to_string (Cat.trg ext)
-               | None -> "No sup"
-             in
-             Printf.printf
-               "Sharing (%s) is %s\n"
-               sup_info (Cat.string_of_span (sh_to_base,sh_to_w))
+        [] -> [Conflicting]
+      | lcomp ->
+         let () = if db() then
+                    if List.length lcomp > 1 then
+                      print_string "Multiple sharings detected!\n" ;
+                      (List.iter (fun (_,sharing_tile) ->
+                           Printf.printf "%s\n" (Cat.string_of_tile sharing_tile)) lcomp ;
+                       print_newline()
+                      )
          in
-         let iso_to_w = Cat.is_iso sh_to_w in
-         let iso_to_base = Cat.is_iso sh_to_base in
-         if iso_to_w then
-           if iso_to_base then
-             Iso (sh_to_base @@ (Cat.invert sh_to_w) ) (*Iso: w (<)--> i *)
+         let lcomp = [List.hd lcomp] in
+         (*TODO instead filter lcomp with irredundant sharings*)
+         List.fold_left
+           (fun cont (inf_to_sh,sharing_tile) ->
+             let sh_to_base,sh_to_w = Cat.lower_bound sharing_tile in
+             let _ =
+               if db() then
+                 let sup_info = match Cat.upper_bound sharing_tile with
+                     Some (ext,_) -> Graph.to_string (Cat.trg ext)
+                   | None -> "No sup"
+                 in
+                 Printf.printf
+                   "Sharing (%s) is %s\n"
+                   sup_info (Cat.string_of_span (sh_to_base,sh_to_w))
+             in
+             let iso_to_w = Cat.is_iso sh_to_w in
+             let iso_to_base = Cat.is_iso sh_to_base in
+             if iso_to_w then
+               if iso_to_base then
+                 (Iso (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Iso: w (<)--> i *)
            else
-             Below (sh_to_base @@ (Cat.invert sh_to_w) ) (*Below wit -> i*)
+             (Below (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Below wit -> i*)
          else
            if iso_to_base then
-             Above (sh_to_w @@ (Cat.invert sh_to_base) ) (*Above i -> wit *)
+             (Above (sh_to_w @@ (Cat.invert sh_to_base) ))::cont (*Above i -> wit *)
            else
              match Cat.upper_bound sharing_tile
              with
-               None -> Incomp {to_w = sh_to_w ;
+               None -> (Incomp {to_w = sh_to_w ;
                                to_base = sh_to_base ;
                                to_midpoint = inf_to_sh ;
-                               has_sup = false}
-             | Some _ -> Incomp {to_w = sh_to_w ;
+                               has_sup = false})::cont
+             | Some _ -> (Incomp {to_w = sh_to_w ;
                                  to_base = sh_to_base ;
                                  to_midpoint = inf_to_sh ;
-                                 has_sup = true}
+                                 has_sup = true})::cont
+           ) [] lcomp
 
 
     exception Found_iso of (Cat.arrows * int)
@@ -352,173 +365,158 @@ module Make (Node:Node.NodeType) =
          let ext_inf_i = step_ki @@ ext_inf_k in
          let _ = if db() then Printf.printf "Visiting (%d --> %d |-> %d )\n" inf k i in
          begin
-           match compare ext_inf_i ext_inf_w ext_base with
+           let actions',visited',best_inf',next_layer',todo' =
+             List.fold_left
+             (fun (actions,visited,best_inf,next_layer,todo) cmp ->
+               match cmp with
 
-             Conflicting ->
-             if db() then print_string (red "Conflicting points\n");
-             let next_layer' =
-               if Lib.IntSet.mem i visited then
-                 next_layer
-               else
-                 Lib.IntMap.fold
-                   (fun j step_ij cont ->
-                     (i,step_ij,j)::cont
-                   ) (find i ext_base).next next_layer
-             in
-             let actions' =
-               (fun w ext_base best_inf -> add_conflict i w ext_base)::actions
-             in
-             let best_inf' = update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf in
-             progress
-               ext_base
-               actions'
-               (Lib.IntSet.add i visited)
-               best_inf'
-               next_layer'
-               todo
+                 Conflicting ->
+                 if db() then print_string (red "Conflicting points\n");
+                 let next_layer' =
+                   if Lib.IntSet.mem i visited then
+                     next_layer
+                   else
+                     Lib.IntMap.fold
+                       (fun j step_ij cont ->
+                         (i,step_ij,j)::cont
+                       ) (find i ext_base).next next_layer
+                 in
+                 let actions' =
+                   (fun w ext_base best_inf -> add_conflict i w ext_base)::actions
+                 in
+                 let best_inf' = update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf in
+                 let visited' = Lib.IntSet.add i visited in
+                 (actions',visited',best_inf',next_layer',todo)
 
-             | Below ext_w_i -> (* w --ext_w_i--> i *)
-                if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
-                progress
-		  ext_base
-		  ((fun w ext_base best_inf ->
-                    remove_step inf i (add_step w i ext_w_i ext_base)
-                  )::actions)
-		  (Lib.IntSet.add i visited)
-                  (update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf)
-		  next_layer
-		  todo
+                 | Below ext_w_i -> (* w --ext_w_i--> i *)
+                    if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
+                    let actions' =
+		      ((fun w ext_base best_inf ->
+                        remove_step inf i (add_step w i ext_w_i ext_base)
+                      )::actions)
+                    in
+                    let visited' = Lib.IntSet.add i visited in
+                    let best_inf' = update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf in
+                    (actions',visited',best_inf',next_layer,todo)
 
-             | Above ext_i_w -> (* i --ext_i_w--> w *)
-                if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
-                let pi = find i ext_base in
-                let todo' =
-                  if Lib.IntSet.mem i visited then
-                    todo
-                  else
-                    Lib.IntMap.fold
-                      (fun j step_ij cont -> (i,step_ij,j)::cont) pi.next todo
-                in
-                let best_inf' =
-                  update_best_inf i
-                                  (Cat.identity pi.value pi.value,i,ext_i_w)
-                                  best_inf
-                in
-                progress ext_base
-                         actions
-                         (Lib.IntSet.add i visited)
-                         best_inf'
-                         next_layer
-                         todo'
+                 | Above ext_i_w -> (* i --ext_i_w--> w *)
+                    if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
+                    let pi = find i ext_base in
+                    let todo' =
+                      if Lib.IntSet.mem i visited then
+                        todo
+                      else
+                        Lib.IntMap.fold
+                          (fun j step_ij cont -> (i,step_ij,j)::cont) pi.next todo
+                    in
+                    let best_inf' =
+                      update_best_inf i
+                                      (Cat.identity pi.value pi.value,i,ext_i_w)
+                                      best_inf
+                    in
+                    (actions,(Lib.IntSet.add i visited),best_inf',next_layer,todo')
 
-             | Iso iso_w_i ->
-                if db() then print_string (red "iso\n");
-                raise (Found_iso (iso_w_i,i))
+                 | Iso iso_w_i ->
+                    if db() then print_string (red "iso\n");
+                    raise (Found_iso (iso_w_i,i))
 
-             | Incomp sh_info ->
-                if db() then print_string
-			       (green (Printf.sprintf
-                                         "I found a midpoint %s (%d)!\n"
+                 | Incomp sh_info ->
+                    if db() then print_string
+			           (green (Printf.sprintf
+                                             "I found a midpoint %s (%d)!\n"
 					 (Graph.to_string
                                             (Cat.trg sh_info.to_midpoint)
                                          )
 					 ext_base.fresh
-                                      )
-			       );
-		(*No better comparison with w exists*)
-                if Cat.is_iso sh_info.to_midpoint then
-                  let next_layer' =
-                    if db() then print_string
-                                   (green "...that is not worth adding\n") ;
-                    if Lib.IntSet.mem i visited then
-                      next_layer
-                    else
-                      Lib.IntMap.fold
-                        (fun j step_ij cont ->
-                          (i,step_ij,j)::cont
-                        ) (find i ext_base).next next_layer
-                  in
-                  let actions' =
-                    if not sh_info.has_sup then
-                      (fun w ext_base best_inf -> add_conflict i w ext_base)::actions
-                    else
-                      actions
-		  in
-                  let best_inf' =
-                    update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf
-                  in
-                  progress
-		    ext_base actions'
-		    (Lib.IntSet.add i visited)
-                    best_inf'
-		    next_layer'
-		    todo
-                else
-                  (*Not a trivial midpoint*)
-                  let next_layer' =
-                    if Lib.IntSet.mem i visited then
-                      next_layer
-                    else
-                      Lib.IntMap.fold
-                        (fun j step_ij cont ->
-                          (i, step_ij, j)::cont
-                        ) (find i ext_base).next next_layer
-                  in
-                  let fresh_id = get_fresh ext_base in
-                  let best_inf' =
-                    update_best_inf ~force:false
-                                    i
-                                    (sh_info.to_base,fresh_id,sh_info.to_w) (*extension from root to fresh_id is not defined here*)
-                                    best_inf
-                  in
-                  let actions' =
-                    (fun w ext_base best_inf_final ->
-                      let id_to_i,id,id_to_w = get_best_inf i best_inf_final
+                                          )
+			           );
+		    (*No better comparison with w exists*)
+                    if Cat.is_iso sh_info.to_midpoint then
+                      let next_layer' =
+                        if db() then print_string
+                                       (green "...that is not worth adding\n") ;
+                        if Lib.IntSet.mem i visited then
+                          next_layer
+                        else
+                          Lib.IntMap.fold
+                            (fun j step_ij cont ->
+                              (i,step_ij,j)::cont
+                            ) (find i ext_base).next next_layer
                       in
-                      if id = fresh_id then
-                        (*this new midpoint is the actual best predecessor*)
-                        let () =
-                          if db() then
-                            Printf.printf
-                              "\t midpoint %d is still the best predecessor of witness %d wrt %d\n"
-                              id w i
-                        in
-                        let mp = point (Cat.trg sh_info.to_midpoint) in
-                        let ext_base =
-                          try
-                            add id
-                                mp
-                                (sh_info.to_midpoint @@ (find_extension inf ext_base))
-                                ext_base
-                          with Cat.Undefined ->
-                            (Printf.printf "Cannot compose %s and %s"
-                                           (Cat.string_of_arrows ~full:true (find_extension inf ext_base))
-                                           (Cat.string_of_arrows ~full:true sh_info.to_midpoint) ; flush stdout ;
-                             failwith "Invariant violation"
-                            )
-                        in
-                        let ext_base = add_step inf id sh_info.to_midpoint ext_base in
-                        let ext_base = add_step id i sh_info.to_base ext_base in
-		        let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
-                        remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
-                      else
-                        let () =
-                          if db() then
-                            Printf.printf
-                              "\t midpoint %d is no longer the best predecessor (%d) of witness %d wrt %d\n" fresh_id id w i
-                        in
-                        (*TODO compute and add step inf |-> id (requires knowning the best intersection between inf and id)*)
-                        (*However not adding all possible sharings implies that not all best inf will be isomorphic*)
-                        ext_base
-                    )::actions
-                  in
-                  progress
-		    ext_base
-		    actions'
-		    (Lib.IntSet.add i visited)
-                    best_inf'
-		    next_layer'
-		    todo
+                      let actions' =
+                        if not sh_info.has_sup then
+                          (fun w ext_base best_inf -> add_conflict i w ext_base)::actions
+                        else
+                          actions
+		      in
+                      let best_inf' =
+                        update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf
+                      in
+		      (actions',(Lib.IntSet.add i visited),best_inf',next_layer',todo)
+                    else
+                      (*Not a trivial midpoint*)
+                      let next_layer' =
+                        if Lib.IntSet.mem i visited then
+                          next_layer
+                        else
+                          Lib.IntMap.fold
+                            (fun j step_ij cont ->
+                              (i, step_ij, j)::cont
+                            ) (find i ext_base).next next_layer
+                      in
+                      let fresh_id = get_fresh ext_base in
+                      let best_inf' =
+                        update_best_inf ~force:false
+                                        i
+                                        (sh_info.to_base,fresh_id,sh_info.to_w) (*extension from root to fresh_id is not defined here*)
+                                        best_inf
+                      in
+                      let actions' =
+                        (fun w ext_base best_inf_final ->
+                          let id_to_i,id,id_to_w = get_best_inf i best_inf_final
+                          in
+                          if id = fresh_id then
+                            (*this new midpoint is the actual best predecessor*)
+                            let () =
+                              if db() then
+                                Printf.printf
+                                  "\t midpoint %d is still the best predecessor of witness %d wrt %d\n"
+                                  id w i
+                            in
+                            let mp = point (Cat.trg sh_info.to_midpoint) in
+                            let ext_base =
+                              try
+                                add id
+                                    mp
+                                    (sh_info.to_midpoint @@ (find_extension inf ext_base))
+                                    ext_base
+                              with Cat.Undefined ->
+                                (Printf.printf "Cannot compose %s and %s"
+                                               (Cat.string_of_arrows ~full:true (find_extension inf ext_base))
+                                               (Cat.string_of_arrows ~full:true sh_info.to_midpoint) ; flush stdout ;
+                                 failwith "Invariant violation"
+                                )
+                            in
+                            let ext_base = add_step inf id sh_info.to_midpoint ext_base in
+                            let ext_base = add_step id i sh_info.to_base ext_base in
+		            let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
+                            remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
+                          else
+                            let () =
+                              if db() then
+                                Printf.printf
+                                  "\t midpoint %d is no longer the best predecessor (%d) of witness %d wrt %d\n" fresh_id id w i
+                            in
+                            (*TODO compute and add step inf |-> id (requires knowning the best intersection between inf and id)*)
+                            (*However not adding all possible sharings implies that not all best inf will be isomorphic*)
+                            ext_base
+                        )::actions
+                      in
+		      (actions',(Lib.IntSet.add i visited),best_inf',next_layer',todo)
+             ) (actions,visited,best_inf,next_layer,todo) (compare ext_inf_i ext_inf_w ext_base)
+           in
+           progress ext_base actions' visited' best_inf' next_layer' todo'
+
          end
 
     let insert ext_w obs_emb obs_id ext_base =
