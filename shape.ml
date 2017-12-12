@@ -119,10 +119,12 @@ module Make (Node:Node.NodeType) =
       let d1 = open_out "neg_corresp.dot" in
       let d' = open_out "pos_base.dot" in
       let d1' = open_out "pos_corresp.dot" in
+      let d2 = open_out "pos_web.dot" in
       Printf.fprintf d "%s\n" (EB.to_dot model.Model.dict neg_ext_base) ;
       Printf.fprintf d1 "%s\n" (EB.to_dot_corresp neg_ext_base) ;
       Printf.fprintf d' "%s\n" (EB.to_dot model.Model.dict pos_ext_base) ;
       Printf.fprintf d1' "%s\n" (EB.to_dot_corresp pos_ext_base) ;
+      Printf.fprintf d2 "%s\n%s" (EB.to_dot model.Model.dict pos_ext_base) (EB.to_dot_content pos_ext_base);
       close_out d ;
       close_out d'
 

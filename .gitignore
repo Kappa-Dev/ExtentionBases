@@ -3,3 +3,8 @@ test
 *.o
 *.a
 ._d/
+_build/
+*.byte
+ptemp
+web/node_modules/
+*.dot

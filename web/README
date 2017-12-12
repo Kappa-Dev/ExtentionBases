@@ -1,0 +1,29 @@
+INSTALL
+=======
+1. Install node & yarn
+
+  e.g.
+  apt install yarn
+  brew install yarn
+  port install yarn
+
+
+2. Install node packages
+
+From web/, run
+
+  yarn install
+
+
+USAGE
+=====
+
+From web/ run
+
+  node server.js
+
+Navigate to
+
+  localhost:3000
+
+Whenever pos_web.dot changes, the display on localhost:3000 wil update.
