@@ -419,8 +419,8 @@ module Make (Node:Node.NodeType) =
           Graph.fold_ids
             (fun id' cont -> (*for all id' in sup*)
               let u' = Node.rename id' u in
-              (*let from_sup = Graph.has_node u' sup in*)
-              if not (comp u u' p_hom) then cont
+              if not (comp u u' p_hom) || not (Graph.compatible u' sup)
+              then cont
               else
                 try
                   let hom_uu' = Hom.add u u' p_hom in
@@ -581,10 +581,18 @@ module Make (Node:Node.NodeType) =
 
     let is_ext_equal f f' =
       try
-        let g = extension_class (merge_arrows f f') in
-        (List.length g.maps) = 2
+        if Graph.is_equal f.src f'.src then
+          let arrows = flatten (f.trg => f'.trg) in
+          List.iter
+            (fun phi ->
+             if (phi @@ f) === f' then raise Exit
+             else ()
+            ) arrows ; false
+        else false
       with
         Undefined -> false
+      | Exit -> true
+
 
     let share f g =
       let compare_sharing (f,tile) (f',tile') =

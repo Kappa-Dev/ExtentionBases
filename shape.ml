@@ -71,12 +71,12 @@ module Make (Node:Node.NodeType) =
       let osquare = graph_of_library "osquare" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		      if (name = "one")
-                         || (name = "triangle")
+		      if (*(name = "one")*)
+                         (name = "triangle")
                          (*|| (name = "square")
                          || (name = "dsquare")*)
                          || (name = "house")
-                         || (name = "osquare")
+                         (*|| (name = "osquare")*)
                       then
                         Model.add_obs name (graph_of_library name) model
                       else model

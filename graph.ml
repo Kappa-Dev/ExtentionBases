@@ -34,6 +34,7 @@ module type GraphType =
     val is_empty : t -> bool
     val is_equal : t -> t -> bool
     val is_connex : t -> bool
+    val compatible : node -> t -> bool
 
     (**Operators*)
     val join : ?weak:bool -> t -> t -> t
@@ -65,6 +66,7 @@ module Make (Node:Node.NodeType) =
        coherent : bool
       }
 
+
     let is_coherent g = g.coherent
 
     module EdgeSet = Set.Make(struct type t = Node.t * Node.t let compare = compare end)
@@ -95,6 +97,11 @@ module Make (Node:Node.NodeType) =
 
     let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []
     let nodes g = NodeSet.elements g.nodes
+
+    let compatible u g =
+      let nodes = nodes_of_id (Node.id u) g in
+      List.for_all (fun u' -> Node.gluable u u') nodes
+
 
     let size_node g = NodeSet.cardinal g.nodes
     let size_edge g = g.size
