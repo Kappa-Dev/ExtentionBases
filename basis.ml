@@ -574,5 +574,16 @@ module Make (Node:Node.NodeType) =
       in
       "digraph G{\n"^(String.concat "\n" str_list)^"\n}"
 
+  let to_dot_content ext_base =
+    let str_list =
+      Lib.IntMap.fold
+        (fun i p str_list ->
+           let f = find_extension i ext_base in
+           let _G = List.hd (Cat.images (Cat.src f) f) in
+           (Graph.to_dot p.value (string_of_int i))::str_list
+        ) ext_base.points []
+    in
+    (String.concat "\n" str_list)
+
 
                                                      end:ExtensionBasisType with type arrows = Cat.Make(Node).arrows and type obj = Cat.Make(Node).obj)

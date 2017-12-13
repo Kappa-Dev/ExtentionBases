@@ -1,0 +1,16 @@
+{
+  "name": "ExtentionBases",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/Kappa-Dev/ExtentionBases.git",
+  "author": "Jean Krivine <jean.krivine@irif.fr>",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^1.7.0",
+    "cytoscape": "^3.2.7",
+    "cytoscape-cose-bilkent": "^4.0.0",
+    "express": "^4.16.2",
+    "expressjs": "^1.0.1",
+    "ws": "^3.3.2"
+  }
+}
