@@ -14,7 +14,7 @@ let basis_file = path.join(path.dirname(__dirname),'pos_web.dot');
 console.log(basis_file);
 let watch = Chokidar.watch(basis_file);
 
-app.use('/',Express.static('./'));
+app.use('/',Express.static(__dirname));
 
 let sendBasis = websocket => () => {
   Fs.readFile(basis_file,'utf8', (err,data) => {

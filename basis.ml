@@ -3,7 +3,7 @@ module type ExtensionBasisType =
     type t
     type arrows
     type obj
-    val to_dot : Lib.Dict.t -> t -> string
+    val to_dot : ?show_conflict:bool -> Lib.Dict.t -> t -> string
     val to_dot_corresp : t -> string
     val to_dot_content : t -> string
     val insert : arrows -> arrows -> int -> t -> t
@@ -36,6 +36,7 @@ module Make (Node:Node.NodeType) =
                 mutable fresh : int
                }
 
+
       let point g =
         {value = g ;
          next = Lib.IntMap.empty ;
@@ -44,7 +45,7 @@ module Make (Node:Node.NodeType) =
         }
 
 
-      let to_dot dict ext_base =
+      let to_dot ?(show_conflict=true) dict ext_base =
         let l =
           Lib.IntMap.fold
             (fun i p dot_string ->
@@ -81,7 +82,7 @@ module Make (Node:Node.NodeType) =
                        dot_string
                     ) p.conflict [])
              in
-             (str^"\n"^str2^"\n"^str3)::dot_string
+             (str^"\n"^str2^"\n"^(if show_conflict then str3 else ""))::dot_string
             ) ext_base.points []
         in
         "digraph G{\n"^(String.concat "\n" l)^"\n}"
