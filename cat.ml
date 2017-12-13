@@ -574,8 +574,17 @@ module Make (Node:Node.NodeType) =
          ls @@ il
 
     let merge_arrows f f' =
-      assert (Graph.is_equal f.src f'.src && Graph.is_equal f.trg f'.trg) ;
-      extension_class {src = f.src ; trg = f.trg ; maps = f.maps@f'.maps; partial = false}
+      if (Graph.is_equal f.src f'.src && Graph.is_equal f.trg f'.trg) then
+        extension_class {src = f.src ; trg = f.trg ; maps = f.maps@f'.maps; partial = false}
+      else
+        raise Undefined
+
+    let is_ext_equal f f' =
+      try
+        let g = extension_class (merge_arrows f f') in
+        (List.length g.maps) = 2
+      with
+        Undefined -> false
 
     let share f g =
       let compare_sharing (f,tile) (f',tile') =
@@ -595,15 +604,23 @@ module Make (Node:Node.NodeType) =
       in
       let sh_tiles = List.fast_sort compare_sharing ipos
       in
-      match sh_tiles with
-        [] -> []
-      | h::_ -> List.fold_left
-                  (fun cont sh ->
-                    let hd = List.hd cont in
-                    if (compare_sharing hd sh) = 0 then sh::cont
-                    else
-                      cont
-                  ) [List.hd sh_tiles] (List.rev sh_tiles)
+      let sh_tiles =
+        match sh_tiles with
+          [] -> []
+        | _ -> List.fold_left
+                 (fun cont sh ->
+                  let hd = List.hd cont in
+                  if (compare_sharing hd sh) = 0 then sh::cont
+                  else
+                    cont
+                 ) [List.hd sh_tiles] (List.rev sh_tiles)
+      in
+      List.fold_left
+        (fun cont (f,tile) ->
+         if List.for_all (fun (f',_) -> not (is_ext_equal f f')) cont
+         then (f,tile)::cont
+         else cont
+        ) [] sh_tiles
 
     let glue g h =
       (*returns spans of the form g <-id- g1 -f-> h where g1 is an edge of g*)

@@ -35,7 +35,6 @@ module Make (Node:Node.NodeType) =
               mutable fresh : int
              }
 
-
     let point g =
       {value = g ;
        next = Lib.IntMap.empty ;
