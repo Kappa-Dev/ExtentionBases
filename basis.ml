@@ -5,6 +5,7 @@ module type ExtensionBasisType =
     type obj
     val to_dot : Lib.Dict.t -> t -> string
     val to_dot_corresp : t -> string
+    val to_dot_content : t -> string
     val insert : arrows -> arrows -> int -> t -> t
     val empty : obj -> t
   end
@@ -578,11 +579,10 @@ module Make (Node:Node.NodeType) =
       Lib.IntMap.fold
         (fun i p str_list ->
            let f = find_extension i ext_base in
-           let _G = List.hd (Cat.images (Cat.src f) f) in
            (Graph.to_dot p.value (string_of_int i))::str_list
         ) ext_base.points []
     in
     (String.concat "\n" str_list)
 
 
-                                                     end:ExtensionBasisType with type arrows = Cat.Make(Node).arrows and type obj = Cat.Make(Node).obj)
+ end:ExtensionBasisType with type arrows = Cat.Make(Node).arrows and type obj = Cat.Make(Node).obj)
