@@ -14,35 +14,45 @@ let test =
                                 | _ -> (true,false)
                         )
   in
-  let simple_test = ask_until "Simple or complete test (s/c)? (s)\n"
-                       (function "s" -> (true,true)
-                               | "c" -> (true,false)
-                               | _ -> (true,true)
+  let test = ask_until "Interactive, Simple or complete test (i/s/c)? (i)\n"
+                       (function "s" -> (true,1)
+                               | "c" -> (true,2)
+                               | "i" -> (true,0)
+                               | _ -> (true,0)
                        )
   in
   match input with
     0 ->
     begin
-      if simple_test then
+      if test=1 then
         Shape.KappaShape.simple_tests debug
       else
-        Shape.KappaShape.generate_tests debug ;
+        if test=2 then
+          Shape.KappaShape.generate_tests debug
+        else
+          Shape.KappaShape.interactive_tests debug ;
       print_string "done\n"
     end
   | 1 ->
      begin
-      if simple_test then
-        Shape.SimpleShape.simple_tests debug
-      else
-        Shape.SimpleShape.generate_tests debug ;
-       print_string "done\n"
+       if test=1 then
+         Shape.SimpleShape.simple_tests debug
+       else
+         if test=2 then
+           Shape.SimpleShape.generate_tests debug
+         else
+           Shape.SimpleShape.interactive_tests debug ;
+       print_string "done\n" ;
      end
   | 2 ->
      begin
-      if simple_test then
-        Shape.DegreeShape.simple_tests debug
-      else
-        Shape.DegreeShape.generate_tests debug ;
-       print_string "done\n"
+       if test=1 then
+         Shape.DegreeShape.simple_tests debug
+       else
+         if test=2 then
+           Shape.DegreeShape.generate_tests debug
+         else
+           Shape.DegreeShape.interactive_tests debug ;
+       print_string "done\n" ;
      end
   | _ -> failwith "Invalid argument"

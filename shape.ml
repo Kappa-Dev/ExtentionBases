@@ -13,7 +13,7 @@ module Make (Node:Node.NodeType) =
       let g =
 	List.fold_left
 	  (fun g u ->
-	   Graph.add_node u g
+	    Graph.add_node u g
 	  ) g [u;v] in
       Graph.add_edge u v g
 
@@ -54,12 +54,81 @@ module Make (Node:Node.NodeType) =
           print_string (Cat.string_of_tile tile) ;
           print_newline() ;
         ) sharing
-      (*print_string "square |> one one\n" ;
+    (*print_string "square |> one one\n" ;
       List.iter (fun tile ->
 		 let emb = Cat.arrows_of_tile tile in
 		 Printf.printf "%s:\n %s\n" (Cat.string_of_arrows emb) (Cat.string_of_tile tile)
 		) (square |> (Graph.sum one one))
-       *)
+     *)
+
+    let interactive_tests debug =
+      if debug then debug_mode () ;
+      if db() then Printexc.record_backtrace true ;
+
+      let rec loop model =
+        let (name,graph) =
+          ask_until "[house|square|osquare|one|triangle] or exit \n"
+                    (function
+                       "exit" -> (true,("exit",Graph.empty))
+                     | str -> if Lib.StringMap.mem str Node.library then
+                                (print_string "there\n" ;
+                                (true,(str,graph_of_library str)))
+                              else
+                                (Printf.printf "here (%s)\n" str ;
+                                 (false,(str,Graph.empty)))
+                    )
+        in
+        if name = "" then raise Exit ;
+        if name = "exit" then ()
+        else
+          let model = Model.add_obs name graph model in
+          let nw,pw = Model.witnesses_of_rule (Graph.empty,graph_of_library "one") model in
+          let get_seed = function
+              (id_obs,tile)::_ -> Cat.left_of_tile tile
+            | [] -> Graph.empty
+          in
+          let neg_ext_base =
+            List.fold_left
+              (fun ext_base (id_obs,tile) ->
+                match Cat.upper_bound tile with
+                  None -> failwith "no witness"
+                | Some (to_w,from_o) ->
+                   if db() then
+                     Printf.printf "Inserting witness of observable \"%s\": %s\n"
+			           (Lib.Dict.to_name id_obs model.Model.dict)
+			           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+                   EB.insert to_w from_o id_obs ext_base
+              ) (EB.empty (get_seed nw)) nw
+          in
+          let pos_ext_base =
+            List.fold_left
+              (fun ext_base (id_obs,tile) ->
+                match Cat.upper_bound tile with
+                  None -> failwith "no witness"
+                | Some (to_w,from_o) ->
+                   if db() then
+                     Printf.printf "Inserting witness of observable '%s': %s\n"
+			           (Lib.Dict.to_name id_obs model.Model.dict)
+			           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+                   EB.insert to_w from_o id_obs ext_base
+              ) (EB.empty (get_seed pw)) pw
+          in
+          let d = open_out "neg_base.dot" in
+          let d1 = open_out "neg_corresp.dot" in
+          let d' = open_out "pos_base.dot" in
+          let d1' = open_out "pos_corresp.dot" in
+          let d2 = open_out "pos_web.dot" in
+          Printf.fprintf d "%s\n" (EB.to_dot model.Model.dict neg_ext_base) ;
+          Printf.fprintf d1 "%s\n" (EB.to_dot_corresp neg_ext_base) ;
+          Printf.fprintf d' "%s\n" (EB.to_dot model.Model.dict pos_ext_base) ;
+          Printf.fprintf d1' "%s\n" (EB.to_dot_corresp pos_ext_base) ;
+          Printf.fprintf d2 "%s\n%s" (EB.to_dot ~show_conflict:false model.Model.dict pos_ext_base) (EB.to_dot_content pos_ext_base);
+          close_out d ;
+          close_out d' ;
+          loop model
+      in
+      loop Model.empty
+
 
     let generate_tests debug =
       if debug then debug_mode () ;
@@ -71,12 +140,12 @@ module Make (Node:Node.NodeType) =
       let osquare = graph_of_library "osquare" in
       let model = Lib.StringMap.fold
 		    (fun name _ model ->
-		      if (*(name = "one")*)
-                         (name = "triangle")
-                         (*|| (name = "square")
-                         || (name = "dsquare")*)
+		      if (name = "one")
+                         || (name = "triangle")
+                         || (name = "square")
+                         || (name = "dsquare")
                          || (name = "house")
-                         (*|| (name = "osquare")*)
+                         || (name = "osquare")
                       then
                         Model.add_obs name (graph_of_library name) model
                       else model
@@ -92,27 +161,27 @@ module Make (Node:Node.NodeType) =
       let neg_ext_base =
         List.fold_left
           (fun ext_base (id_obs,tile) ->
-           match Cat.upper_bound tile with
-             None -> failwith "no witness"
-           | Some (to_w,from_o) ->
-              if db() then
-                Printf.printf "Inserting witness of observable \"%s\": %s\n"
-			      (Lib.Dict.to_name id_obs model.Model.dict)
-			      (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-              EB.insert to_w from_o id_obs ext_base
+            match Cat.upper_bound tile with
+              None -> failwith "no witness"
+            | Some (to_w,from_o) ->
+               if db() then
+                 Printf.printf "Inserting witness of observable \"%s\": %s\n"
+			       (Lib.Dict.to_name id_obs model.Model.dict)
+			       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed nw)) nw
       in
       let pos_ext_base =
         List.fold_left
           (fun ext_base (id_obs,tile) ->
-           match Cat.upper_bound tile with
-             None -> failwith "no witness"
-           | Some (to_w,from_o) ->
-              if db() then
-                Printf.printf "Inserting witness of observable '%s': %s\n"
-			      (Lib.Dict.to_name id_obs model.Model.dict)
-			      (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-              EB.insert to_w from_o id_obs ext_base
+            match Cat.upper_bound tile with
+              None -> failwith "no witness"
+            | Some (to_w,from_o) ->
+               if db() then
+                 Printf.printf "Inserting witness of observable '%s': %s\n"
+			       (Lib.Dict.to_name id_obs model.Model.dict)
+			       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+               EB.insert to_w from_o id_obs ext_base
           ) (EB.empty (get_seed pw)) pw
       in
       let d = open_out "neg_base.dot" in

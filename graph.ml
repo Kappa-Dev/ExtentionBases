@@ -98,11 +98,6 @@ module Make (Node:Node.NodeType) =
     let nodes_of_id i g = try Lib.IntMap.find i g.idmap with Not_found -> []
     let nodes g = NodeSet.elements g.nodes
 
-    let compatible u g =
-      let nodes = nodes_of_id (Node.id u) g in
-      List.for_all (fun u' -> Node.gluable u u') nodes
-
-
     let size_node g = NodeSet.cardinal g.nodes
     let size_edge g = g.size
 
@@ -373,6 +368,10 @@ module Make (Node:Node.NodeType) =
 	  let cod = add_node u' (add_node v' cod) in
 	  add_edge u' v' cod
 	) g empty
+
+    let compatible u g =
+      let nodes = nodes_of_id (Node.id u) g in
+      List.for_all (fun u' -> Node.gluable u u') nodes
 
   end:GraphType with type node = Node.t and type hom = Homomorphism.Make(Node).t)
 

@@ -151,7 +151,7 @@ module KappaNodeSym =
           Exit -> false
 
       let gluable u v = (*same id, same label and different ports*)
-        (id u = id v) && (structure_preserving.(0) u v) && (u.port_id <> v.port_id)
+        (id u = id v) && (structure_preserving.(0) u v)
 
       let compare u v = Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)
 
@@ -283,7 +283,7 @@ module KappaNode =
           Exit -> false
 
       let gluable u v = (*same id, same label and different ports*)
-        (id u = id v) && (u.label = v.label) && (u.port_id <> v.port_id)
+        (id u = id v) && (u.label = v.label)
 
       let compare u v = Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)
 
@@ -324,8 +324,8 @@ module KappaNode =
 	    ([1;1;0],[2;1;0]) ;
 	    ([2;0;0],[3;0;0]) ;
 	    ([3;1;0],[0;1;0]) ;
-	    ([3;2;0],[4;0;1]) ;
-	    ([4;1;1]),[2;2;0]
+	    ([3;2;0],[4;0;0]) ;
+	    ([4;1;0]),[2;2;0]
 	  ]
 	in
 	let square =
@@ -422,7 +422,7 @@ module DegreeNode =
 
       let to_dot u i =
 	let ref_node = string_of_int i in
-	ref_node^" [label=\""^(string_of_int (id u))^"\"]"
+	ref_node^" [label=\""^(string_of_int (u.id))^"\"]"
 
       let dot_of_edge u i v j =
 	Printf.sprintf "%d->%d [dir = none]" i j

@@ -419,7 +419,7 @@ module Make (Node:Node.NodeType) =
           Graph.fold_ids
             (fun id' cont -> (*for all id' in sup*)
               let u' = Node.rename id' u in
-              if not (comp u u' p_hom) || not (Graph.compatible u' sup)
+              if not ((comp u u' p_hom) && (Graph.compatible u' sup))
               then cont
               else
                 try
@@ -602,7 +602,9 @@ module Make (Node:Node.NodeType) =
         | Some (f,_), Some (g,_) ->
            compare (Graph.size_node f.trg,Graph.size_edge f.trg)
                    (Graph.size_node g.trg,Graph.size_edge g.trg)
-        | _ -> 0
+        | (None,None) ->
+           compare (Graph.size_node f'.trg,Graph.size_edge f'.trg)
+                   (Graph.size_node f.trg,Graph.size_edge f.trg)
       in
       let ipos =
         List.filter

@@ -14,6 +14,7 @@ module Make (Node:Node.NodeType) =
   (struct
       module Graph = Graph.Make (Node)
       module Cat = Cat.Make (Node)
+
       let (-->) = Cat.(-->)
       let (|/) = Cat.(|/)
 
@@ -258,12 +259,14 @@ module Make (Node:Node.NodeType) =
           [] -> [Conflicting]
         | lcomp ->
            let () = if db() then
-                      if List.length lcomp > 1 then
-                        print_string "Multiple sharings detected!\n" ;
-                    (List.iter (fun (_,sharing_tile) ->
-                                Printf.printf "%s\n" (Cat.string_of_tile sharing_tile)) lcomp ;
-                     print_newline()
-                    )
+                      (
+                        if List.length lcomp > 1 then
+                          print_string "Multiple sharings detected!\n" ;
+                        (List.iter (fun (_,sharing_tile) ->
+                             Printf.printf "%s\n" (Cat.string_of_tile sharing_tile)) lcomp ;
+                         print_newline()
+                        )
+                      )
            in
            (*let lcomp = [List.hd lcomp] in*)
 
@@ -342,9 +345,8 @@ module Make (Node:Node.NodeType) =
           (*not a midpoint just before reaching i*)
           (*or the first intersection between i and w*)
           if force || not (Lib.IntMap.mem i m) then
-            let inf_list = try Lib.IntMap.find i m with Not_found -> []
-            in
-            Lib.IntMap.add i (triple::inf_list) m
+            (*TODO: deal here with mutliple incomparable infs*)
+            Lib.IntMap.add i [triple] m
           else
             m
         in
