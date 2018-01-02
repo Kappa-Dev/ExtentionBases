@@ -7,7 +7,8 @@
 // Otherwise, every element is interpreted as [id,label]
 let _nodes = ar => _.map(ar, e => {
   if (Array.isArray(e)) {
-    return {data: {id: e[0], label: e[1]}};
+    let info = e[2] || {};
+    return {data: _.extend({id: e[0], label: e[1]},info)};
   } else {
     return {data: {id: e, label: e}};
   }
@@ -19,7 +20,9 @@ let nodes = (...rest) => {
 }
 
 // Turn id pair into edge
-let edge = (i,j,info) => ({data: _.extend({id:`${i}-${j}`, source: i, target: j},info||{})});
+let edge = (i,j,info) => {
+  return ({data: _.extend({id:`${i}-${j}`, source: i, target: j},info||{})});
+}
 
 //let edge_label = (i,j) => ({data: _.extend({sourceLabel: i, targetLabel: j},edge(i,j).data)});
 
@@ -55,7 +58,7 @@ let basis = {info: {id: "basis"}, elements: _.union(basis_nodes,basis_edges)};
 
 // graphlib -> cytoscape-ready data with shape: {info, elements}
 let gl_to_cy_data = (gl) => {
-  let l_nodes = nodes(... _.map(gl.nodes(),n => [n,gl.node(n).label]));
+  let l_nodes = nodes(... _.map(gl.nodes(),n => [n,gl.node(n).label,gl.node(n)]));
   let l_edges = edges(... _.map(gl.edges(), ({v,w}) => [v,w,gl.edge({v,w})]));
   let data = gl.graph();
   let loaded = {info: (_.isString(data) ? {id: data} : data), elements: _.union(l_nodes,l_edges)};

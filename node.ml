@@ -1,3 +1,6 @@
+let hi2str = function
+  | None -> ""
+  | Some i -> "highlight = "^(string_of_int i)
 
 module type NodeType =
   sig
@@ -10,7 +13,7 @@ module type NodeType =
     val compare : t -> t -> int
     val create : int list -> t
     val to_string : t -> string
-    val to_dot : t -> int -> string
+    val to_dot : t -> ?highlight:(int option) -> int -> string
     val dot_of_edge : t -> int -> t -> int -> string
     val coh : (t*t) list -> (t*t) -> bool
     val rename : int -> t -> t
@@ -43,9 +46,10 @@ module SimpleNode =
 
       let to_string = string_of_int
 
-      let to_dot u i =
+      let to_dot u ?(highlight=None) i =
 	let ref_node = string_of_int i in
-	ref_node^" [label=\""^(to_string u)^"\"]"
+  (*let highlight_str = if not highlight then "" else " highlight=\"red\"" in*)
+	ref_node^" [label=\""^(to_string u)^"\" "^(hi2str highlight)^"]"
 
       let dot_of_edge u i v j =
 	Printf.sprintf "%d -> %d [dir=none]" i j
@@ -164,9 +168,9 @@ module KappaNodeSym =
       let to_string u =
 	(string_of_int u.ag_id)^"."^(string_of_int (u.port_id))
 
-      let to_dot u i =
+      let to_dot u ?(highlight=None) i =
 	let ref_node = string_of_int i in
-	ref_node^" [label=\""^(string_of_int (id u))^"\"]"
+	ref_node^" [label=\""^(string_of_int (id u))^"\" "^(hi2str highlight)^"]"
 
       let dot_of_edge u i v j =
 	let tl = string_of_int u.port_id in
@@ -296,9 +300,10 @@ module KappaNode =
       let to_string u =
 	(string_of_int u.ag_id)^"."^(string_of_int (u.port_id))
 
-      let to_dot u i =
+      let to_dot u ?(highlight=None) i =
 	let ref_node = string_of_int i in
-	ref_node^" [label=\""^(string_of_int u.label)^"\"]"
+
+	ref_node^" [label=\""^(string_of_int u.label)^"\" "^(hi2str highlight)^"]"
 
       let dot_of_edge u i v j =
 	let tl = string_of_int u.port_id in
@@ -420,9 +425,9 @@ module DegreeNode =
       let to_string u =
 	"["^(string_of_int u.id)^";"^(string_of_int (u.max_degree))^"]"
 
-      let to_dot u i =
+      let to_dot u ?(highlight=None) i =
 	let ref_node = string_of_int i in
-	ref_node^" [label=\""^(string_of_int (u.id))^"\"]"
+	ref_node^" [label=\""^(string_of_int (u.id))^"\" "^(hi2str highlight)^"]"
 
       let dot_of_edge u i v j =
 	Printf.sprintf "%d->%d [dir = none]" i j
