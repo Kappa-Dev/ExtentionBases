@@ -586,7 +586,9 @@ module Make (Node:Node.NodeType) =
         let str_list =
           Lib.IntMap.fold
             (fun i p str_list ->
-             (Graph.to_dot p.value (string_of_int i))::str_list
+              let f = find_extension i ext_base in
+              let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
+             (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
             ) ext_base.points []
         in
         (String.concat "\n" str_list)

@@ -23,6 +23,8 @@ module type Category =
 
     val src : arrows -> obj
     val trg : arrows -> obj
+    val fold_arrow : arrows -> (int * int) list
+
 
     val share : arrows -> arrows -> (arrows * tile) list
     val is_iso : arrows -> bool
@@ -50,6 +52,7 @@ module Make (Node:Node.NodeType) =
 
     type obj = Graph.t
 
+
     module NodeSet = Set.Make (Node)
     open Lib.Util
 
@@ -59,6 +62,9 @@ module Make (Node:Node.NodeType) =
 
     type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
 
+    let fold_arrow ars = 
+      let ar = List.hd ars.maps in
+      Hom.fold (fun u v cont -> (Node.id u, Node.id v)::cont) ar []
 
     let is_identity f = List.for_all (fun h -> Hom.is_identity h) f.maps
     let lower_bound tile = tile.span

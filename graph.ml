@@ -12,7 +12,7 @@ module type GraphType =
     (**Pretty printing*)
     val to_string : t -> string
     val to_dot_cluster : ?sub:t -> t -> int -> int -> string * string * int
-    val to_dot : t -> string -> string
+    val to_dot : t -> ?highlights:(int*int) list -> string -> string
 
     (**Iterators*)
     val fold_edges : (node -> node -> 'a -> 'a) -> t -> 'a -> 'a
@@ -311,14 +311,15 @@ module Make (Node:Node.NodeType) =
       else
         "{!!"^str^"!!}"
 
-    let to_dot_generic ?(sub=empty) g n gtype fresh =
+    let to_dot_generic ?(sub=empty) g ?(highlights=[]) n gtype fresh =
       let nodes,fresh,map =
 	fold_nodes
 	  (fun u (cont,fresh,map) ->
 	   if Lib.IntMap.mem (Node.id u) map then (cont,fresh,map)
 	   else
 	     let i = fresh in
-	     let node_str = Node.to_dot u i in
+       let highlight = try Some (List.assoc (Node.id u) highlights) with Not_found -> None in
+	     let node_str = Node.to_dot u ~highlight i in
 	     (node_str::cont,fresh+1,Lib.IntMap.add (Node.id u) i map)
 	  ) g ([],fresh,Lib.IntMap.empty)
       in
@@ -343,12 +344,12 @@ module Make (Node:Node.NodeType) =
 
   (* TODO use to_dot (after verifying the fn does what I want) to print all graphs in the dot file
    * (using stuff in basis.ml. Then import that in the browser, place everything properly*)
-  let to_dot g name =
-    let (str,name,fresh) = to_dot_generic g name "digraph" 0
+  let to_dot g ?(highlights=[]) name =
+    let (str,name,fresh) = to_dot_generic g ~highlights name "digraph" 0
     in str
 
     let to_dot_cluster ?(sub=empty) g n fresh = 
-      to_dot_generic ~sub g ("cluster_"^(string_of_int n)) "subgraph" fresh
+      to_dot_generic ~sub g ~highlights:[] ("cluster_"^(string_of_int n)) "subgraph" fresh
 
     let sum g h =
       let shift g d =
