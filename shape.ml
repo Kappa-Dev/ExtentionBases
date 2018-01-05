@@ -61,74 +61,31 @@ module Make (Node:Node.NodeType) =
 		) (square |> (Graph.sum one one))
      *)
 
-    let interactive_tests debug =
+let rec prompt () =
+  match LNoise.linenoise "> " with
+  | None ->
+    log "Attempting to save session history";
+    ignore (LNoise.history_save histfile)
+  | Some v ->
+    (match v with
+       "one" | "triangle")
+                         || (name = "square")
+                         || (name = "dsquare")
+                         || (name = "house")
+                         || (name = "osquare")
+     | _ -> log "Parse error.");
+    ignore(LNoise.history_add v);  
+    prompt()
+
+let interactive_tests debug =
+  ignore (LNoise.history_load histfile);
+  if (Array.length Sys.argv) > 1 && Sys.argv.(1) = "test" 
+  then test ()
+  else log "miniota model finder. take a look at the readme."; log ""; prompt ()
+                                                                              
       if debug then debug_mode () ;
       if db() then Printexc.record_backtrace true ;
-
-      let rec loop model =
-        let (name,graph) =
-          ask_until "[house|square|osquare|one|triangle] or exit \n"
-                    (function
-                       "exit" -> (true,("exit",Graph.empty))
-                     | str -> if Lib.StringMap.mem str Node.library then
-                                (print_string "there\n" ;
-                                (true,(str,graph_of_library str)))
-                              else
-                                (Printf.printf "here (%s)\n" str ;
-                                 (false,(str,Graph.empty)))
-                    )
-        in
-        if name = "" then raise Exit ;
-        if name = "exit" then ()
-        else
-          let model = Model.add_obs name graph model in
-          let nw,pw = Model.witnesses_of_rule (Graph.empty,graph_of_library "one") model in
-          let get_seed = function
-              (id_obs,tile)::_ -> Cat.left_of_tile tile
-            | [] -> Graph.empty
-          in
-          let neg_ext_base =
-            List.fold_left
-              (fun ext_base (id_obs,tile) ->
-                match Cat.upper_bound tile with
-                  None -> failwith "no witness"
-                | Some (to_w,from_o) ->
-                   if db() then
-                     Printf.printf "Inserting witness of observable \"%s\": %s\n"
-			           (Lib.Dict.to_name id_obs model.Model.dict)
-			           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                   EB.insert to_w from_o id_obs ext_base
-              ) (EB.empty (get_seed nw)) nw
-          in
-          let pos_ext_base =
-            List.fold_left
-              (fun ext_base (id_obs,tile) ->
-                match Cat.upper_bound tile with
-                  None -> failwith "no witness"
-                | Some (to_w,from_o) ->
-                   if db() then
-                     Printf.printf "Inserting witness of observable '%s': %s\n"
-			           (Lib.Dict.to_name id_obs model.Model.dict)
-			           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                   EB.insert to_w from_o id_obs ext_base
-              ) (EB.empty (get_seed pw)) pw
-          in
-          let d = open_out "neg_base.dot" in
-          let d1 = open_out "neg_corresp.dot" in
-          let d' = open_out "pos_base.dot" in
-          let d1' = open_out "pos_corresp.dot" in
-          let d2 = open_out "pos_web.dot" in
-          Printf.fprintf d "%s\n" (EB.to_dot model.Model.dict neg_ext_base) ;
-          Printf.fprintf d1 "%s\n" (EB.to_dot_corresp neg_ext_base) ;
-          Printf.fprintf d' "%s\n" (EB.to_dot model.Model.dict pos_ext_base) ;
-          Printf.fprintf d1' "%s\n" (EB.to_dot_corresp pos_ext_base) ;
-          Printf.fprintf d2 "%s\n%s" (EB.to_dot ~show_conflict:false model.Model.dict pos_ext_base) (EB.to_dot_content pos_ext_base);
-          close_out d ;
-          close_out d' ;
-          loop model
-      in
-      loop Model.empty
-
+      print_string "Not implemented yet...\n"
 
     let generate_tests debug =
       if debug then debug_mode () ;
