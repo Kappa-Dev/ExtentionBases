@@ -19,11 +19,15 @@ module Dict =
 
 module Util =
   struct
+    let log s = print_endline s
     let db_mode = ref false
     let db () = !db_mode
     let flush_string = fun x -> print_string x ; flush stdout
     let debug_mode () =
-      (print_string "Entering debug mode\n" ; db_mode := true)
+      if not !db_mode then
+        (print_string "Entering debug mode\n" ; db_mode := true)
+      else
+        (print_string "Exiting debug mode\n" ; db_mode := false)
 
     let proj_left = (fun (x,_) -> x)
     let proj_right = (fun (_,y) -> y)

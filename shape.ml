@@ -61,31 +61,74 @@ module Make (Node:Node.NodeType) =
 		) (square |> (Graph.sum one one))
      *)
 
-let rec prompt () =
-  match LNoise.linenoise "> " with
-  | None ->
-    log "Attempting to save session history";
-    ignore (LNoise.history_save histfile)
-  | Some v ->
-    (match v with
-       "one" | "triangle")
-                         || (name = "square")
-                         || (name = "dsquare")
-                         || (name = "house")
-                         || (name = "osquare")
-     | _ -> log "Parse error.");
-    ignore(LNoise.history_add v);  
-    prompt()
 
-let interactive_tests debug =
-  ignore (LNoise.history_load histfile);
-  if (Array.length Sys.argv) > 1 && Sys.argv.(1) = "test" 
-  then test ()
-  else log "miniota model finder. take a look at the readme."; log ""; prompt ()
-                                                                              
-      if debug then debug_mode () ;
-      if db() then Printexc.record_backtrace true ;
-      print_string "Not implemented yet...\n"
+
+    let interactive_tests debug =
+      let rec prompt model =
+        (match (LNoise.linenoise "> ") with
+         | None ->
+            log "Attempting to save session history";
+            exit 0
+         | Some v ->
+            match Parser.parse v with
+              Debug ->
+              begin
+                debug_mode () ;
+                Printexc.record_backtrace true ;
+                prompt model
+              end
+            | Build (l,r) ->
+               (try
+                 let (lg,rg) = graph_of_library l, graph_of_library r in
+                 let nw,pw = Model.witnesses_of_rule (lg,rg) model in
+                 let get_seed = function
+                     (id_obs,tile)::_ -> Cat.left_of_tile tile
+                   | [] -> Graph.empty
+                 in
+                 let pos_ext_base =
+                   List.fold_left
+                     (fun ext_base (id_obs,tile) ->
+                       match Cat.upper_bound tile with
+                         None -> failwith "no witness"
+                       | Some (to_w,from_o) ->
+                          if db() then
+                            log "Inserting witness of observable '%s': %s\n"
+			        (Lib.Dict.to_name id_obs model.Model.dict)
+			        (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+                          EB.insert to_w from_o id_obs ext_base
+                     ) (EB.empty (get_seed pw)) pw
+                 in
+                 let d2 = open_out "pos_web.dot" in
+                 Printf.fprintf d2 "%s\n%s"
+                                (EB.to_dot ~show_conflict:false
+                                           model.Model.dict pos_ext_base)
+                                (EB.to_dot_content pos_ext_base) ;
+                 close_out d2 ;
+                 prompt model
+               with Not_found ->
+                    log "Unrecognized rule shapes" ;
+                    prompt model
+               )
+            | Add v ->
+               ignore (LNoise.history_add v) ;
+               if Lib.StringMap.mem v Node.library then
+                 let graph = graph_of_library v in
+                 let model =  Model.add_obs v graph model in
+                 prompt model
+               else
+                 begin
+                   log "Unrecognized shape" ;
+                   prompt model
+                 end
+            | Add_new (v,g) ->
+               ignore (LNoise.history_add v) ;
+               let model =  Model.add_obs v g model in
+               prompt model
+        )
+      in
+      ignore (LNoise.history_load histfile);
+      log "entering interactive extension base builder."; log "" ; prompt Model.empty
+
 
     let generate_tests debug =
       if debug then debug_mode () ;
