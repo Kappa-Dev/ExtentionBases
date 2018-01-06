@@ -1,3 +1,5 @@
+exception Change_shape of string
+
 module Make (Node:Node.NodeType) =
   struct
     module Cat = Cat.Make (Node)
@@ -36,8 +38,7 @@ module Make (Node:Node.NodeType) =
     let (|>) = Cat.(|>)
     let (<|) = fun x y -> (y |> x)
 
-    let simple_tests debug =
-      if debug then debug_mode () ;
+  let simple_tests () =
       let one = graph_of_library "one" in
       let square = graph_of_library "square" in
       let open_square = graph_of_library "osquare" in
@@ -61,81 +62,87 @@ module Make (Node:Node.NodeType) =
 		) (square |> (Graph.sum one one))
      *)
 
+let process_result model = function 
+  | Parser.Mode s ->
+    log "Changing mode. Current model has been erased.";
+    raise (Change_shape s)
+  | Parser.Debug ->
+    begin
+      debug_mode () ;
+      Printexc.record_backtrace true;
+      model
+    end
+  | Parser.List ->
+    log "<list of observables>";
+    model
+  | Parser.Build (l,r) ->
+    (try
+       let (lg,rg) = graph_of_library l, graph_of_library r in
+       let nw,pw = Model.witnesses_of_rule (lg,rg) model in
+       let get_seed = function
+           (id_obs,tile)::_ -> Cat.left_of_tile tile
+         | [] -> Graph.empty
+       in
+       let pos_ext_base =
+         List.fold_left
+           (fun ext_base (id_obs,tile) ->
+              match Cat.upper_bound tile with
+                None -> failwith "no witness"
+              | Some (to_w,from_o) ->
+                if db() then
+                  Printf.printf "Inserting witness of observable '%s': %s\n"
+                    (Lib.Dict.to_name id_obs model.Model.dict)
+                    (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+                EB.insert to_w from_o id_obs ext_base
+           ) (EB.empty (get_seed pw)) pw
+       in
+       let d2 = open_out "pos_web.dot" in
+       Printf.fprintf d2 "%s\n%s"
+         (EB.to_dot ~show_conflict:false
+            model.Model.dict pos_ext_base)
+         (EB.to_dot_content pos_ext_base) ;
+       close_out d2 ;
+       model
+     with Not_found ->
+       log "Unrecognized rule shapes" ;
+       model
+    )
+  | Parser.Add v ->
+    if Lib.StringMap.mem v Node.library then
+      let graph = graph_of_library v in
+      Model.add_obs v graph model
+    else
+      begin
+        log "Unrecognized shape" ;
+        model
+      end
+  | Parser.Add_named (lst,v) ->
+    let edges = Node.tn lst in
+    let graph = draw edges Graph.empty in
+    Model.add_obs v graph model
+
+  let interactive debug =
+    let rec session model =
+    (match (LNoise.linenoise "> ") with
+     | None ->
+       log "Attempting to save session history";
+       ignore (LNoise.history_save histfile);
+       exit 0
+     | Some v ->
+       ignore (LNoise.history_add v);
+       (match Parser.parse v with
+        | Result.Ok result -> 
+          session (process_result model result)
+        | Error _ -> log "Parse error."; session model);
+    )
+    in session Model.empty
 
 
-    let interactive_tests debug =
-      let rec prompt model =
-        (match (LNoise.linenoise "> ") with
-         | None ->
-            log "Attempting to save session history";
-            exit 0
-         | Some v ->
-            match Parser.parse v with
-              Debug ->
-              begin
-                debug_mode () ;
-                Printexc.record_backtrace true ;
-                prompt model
-              end
-            | Build (l,r) ->
-               (try
-                 let (lg,rg) = graph_of_library l, graph_of_library r in
-                 let nw,pw = Model.witnesses_of_rule (lg,rg) model in
-                 let get_seed = function
-                     (id_obs,tile)::_ -> Cat.left_of_tile tile
-                   | [] -> Graph.empty
-                 in
-                 let pos_ext_base =
-                   List.fold_left
-                     (fun ext_base (id_obs,tile) ->
-                       match Cat.upper_bound tile with
-                         None -> failwith "no witness"
-                       | Some (to_w,from_o) ->
-                          if db() then
-                            log "Inserting witness of observable '%s': %s\n"
-			        (Lib.Dict.to_name id_obs model.Model.dict)
-			        (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                          EB.insert to_w from_o id_obs ext_base
-                     ) (EB.empty (get_seed pw)) pw
-                 in
-                 let d2 = open_out "pos_web.dot" in
-                 Printf.fprintf d2 "%s\n%s"
-                                (EB.to_dot ~show_conflict:false
-                                           model.Model.dict pos_ext_base)
-                                (EB.to_dot_content pos_ext_base) ;
-                 close_out d2 ;
-                 prompt model
-               with Not_found ->
-                    log "Unrecognized rule shapes" ;
-                    prompt model
-               )
-            | Add v ->
-               ignore (LNoise.history_add v) ;
-               if Lib.StringMap.mem v Node.library then
-                 let graph = graph_of_library v in
-                 let model =  Model.add_obs v graph model in
-                 prompt model
-               else
-                 begin
-                   log "Unrecognized shape" ;
-                   prompt model
-                 end
-            | Add_new (v,g) ->
-               ignore (LNoise.history_add v) ;
-               let model =  Model.add_obs v g model in
-               prompt model
-        )
-      in
-      ignore (LNoise.history_load histfile);
-      log "entering interactive extension base builder."; log "" ; prompt Model.empty
-
-
-    let generate_tests debug =
-      if debug then debug_mode () ;
+  let generate_tests () =
 
       if db() then Printexc.record_backtrace true ;
-      let one = graph_of_library "one" in
-      let triangle = graph_of_library "triangle" in
+      (*let one = graph_of_library "one" in*)
+      (*let triangle = graph_of_library "triangle" in*)
       let square = graph_of_library "square" in
       let osquare = graph_of_library "osquare" in
       let model = Lib.StringMap.fold

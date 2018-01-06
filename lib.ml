@@ -19,6 +19,7 @@ module Dict =
 
 module Util =
   struct
+    let histfile = "./session_history"
     let log s = print_endline s
     let db_mode = ref false
     let db () = !db_mode
@@ -32,16 +33,16 @@ module Util =
     let proj_left = (fun (x,_) -> x)
     let proj_right = (fun (_,y) -> y)
 
-    let ask_until str f =
-      let inp = ref "" in
-      let init = ref true in
-      while (proj_left (f !inp)) && !init do
-        print_string !inp ; flush stdout ;
-        init := false ;
-        print_string str ; flush stdout ;
-        inp := Pervasives.input_line stdin ;
-      done ;
-      proj_right (f !inp)
+    let rec ask_until s f = match LNoise.linenoise s with
+      | None -> 
+        log "Attempting to save session history";
+        ignore (LNoise.history_save histfile);
+        failwith "Could not read answer."; 
+      | Some resp -> 
+        ignore(LNoise.history_add resp);
+        match f resp with
+        | None -> failwith "bye"
+        | Some value -> value
 
     let red str = "\027[91m"^str^"\027[0m"
     let green str = "\027[92m"^str^"\027[0m"

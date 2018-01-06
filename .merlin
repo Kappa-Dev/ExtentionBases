@@ -1,1 +1,4 @@
+S ./**
 B _build/**
+PKG angstrom
+PKG linenoise

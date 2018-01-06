@@ -20,6 +20,7 @@ module type NodeType =
     val library : (t*t) list Lib.StringMap.t
     val compatible : t -> t -> bool
     val gluable : t -> t -> bool
+    val tn : (int list * int list) list -> (t*t) list
   end
 
 
@@ -55,6 +56,8 @@ module SimpleNode =
 	Printf.sprintf "%d -> %d [dir=none]" i j
 
       let coh _ _ = true
+
+	let tn = List.map (fun (l,l') -> (create l,create l'))
 
       let library =
 	let void = [] in
@@ -102,7 +105,6 @@ module SimpleNode =
 	let one = [([3],[2])] in
 	let two = [([0],[1]);([1],[2])]
 	in
-	let tn = List.map (fun (l,l') -> (create l,create l')) in
 	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
 	let lib = Lib.StringMap.add "one" (tn one) lib in
 	let lib = Lib.StringMap.add "two" (tn two) lib in
@@ -177,6 +179,7 @@ module KappaNodeSym =
 	let hl = string_of_int v.port_id in
 	Printf.sprintf "%d->%d [dir = none, taillabel = \"%s\", headlabel = \"%s\"]" i j tl hl
 
+	let tn = List.map (fun (l,l') -> (create l,create l'))
 
       let coh edges (w,x) =
 	let ok u v =
@@ -233,8 +236,6 @@ module KappaNodeSym =
 	in
 	let one = [([0;0;0],[1;0;0])] in
         let two = [([0;0;0],[1;0;0]);([2;0;0],[1;1;0])] in
-	let tn = List.map (fun (l,l') -> (create l,create l'))
-	in
 	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
 	let lib = Lib.StringMap.add "house" (tn house) lib
 	in
@@ -310,6 +311,7 @@ module KappaNode =
 	let hl = string_of_int v.port_id in
 	Printf.sprintf "%d->%d [dir = none, taillabel = \"%s\", headlabel = \"%s\"]" i j tl hl
 
+	let tn = List.map (fun (l,l') -> (create l,create l'))
 
       let coh edges (w,x) =
 	let ok u v =
@@ -366,8 +368,6 @@ module KappaNode =
 	in
 	let one = [([0;0;0],[1;0;0])] in
         let two = [([0;0;0],[1;0;0]);([2;0;0],[1;1;0])] in
-	let tn = List.map (fun (l,l') -> (create l,create l'))
-	in
 	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
 	let lib = Lib.StringMap.add "house" (tn house) lib
 	in
@@ -432,6 +432,8 @@ module DegreeNode =
       let dot_of_edge u i v j =
 	Printf.sprintf "%d->%d [dir = none]" i j
 
+        let tn = List.map (fun (l,l') -> (create l,create l'))
+
       let coh edges (w,x) =
 	let dw,dx =
 	  List.fold_left
@@ -487,8 +489,6 @@ module DegreeNode =
 	  ]
 	in
 	let one = [([0;3],[1;3])]
-	in
-        let tn = List.map (fun (l,l') -> (create l,create l'))
 	in
 	let lib = Lib.StringMap.add "empty" (tn void) Lib.StringMap.empty in
 	let lib = Lib.StringMap.add "house" (tn house) lib
