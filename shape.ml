@@ -36,7 +36,6 @@ module Make (Node:Node.NodeType) =
 
     let (=>) = Cat.(=>)
     let (|>) = Cat.(|>)
-    let (<|) = fun x y -> (y |> x)
 
   let simple_tests () =
       let one = graph_of_library "one" in
@@ -138,7 +137,17 @@ let process_result model = function
           session (process_result model result)
         | Error _ -> log "Parse error."; session model);
     )
-    in session Model.empty
+    in
+    (*let pid = Unix.fork () in
+    if pid = 0 then (*child process*)
+      try
+        Unix.execvp "node" [|"web/server.js"|]
+      with
+        exn -> log (Printexc.to_string exn)
+    else (*parent process*)
+      session Model.empty
+     *)
+    session Model.empty
   end
 
 module SimpleShape = Make (Node.SimpleNode)

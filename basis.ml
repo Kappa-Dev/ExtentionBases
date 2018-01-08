@@ -52,7 +52,7 @@ module Make (Node:Node.NodeType) =
             (fun i p dot_string ->
              let str =
                match p.obs with
-                 [] -> Printf.sprintf "%d [shape = none] ;" i
+                 [] -> Printf.sprintf "%d [label =\"%d\" , shape = none] ;" i i
                | ol ->
                   Printf.sprintf
                     "%d [label=\"%d [obs: %s]\" , shape = \"%s\"];" i
