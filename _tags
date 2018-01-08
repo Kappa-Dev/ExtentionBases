@@ -1,1 +1,1 @@
-true: package(angstrom), package(linenoise)
+true: package(linenoise), package(angstrom)
