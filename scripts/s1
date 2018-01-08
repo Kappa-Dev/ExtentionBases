@@ -1,0 +1,5 @@
+mode kappa
+add house
+add [] as empty
+list
+build (empty,one)

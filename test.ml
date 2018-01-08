@@ -35,6 +35,12 @@ let rec interactive maybe_shape =
       | None -> ask_shape ()
     in interactive (Some shape)
 
+let load shape file = (match shape with
+  | Some Simple -> ignore (Simple.process_command Simple.Model.empty (Parser.Load file))
+  | Some Degree -> ignore (Degree.process_command Degree.Model.empty (Parser.Load file))
+  | Some Kappa -> ignore (Kappa.process_command Kappa.Model.empty (Parser.Load file))
+  | _ -> failwith "Impossible"); log ""
+
 let test shape debug mode =
   if debug then debug_mode () else ();
   match mode with
@@ -48,6 +54,10 @@ let () =
        test Kappa false SimpleT
      else if Sys.argv.(1) = "interactive" then
        interactive None
+     else if Sys.argv.(1) = "load" then
+       (if Array.length Sys.argv > 3 then
+          load (shape_matcher Sys.argv.(2)) Sys.argv.(3)
+        else log "You must specify a shape(kappa|simple|degree) and a file")
     )
   else
     let shape = ask_shape () in
