@@ -1,17 +1,12 @@
 open Lib.Util
 
-type mode = SimpleT | Complete | Interactive
+type mode = SimpleT | Interactive
 type shape = Simple | Degree | Kappa
 
 let simple_tests shape = match shape with
   | Simple -> Shape.SimpleShape.simple_tests ()
   | Degree -> Shape.DegreeShape.simple_tests ()
   | Kappa -> Shape.KappaShape.simple_tests ()
-
-let generate_tests shape = match shape with
-  | Simple -> Shape.SimpleShape.generate_tests ()
-  | Degree -> Shape.DegreeShape.generate_tests ()
-  | Kappa -> Shape.KappaShape.generate_tests ()
 
 let shape_matcher = function
   | "simple" -> Some Simple
@@ -26,30 +21,29 @@ let rec interactive maybe_shape =
     | None -> ask_shape () in
   log "entering interactive extension base builder."; log "" ;
   try
-    match shape with 
+    match shape with
     | Simple -> Shape.SimpleShape.interactive ()
     | Degree -> Shape.DegreeShape.interactive ()
     | Kappa -> Shape.KappaShape.interactive ()
-  with Shape.Change_shape s -> 
+  with Shape.Change_shape s ->
     let shape = match shape_matcher s with
       | Some shape -> shape
       | None -> ask_shape ()
     in interactive (Some shape)
 
-let test shape debug mode = 
+let test shape debug mode =
   if debug then debug_mode () else ();
   match mode with
   | SimpleT -> simple_tests shape
-  | Complete -> generate_tests shape
   | Interactive -> interactive (Some shape)
 
 let () =
   ignore (LNoise.history_load histfile);
   if Array.length Sys.argv > 1 then
     (if Sys.argv.(1) = "auto" then
-       test Kappa false Complete
+       test Kappa false SimpleT
      else if Sys.argv.(1) = "interactive" then
-       interactive None 
+       interactive None
     )
   else
     let shape = ask_shape () in
@@ -58,9 +52,8 @@ let () =
                 | _ -> Some false
         )
     in
-    let mode = ask_until "Interactive, Simple or complete test (i/s/c)? (i) > "
+    let mode = ask_until "Interactive or Simple (i/s)? (i) > "
         (function "s" -> Some SimpleT
-                | "c" -> Some Complete
                 | _ -> Some Interactive
         )
     in test shape debug mode

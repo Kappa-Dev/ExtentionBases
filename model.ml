@@ -23,6 +23,15 @@ module Make (Node:Node.NodeType) =
       let dict = Lib.Dict.add id name dict in
       {m with obs = Lib.IntMap.add id o m.obs ; dict = dict}
 
+    let list m =
+      let l =
+        Lib.IntMap.fold
+          (fun id _ cont ->
+           (Lib.Dict.to_name id m.dict)::cont
+          ) m.obs []
+      in
+      List.rev l
+
     let empty = {rules = Lib.IntMap.empty ; obs = Lib.IntMap.empty ; dict = Lib.Dict.empty}
 
     let effect_of_rule (l,r) =

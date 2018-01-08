@@ -34,11 +34,11 @@ module Util =
     let proj_right = (fun (_,y) -> y)
 
     let rec ask_until s f = match LNoise.linenoise s with
-      | None -> 
+      | None ->
         log "Attempting to save session history";
         ignore (LNoise.history_save histfile);
-        failwith "Could not read answer."; 
-      | Some resp -> 
+        failwith "Could not read answer.";
+      | Some resp ->
         ignore(LNoise.history_add resp);
         match f resp with
         | None -> failwith "bye"
