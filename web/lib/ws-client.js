@@ -6,7 +6,7 @@ let ws_client = ({url,cb}) => {
   let retry = () => {
     ready = false;
     if(!interval) {
-      interval = setInterval(connect,100);
+      interval = setInterval(connect,300);
     }
   }
 
