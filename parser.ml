@@ -1,6 +1,6 @@
 open Angstrom
 
-type result =
+type command =
   | Mode of string
   | Add of string
   | Add_named of (int list * int list) list * string

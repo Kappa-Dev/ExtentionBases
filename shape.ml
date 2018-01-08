@@ -61,7 +61,7 @@ module Make (Node:Node.NodeType) =
 		) (square |> (Graph.sum one one))
      *)
 
-let process_result model = function
+let rec process_command model = function
   | Parser.Mode s ->
     log "Changing mode. Current model has been erased.";
     raise (Change_shape s)
@@ -130,12 +130,12 @@ let process_result model = function
        log "Attempting to save session history";
        ignore (LNoise.history_save histfile);
        exit 0
-     | Some v ->
-       ignore (LNoise.history_add v);
-       (match Parser.parse v with
-        | Result.Ok result ->
-          session (process_result model result)
-        | Error _ -> log "Parse error."; session model);
+     | Some line ->
+       ignore (LNoise.history_add line);
+       (match Parser.parse line with
+        | Result.Ok command ->
+          session (process_command model command)
+        | Result.Error _ -> log "Parse error."; session model);
     )
     in
     (*let pid = Unix.fork () in
