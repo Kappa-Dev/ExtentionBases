@@ -62,14 +62,14 @@ module Make (Node:Node.NodeType) =
 		) (square |> (Graph.sum one one))
      *)
 
-let process_result model = function 
+let process_result model = function
   | Parser.Mode s ->
     log "Changing mode. Current model has been erased.";
     raise (Change_shape s)
   | Parser.Debug ->
     begin
       debug_mode () ;
-      Printexc.record_backtrace true;
+      Printexc.record_backtrace (db());
       model
     end
   | Parser.List ->
@@ -131,12 +131,11 @@ let process_result model = function
      | Some v ->
        ignore (LNoise.history_add v);
        (match Parser.parse v with
-        | Result.Ok result -> 
+        | Result.Ok result ->
           session (process_result model result)
         | Error _ -> log "Parse error."; session model);
     )
     in session Model.empty
-
 
   let generate_tests () =
 
