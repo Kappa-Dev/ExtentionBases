@@ -119,9 +119,18 @@ let rec process_command model = function
     let edges = Node.tn lst in
     let graph = draw edges Graph.empty in
     Model.add_obs v graph model
-  | Parser.Load f ->
-     log (Printf.sprintf "<Attempting to load file %s>" f) ;
-     model
+  | Parser.Load file ->
+    let run_line acc lineno line = match Parser.parse line with
+      | Result.Ok command -> (match command with
+        | Parser.Mode _ ->
+          log (Printf.sprintf "Ignoring mode command at line %d" lineno);
+          Some acc
+        | _ ->
+          Some (process_command acc command))
+      | Result.Error _ ->
+        log (Printf.sprintf "Parse error at line %d" lineno);
+        None
+        in try each_line file run_line model with exn -> log (Printexc.to_string exn); model
 
   let interactive debug =
     let rec session model =

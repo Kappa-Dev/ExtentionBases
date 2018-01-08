@@ -44,6 +44,24 @@ module Util =
         | None -> failwith "bye"
         | Some value -> value
 
+
+    let each_line file callback initial  = 
+      let channel = open_in file
+      and line = ref ""
+      and lineno = ref 0
+      and acc = ref initial in
+      try
+        while true do
+          line := input_line channel;
+          incr lineno;
+          (match callback !acc !lineno !line with
+           | Some d -> acc := d
+           | None -> raise End_of_file);
+        done;
+        !acc
+      with End_of_file -> !acc
+
+
     let red str = "\027[91m"^str^"\027[0m"
     let green str = "\027[92m"^str^"\027[0m"
     let yellow str = "\027[93m"^str^"\027[0m"
