@@ -15,15 +15,13 @@ let mode =
   take_while (function _ -> true) >>| fun mode_result ->
   Mode mode_result
 
-  let list_parser p = char '[' *> ws *> sep_by (ws *> (char ';') *> ws) p <* ws <* char ']' 
-  let number = take_while (function '0'..'9' -> true | _ -> false) >>= (function
-  | "" -> fail "Cannot find number"
-  |  s -> return (int_of_string s))
+let list_parser p = char '[' *> ws *> sep_by (ws *> (char ';') *> ws) p <* ws <* char ']' 
+let number = take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> int_of_string s
 
-  let tuple = 
-    char '(' *> ws *> list_parser number >>= fun list1 ->
-    ws *> char ',' *> ws *> list_parser number >>= fun list2 -> 
-    ws *> char ')' *> return (list1,list2)
+let tuple = 
+  char '(' *> ws *> list_parser number >>= fun list1 ->
+  ws *> char ',' *> ws *> list_parser number >>= fun list2 -> 
+  ws *> char ')' *> return (list1,list2)
 
 let nodes = list_parser tuple
 
