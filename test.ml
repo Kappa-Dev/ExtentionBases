@@ -1,12 +1,16 @@
 open Lib.Util
 
+module Simple = Shape.SimpleShape
+module Degree = Shape.DegreeShape
+module Kappa = Shape.KappaShape
+
 type mode = SimpleT | Interactive
 type shape = Simple | Degree | Kappa
 
 let simple_tests shape = match shape with
-  | Simple -> Shape.SimpleShape.simple_tests ()
-  | Degree -> Shape.DegreeShape.simple_tests ()
-  | Kappa -> Shape.KappaShape.simple_tests ()
+  | Simple -> Simple.simple_tests ()
+  | Degree -> Degree.simple_tests ()
+  | Kappa -> Kappa.simple_tests ()
 
 let shape_matcher = function
   | "simple" -> Some Simple
@@ -22,9 +26,9 @@ let rec interactive maybe_shape =
   log "entering interactive extension base builder."; log "" ;
   try
     match shape with
-    | Simple -> Shape.SimpleShape.interactive ()
-    | Degree -> Shape.DegreeShape.interactive ()
-    | Kappa -> Shape.KappaShape.interactive ()
+    | Simple -> Simple.interactive ()
+    | Degree -> Degree.interactive ()
+    | Kappa -> Kappa.interactive ()
   with Shape.Change_shape s ->
     let shape = match shape_matcher s with
       | Some shape -> shape
