@@ -10,7 +10,7 @@ const config = {
 const path = require('path');
 
 const app = Express();
-let basis_file = path.join(path.dirname(__dirname),'pos_web.dot');
+let basis_file = path.join(path.dirname(__dirname),'web_eb.dot');
 console.log(basis_file);
 let watch = Chokidar.watch(basis_file);
 

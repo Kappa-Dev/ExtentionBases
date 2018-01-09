@@ -1,8 +1,8 @@
 open Lib.Util
 
-module Simple = Shape.SimpleShape
-module Degree = Shape.DegreeShape
-module Kappa = Shape.KappaShape
+module Simple = Interactive.SPrompt
+module Degree = Interactive.DPrompt
+module Kappa = Interactive.KPrompt
 
 type mode = SimpleT | Interactive
 type shape = Simple | Degree | Kappa
@@ -29,16 +29,16 @@ let rec interactive maybe_shape =
     | Simple -> Simple.interactive ()
     | Degree -> Degree.interactive ()
     | Kappa -> Kappa.interactive ()
-  with Shape.Change_shape s ->
+  with Interactive.Change_shape s ->
     let shape = match shape_matcher s with
       | Some shape -> shape
       | None -> ask_shape ()
     in interactive (Some shape)
 
 let load shape file = (match shape with
-  | Some Simple -> ignore (Simple.process_command Simple.Model.empty (Parser.Load file))
-  | Some Degree -> ignore (Degree.process_command Degree.Model.empty (Parser.Load file))
-  | Some Kappa -> ignore (Kappa.process_command Kappa.Model.empty (Parser.Load file))
+  | Some Simple -> ignore (Simple.process_command Simple.empty (Parser.Load file))
+  | Some Degree -> ignore (Degree.process_command Degree.empty (Parser.Load file))
+  | Some Kappa -> ignore (Kappa.process_command Kappa.empty (Parser.Load file))
   | _ -> failwith "Impossible"); log ""
 
 let test shape debug mode =

@@ -1,6 +1,8 @@
 open Angstrom
 
 let legal_modes = ["kappa";"kappaSym";"degree";"simple"]
+let legal_output = ["positive" ; "negative"]
+
 type command =
   | Mode of string
   | Add of string
@@ -9,16 +11,18 @@ type command =
   | Debug
   | Build of string*string
   | Load of string
+  | Output of bool
 
 let ws = skip_while (function ' ' -> true | _ -> false)
 
 let inst name alt ret =
   string name *> ws *>
-  (if alt = [] then take_while (function _ -> true) else choice (List.map string legal_modes)) >>| fun mode_result ->
+  (if alt = [] then take_while (function _ -> true) else choice (List.map string alt)) >>| fun mode_result ->
   ret mode_result
 
 let mode mlist = inst "mode" mlist (fun x -> Mode x)
 let load = inst "load" [] (fun x -> Load x)
+let output olist = inst "output" olist (fun x -> Output (if x="positive" then true else false))
 
 let list_parser p = char '[' *> ws *> sep_by (ws *> (char ';') *> ws) p <* ws <* char ']'
 let number = take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> int_of_string s
@@ -52,6 +56,6 @@ let build =
 
 let global p = p <* end_of_input
 
-let line = choice (List.map global [mode legal_modes; add; debug ; add_named; list; build ; load])
+let line = choice (List.map global [mode legal_modes; add; debug ; add_named; list; build ; load ; output legal_output])
 
 let parse = parse_string line

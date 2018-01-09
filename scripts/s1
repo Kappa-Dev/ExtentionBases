@@ -1,5 +1,7 @@
 mode kappa
 add house
+add square
 add [] as empty
 list
 build (empty,one)
+zz

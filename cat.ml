@@ -62,7 +62,7 @@ module Make (Node:Node.NodeType) =
 
     type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
 
-    let fold_arrow ars = 
+    let fold_arrow ars =
       let ar = List.hd ars.maps in
       Hom.fold (fun u v cont -> (Node.id u, Node.id v)::cont) ar []
 
@@ -704,5 +704,4 @@ module Make (Node:Node.NodeType) =
                else tile::cont
         ) [] (glue h obs)
 
-
-        end:Category with type obj = Graph.Make(Node).t)
+ end:Category with type obj = Graph.Make(Node).t)
