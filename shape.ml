@@ -67,6 +67,7 @@ let rec process_command model = function
     raise (Change_shape s)
   | Parser.Debug ->
     begin
+      log "Toggling debug mode";
       debug_mode () ;
       Printexc.record_backtrace (db());
       model
@@ -76,6 +77,7 @@ let rec process_command model = function
      model
   | Parser.Build (l,r) ->
     (try
+       log (Printf.sprintf "Building extension base for rule %s -> %s" l r);
        let (lg,rg) = graph_of_library l, graph_of_library r in
        let nw,pw = Model.witnesses_of_rule (lg,rg) model in
        let get_seed = function
