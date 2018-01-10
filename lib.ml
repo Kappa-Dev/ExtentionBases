@@ -9,11 +9,15 @@ module StringMap = Map.Make (struct type t = string let compare = compare end)
 
 module Dict =
   struct
+    exception Clashing
     type t = {int_of_str : int StringMap.t ; str_of_int : string IntMap.t ; fresh : int}
     let empty = {int_of_str = StringMap.empty ; str_of_int = IntMap.empty ; fresh = 0}
     let to_id x d = StringMap.find x d.int_of_str
     let to_name x d = IntMap.find x d.str_of_int
-    let add i n d = {d with str_of_int = IntMap.add i n d.str_of_int ; int_of_str = StringMap.add n i d.int_of_str}
+    let add i n d =
+      if StringMap.mem n d.int_of_str || IntMap.mem i d.str_of_int then raise Clashing
+      else
+        {d with str_of_int = IntMap.add i n d.str_of_int ; int_of_str = StringMap.add n i d.int_of_str}
     let fresh d = (d.fresh, {d with fresh = d.fresh+1})
   end
 

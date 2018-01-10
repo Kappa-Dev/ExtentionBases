@@ -1,5 +1,7 @@
+BIN = test
+
 test:
-	./run test
+	ocamlbuild -use-ocamlfind $(BIN).native
 
 clean:
 	rm -f _build/*
