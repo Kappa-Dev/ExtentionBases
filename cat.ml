@@ -386,11 +386,11 @@ module Make (Node:Node.NodeType) =
     let (@@) = compose
 
     let is_iso f =
-      let l = f.src --> f in
-      if List.exists (fun trg -> Graph.is_equal trg f.trg) l then
+      let trg = List.hd (f.src --> f) in
+      if Graph.is_equal trg f.trg then
         true
       else
-        (Printf.printf "Not iso : %s <> %s\n" (Graph.to_string (List.hd l)) (Graph.to_string f.trg) ;
+        (Printf.printf "Not iso : %s <> %s\n" (Graph.to_string trg) (Graph.to_string f.trg) ;
          false)
 
     let invert f =
@@ -451,6 +451,7 @@ module Make (Node:Node.NodeType) =
                              inf',Hom.add u_inf u' (Hom.add v_inf v' ir),
                              sup)
                           else
+                            let sup = Graph.add_node u' (Graph.add_node v' sup) in
                             (il,inf,ir,Graph.add_edge ~weak:true u' v' sup)
                         with
                           (*v has no image by p_hom*)
