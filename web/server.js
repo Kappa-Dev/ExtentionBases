@@ -30,11 +30,12 @@ let ws_server = function({on_connect}) {
 
   let handle = null;
 
-  let send = (type,data) => {
+  let send = (_type,_data=null) => {
     try {
-      let msg = data ? JSON.stringify({type,data}) : JSON.stringify({type:'log',data:type});
+      let [type,data] = (_data===null) ? ['log',_type] : [_type,_data];
+      let msg = JSON.stringify({type,data});
       handle && handle.send(msg);
-      console.log('sent message');
+      console.log('Sent: ['+type+'] '+ data.substring(0,40) + (data.length < 40 ? "" : "..."));
     } catch(e) {
       if (e.message == 'not opened') {} else { throw e; }
     }
