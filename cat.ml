@@ -62,6 +62,8 @@ module Make (Node:Node.NodeType) =
 
     type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
 
+    let flat f = match f.maps with [_] -> true | _ -> false
+
     let fold_arrow ars =
       let ar = List.hd ars.maps in
       Hom.fold (fun u v cont -> (Node.id u, Node.id v)::cont) ar []
@@ -297,27 +299,17 @@ module Make (Node:Node.NodeType) =
 	{src = src ; trg = trg ; maps = maps ; partial = f.partial || f'.partial}
 
     let compose f f' =
-      let maps =
-	List.fold_left
-	  (fun maps hom ->
-	    let hom_ext_list =
-	      List.fold_left
-	        (fun maps hom' ->
-		  try
-		    (Hom.compose hom hom')::maps
-		  with
-		    Hom.Not_injective -> maps
-	        ) maps f'.maps
-	    in
-	    hom_ext_list@maps
-	  ) [] f.maps
-      in
-      if maps = [] then raise Undefined
-      else
-	{src = f'.src ;
-	 trg = f.trg ;
-	 maps = maps;
-         partial = f.partial || f'.partial}
+      try
+        assert (flat f && flat f') ;
+        let hom = List.hd f.maps in
+        let hom' = List.hd f'.maps in
+        {src = f'.src ;
+         trg = f.trg ;
+         maps = [Hom.compose hom hom'];
+         partial = f.partial || f'.partial
+        }
+      with
+        Hom.Not_injective | Hom.Not_structure_preserving -> raise Undefined
 
 
     let eq_class matching f auto =
@@ -488,6 +480,7 @@ module Make (Node:Node.NodeType) =
                 (fun sup' v ->
                   try
                     let v' = Hom.find v hom_uu_sup in
+                    let sup' = Graph.add_node v' sup' in
                     Graph.add_edge ~weak:true u_sup v' sup'
                   with
                     Not_found -> sup'

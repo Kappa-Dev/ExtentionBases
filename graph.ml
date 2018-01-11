@@ -149,6 +149,7 @@ module Make (Node:Node.NodeType) =
 	{g with nodes = NodeSet.add u g.nodes ; idmap = idmap'}
 
     let add_edge ?(weak=false) u v g =
+      assert (has_node u g && has_node v g) ;
       if has_edge u v g then g
       else
 	let bu = bound_to u g in
