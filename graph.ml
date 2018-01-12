@@ -149,6 +149,7 @@ module Make (Node:Node.NodeType) =
 	{g with nodes = NodeSet.add u g.nodes ; idmap = idmap'}
 
     let add_edge ?(weak=false) u v g =
+      assert (has_node u g && has_node v g) ;
       if has_edge u v g then g
       else
 	let bu = bound_to u g in
@@ -215,23 +216,22 @@ module Make (Node:Node.NodeType) =
 
     exception Found of string
     let is_equal g h =
-      if (size_node g = size_node h) && (size_edge g = size_edge h) then
+      (*if (size_node g = size_node h) && (size_edge g = size_edge h) then*)
 	try
           fold_nodes
             (fun u () ->
-              if has_node u h then () else raise Exit
+              if has_node u h then () else (print_string (Node.to_string u) ; flush stdout  ; raise Exit)
             ) g () ;
           fold_edges
             (fun u v () ->
               if has_edge u v h then ()
-              else raise (Found ((Node.to_string u)^","^(Node.to_string v)))
+              else (print_string "or here\n" ; flush stdout  ; raise Exit)
             ) g () ;
           true
         with
           Exit -> false
-        | Found s -> print_endline s ; false
-      else
-        false
+     (* else
+        (Printf.printf "(%d,%d) and (%d,%d)\n" (size_node g) (size_node h) (size_edge g) (size_edge h) ; flush stdout ; false)*)
 
     let connected_components g =
       let ccmap,ccsize =
