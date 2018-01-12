@@ -12,9 +12,13 @@ type command =
   | Build of string*string
   | Load of string
   | Output of bool
+  | Shell of string * string array
   | Exit
+  | Reset
 
 let ws = skip_while (function ' ' -> true | _ -> false)
+let ws1 = take_while1 (function ' ' -> true | _ -> false)
+
 
 let inst name alt ret =
   string name *> ws *>
@@ -29,6 +33,21 @@ let exit_p = inst "exit" [] (fun _ -> Exit)
 
 let list_parser p = char '[' *> ws *> sep_by (ws *> (char ';') *> ws) p <* ws <* char ']'
 let number = take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> int_of_string s
+
+let arg = take_while1 (function ' ' -> false | _ -> true)
+let args_parser = sep_by ws1 arg
+
+let shell = char '!' *> args_parser >>| function
+            | arg::tl as l ->
+               let args = Array.make (List.length l) ""
+               in
+               let _ =
+                 List.fold_left
+                   (fun i argument -> args.(i) <- argument ; i+1
+                   ) 0 l
+               in
+               Shell (arg,args)
+            | [] -> Shell ("",Array.make 0 "")
 
 let tuple elt_parser ret =
   char '(' *> ws *> elt_parser >>= fun elt1 ->
@@ -57,8 +76,9 @@ let build =
   string "build" *> ws *> tuple name (fun (x,y) -> Build (x,y))
 
 
-let global p = p <* end_of_input
+let global p = ws *> p <* end_of_input
+let reset = string "reset" *> ws *> return Reset
 
-let line = choice (List.map global [mode legal_modes; add; debug ; add_named; list; build ; load ; output legal_output ; exit_p])
+let line = choice (List.map global [mode legal_modes; add; debug ; add_named; list; build ; load ; output legal_output ; exit_p ; shell ;reset])
 
 let parse = parse_string line

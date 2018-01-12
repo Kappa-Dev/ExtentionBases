@@ -188,7 +188,13 @@ let rec process_command env = function
      output env ;
      env
   | Parser.Exit -> log "exiting" ; exit 0
-
+  | Parser.Reset -> empty
+  | Parser.Shell (inst,args) ->
+     let pid = Unix.fork () in
+     if pid = 0 then Unix.execvp inst args
+     else
+       let _ = Unix.wait () in
+       env
   | Parser.Load file ->
      let run_line acc lineno line = match Parser.parse line with
        | Result.Ok command -> (match command with
@@ -201,7 +207,7 @@ let rec process_command env = function
           log (Printf.sprintf "Parse error at line %d" lineno);
           None
      in
-     each_line file run_line env 
+     each_line file run_line env
 
   let interactive debug =
     let rec session env =
@@ -214,7 +220,7 @@ let rec process_command env = function
        ignore (LNoise.history_add line);
        (match Parser.parse line with
         | Result.Ok command ->
-          session (process_command env command)
+           (try session (process_command env command) with exn -> log (Printexc.to_string exn) ; session env)
         | Result.Error s -> log ("Parse error "^s); session env);
     )
     in
