@@ -387,7 +387,7 @@ module Make (Node:Node.NodeType) =
 
     let is_iso f =
       let l = f.src --> f in
-      if List.exists (fun trg -> Graph.is_equal trg f.trg) l then
+      if List.for_all (fun trg -> Graph.is_equal trg f.trg) l then
         true
       else
         (Printf.printf "Not iso : %s <> %s\n" (Graph.to_string (List.hd l)) (Graph.to_string f.trg) ;
