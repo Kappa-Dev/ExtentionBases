@@ -214,24 +214,22 @@ module Make (Node:Node.NodeType) =
     let max_id g =
       fold_nodes (fun u max -> if Node.id u > max then Node.id u else max) g 0
 
-    exception Found of string
     let is_equal g h =
-      (*if (size_node g = size_node h) && (size_edge g = size_edge h) then*)
-	try
-          fold_nodes
-            (fun u () ->
-              if has_node u h then () else (print_string (Node.to_string u) ; flush stdout  ; raise Exit)
-            ) g () ;
-          fold_edges
-            (fun u v () ->
-              if has_edge u v h then ()
-              else (print_string "or here\n" ; flush stdout  ; raise Exit)
-            ) g () ;
-          true
-        with
-          Exit -> false
-     (* else
-        (Printf.printf "(%d,%d) and (%d,%d)\n" (size_node g) (size_node h) (size_edge g) (size_edge h) ; flush stdout ; false)*)
+      g.size = h.size &&
+      try
+        fold_edges
+          (fun u v () ->
+            if has_edge u v h then ()
+            else raise Exit
+          ) g () ;
+        fold_edges
+          (fun u v () ->
+            if has_edge u v g then ()
+            else raise Exit
+          ) h () ;
+        true
+      with
+        Exit -> false
 
     let connected_components g =
       let ccmap,ccsize =

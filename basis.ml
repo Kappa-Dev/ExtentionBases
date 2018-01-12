@@ -287,7 +287,13 @@ module Make (Node:Node.NodeType) =
               let iso_to_base = Cat.is_iso sh_to_base in
               if iso_to_w then
                 if iso_to_base then
-                  (Iso (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Iso: w (<)--> i *)
+                  (if db() then
+                     Printf.printf
+                       "Trying to compose obs_emb : %s o %s \n"
+                       (Cat.string_of_arrows ~full:true sh_to_base)
+                       (Cat.string_of_arrows ~full:true (Cat.invert sh_to_w)) ;
+                   (Iso (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Iso: w (<)--> i *)
+                  )
                 else
                   (Below (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Below wit -> i*)
               else

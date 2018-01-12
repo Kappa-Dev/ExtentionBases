@@ -144,7 +144,6 @@ let rec process_command env = function
      raise (Change_shape s)
   | Parser.Debug ->
      begin
-       log "Toggling debug mode";
        debug_mode () ;
        Printexc.record_backtrace (db());
        env
@@ -202,7 +201,7 @@ let rec process_command env = function
           log (Printf.sprintf "Parse error at line %d" lineno);
           None
      in
-     try each_line file run_line env with exn -> log (Printexc.to_string exn); output env ; env
+     each_line file run_line env 
 
   let interactive debug =
     let rec session env =

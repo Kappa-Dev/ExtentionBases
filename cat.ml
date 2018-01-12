@@ -380,11 +380,7 @@ module Make (Node:Node.NodeType) =
     let is_iso f =
       assert (flat f) ;
       let trg = List.hd (f.src --> f) in
-      if Graph.is_equal trg f.trg then
-        true
-      else
-        (Printf.printf "Not iso : %s <> %s\n" (Graph.to_string trg) (Graph.to_string f.trg) ;
-         false)
+      Graph.is_equal trg f.trg
 
     let invert f =
       let f' = {src = f.trg ;
