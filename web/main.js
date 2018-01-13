@@ -112,7 +112,7 @@ let init = (cyd_basis,cyd_graphs) => {
         }
         }
       ],
-      layout: { name: 'cose-bilkent'},
+      layout: { name: 'cose-bilkent', animate: false},
       userZoomingEnabled: false,
     });
 
@@ -128,6 +128,8 @@ let init = (cyd_basis,cyd_graphs) => {
       elements:cyd_basis.elements,
       autoungrabify: true,
       autounselectify: true,
+      maxZoom: 1.8,
+      minZoom: 0.4,
 
       style: [ // the stylesheet for the graph
       {
@@ -198,25 +200,24 @@ cy_basis.collection('edge').on('mouseover', evt => evt.target.addClass('hover'))
 
 cy_basis.collection('edge').on('mouseout', evt => evt.target.removeClass('hover'));
 
+adjust = (zoom) => {
+  let wHeight = window.innerHeight;
+  let wWidth = window.innerWidth;
 
-};
+  _.each(cy_graphs, (g,id) => {
 
-document.addEventListener('DOMContentLoaded', function() {
+    let host_node = cy_basis.nodes('#'+id);
+    if (host_node.length == 0) {
+      return;
+    }
+    let pos = host_node.renderedPosition(),
+    w = host_node.renderedWidth(),
+    h = host_node.renderedHeight();
 
-
-function step2(ts) {
-
-  if (window.cy_graphs) {
-
-    _.each(cy_graphs, (g,id) => {
-      //let id = g.graph().id;
-      let host_node = cy_basis.nodes('#'+id);
-      if (host_node.length == 0) {
-        return;
-      }
-      let pos = host_node.renderedPosition(),
-      w = host_node.renderedWidth(),
-      h = host_node.renderedHeight();
+    // We don't use is_contained for now because it uses the positions
+    // *before* the zoom; so we are left with dangling midpoints on the
+    // side of the screen. FIXME
+    if (true || is_contained(wHeight,wWidth,pos.x,pos.y,w,h)) {
 
       //ccy.zoom({level:cy.zoom(),renderedPosition:{x:pos.x-w/2, y:pos.y-h/2}});
       g.container().style.left = pos.x - w/2;
@@ -224,26 +225,36 @@ function step2(ts) {
       g.container().style.width = w;
       g.container().style.height = h;
 
-      // Somehow doing resize() before fit() makes everything faster (fit() alone is slow)
-      g.resize();
-      g.center();
-      g.fit(0.05*w);
+      if (zoom) {
+        // Somehow doing resize() before fit() makes everything faster (fit() alone is slow)
+        g.resize();
+        g.center();
+        g.fit(0.05*w);
+        // Old method to rezoom fast was
+        //  g.zoom({level:cy_basis.zoom(),renderedPosition:{x:0,y:0}}); // fast
+        //  imperfect but this was incorrect: this assumed the initial zoom level
+        //  (to fit the default 200px * 200px box for inner graphs) was 1. So if
+        //  I go this route again, I need to store, for each inner graph g, their
+        //  initial zoom level z_g and then if cy_basis has zoom level z, I give
+        //  g the zoom level z * z_g.
+      }
+    }
+  });
+};
 
-      // Old method to rezoom fast was
-      //  g.zoom({level:cy_basis.zoom(),renderedPosition:{x:0,y:0}}); // fast
-      //  imperfect but this was incorrect: this assumed the initial zoom level
-      //  (to fit the default 200px * 200px box for inner graphs) was 1. So if
-      //  I go this route again, I need to store, for each inner graph g, their
-      //  initial zoom level z_g and then if cy_basis has zoom level z, I give
-      //  g the zoom level z * z_g.
-
-    });
-  }
-
-  window.requestAnimationFrame(step2);
-}
-
-
-window.requestAnimationFrame(step2);
-
+cy_basis.on('pan', () => {
+  adjust(false);
 });
+
+cy_basis.on('zoom', () =>  {
+  adjust(true);
+});
+
+adjust(true);
+};
+
+
+// Performance links for later:
+// https://github.com/cytoscape/cytoscape.js/blob/master/documentation/md/performance.md
+// https://github.com/cytoscape/cytoscape.js/issues/292
+// Idea for later performance: detect for each if
