@@ -47,28 +47,19 @@ module Make (Node:Node.NodeType) =
     let (|>) = Cat.(|>)
 
   let simple_tests () =
-      let one = graph_of_library "one" in
-      let square = graph_of_library "square" in
-      let open_square = graph_of_library "osquare" in
-      List.iter (fun g -> if Graph.is_connex g then print_string "true\n" else print_string "false\n")
-                [one;square;open_square; Graph.sum one one] ;
-      let f_list = Cat.flatten (Cat.extension_class (one => open_square)) in
-      let g_list = Cat.flatten (Cat.extension_class (one => square)) in
-      let f = List.hd (List.filter (fun f -> Cat.is_identity f) f_list) in
-      let g = List.hd (List.filter (fun f -> Cat.is_identity f) g_list) in
-      let sharing = Cat.share f g in
-      List.iter
-        (fun (sh,tile) ->
-          Printf.printf "(square <-- one --> osquare) %s:\n" (Cat.string_of_arrows sh) ;
-          print_string (Cat.string_of_tile tile) ;
-          print_newline() ;
-        ) sharing
-    (*print_string "square |> one one\n" ;
-      List.iter (fun tile ->
-		 let emb = Cat.arrows_of_tile tile in
-		 Printf.printf "%s:\n %s\n" (Cat.string_of_arrows emb) (Cat.string_of_tile tile)
-		) (square |> (Graph.sum one one))
-     *)
+    let square = graph_of_library "square" in
+    let triangle = graph_of_library "triangle" in
+    let tiles = square |> triangle in
+    List.iter (fun tile ->
+	Printf.printf "%s\n" (Cat.string_of_tile tile)
+      ) tiles ;
+    print_newline() ;
+    let house = graph_of_library "house" in
+    let tiles = square |> house in
+    List.iter (fun tile ->
+	Printf.printf "%s\n" (Cat.string_of_tile tile)
+      ) tiles
+
 
 type t = {model : Model.t ; show_positive : bool ; eb : (EB.t * EB.t) option ; rule : (string * string) option}
 let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None}
@@ -145,7 +136,6 @@ let rec process_command env = function
   | Parser.Debug ->
      begin
        debug_mode () ;
-       Printexc.record_backtrace (db());
        env
      end
   | Parser.List ->

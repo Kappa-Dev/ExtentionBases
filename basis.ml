@@ -58,10 +58,9 @@ module Make (Node:Node.NodeType) =
                     "%d [label=\"%d [obs: %s]\" , shape = \"%s\"];" i
                     i
                     (String.concat ","
-                                   (List.map (fun (emb,x) ->
-                                              (Cat.string_of_arrows ~nocolor:true emb)
-                                              ^","^(Lib.Dict.to_name x dict)
-                                             ) ol))
+                       (List.map (fun (_,x) ->
+                            Lib.Dict.to_name x dict
+                          ) ol))
                     (if Lib.IntMap.is_empty p.next then "rectangle" else "oval")
              in
              let str2 =
