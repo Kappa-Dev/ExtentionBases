@@ -187,17 +187,6 @@ module Make (Node:Node.NodeType) =
         in
         replace i pi ext_base
 
-      type sharing_info = {to_w : Cat.arrows ;
-                           to_base : Cat.arrows ;
-                           to_midpoint : Cat.arrows ;
-                           has_sup : bool}
-      type comparison =
-        Iso of Cat.arrows
-        | Below of Cat.arrows
-        | Above of Cat.arrows
-        | Incomp of sharing_info
-        | Conflicting
-
       let remove_step i j ext_base =
         let pi = find i ext_base in
         let _ = if db() then
@@ -250,6 +239,18 @@ module Make (Node:Node.NodeType) =
           replace i
                   {pi with next = Lib.IntMap.add j emb_ij pi.next}
                   {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
+
+      type sharing_info = {to_w : Cat.arrows ;
+                           to_base : Cat.arrows ;
+                           to_midpoint : Cat.arrows ;
+                           has_sup : bool}
+      type comparison =
+        Iso of Cat.arrows
+        | Below of Cat.arrows
+        | Above of Cat.arrows
+        | Incomp of sharing_info
+        | Conflicting
+
 
       let compare inf_to_i inf_to_w ext_base =
         if db() then
@@ -313,7 +314,6 @@ module Make (Node:Node.NodeType) =
 
 
       exception Found_iso of (Cat.arrows * int)
-
 
       let rec progress ext_base actions visited best_inf next_layer todo =
         (************* DEBUGING INFO ***************)

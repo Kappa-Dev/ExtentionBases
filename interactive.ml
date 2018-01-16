@@ -147,7 +147,7 @@ let rec process_command env = function
   | Parser.Build (l,r) ->
      (try
         log (Printf.sprintf "Generating extension basis for rule %s -> %s" l r);
-        let env = {env with rule = Some (l,r)} in
+        let env = {env with rule = Some (l,r) ; eb = None} in
         let env = build_base env in
         output env ;
         env
