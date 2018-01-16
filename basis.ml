@@ -17,6 +17,7 @@ module Make (Node:Node.NodeType) =
 
       let (-->) = Cat.(-->)
       let (|/) = Cat.(|/)
+      let (=~=) = Cat.(=~=)
 
       type arrows = Cat.arrows
       type obj = Cat.obj
@@ -313,7 +314,7 @@ module Make (Node:Node.NodeType) =
              ) [] lcomp
 
 
-      exception Found_iso of (Cat.arrows * int)
+      exception Found_iso of Cat.arrows * int
 
       let rec progress ext_base actions visited best_inf next_layer todo =
         (************* DEBUGING INFO ***************)
@@ -346,14 +347,24 @@ module Make (Node:Node.NodeType) =
                   end
         in
         (************* DEBUGING INFO ***************)
-        let update_best_inf ?(force=true) i triple m =
-          (*not a midpoint just before reaching i*)
-          (*or the first intersection between i and w*)
-          if force || not (Lib.IntMap.mem i m) then
-            (*TODO: deal here with mutliple incomparable infs*)
-            Lib.IntMap.add i [triple] m
-          else
-            m
+        let update_best_inf i (root_to_inf,inf,inf_to_i,inf_to_w) m =
+          let cut = try Lib.IntMap.find i m with Not_found -> [] in
+          let cut' =
+            List.fold_left
+              (fun cut (root_to_mp,mp,mp_to_i,mp_to_w) ->
+                if root_to_mp =~= root_to_inf then
+                  match Cat.share root_to_mp root_to_inf with
+                    (_,sh_tile)::_ ->
+                     let (to_mp,to_inf) = Cat.lower_bound sh_tile
+                     in
+                     assert (Cat.is_iso to_mp && Cat.is_iso to_inf) ;
+                     raise (Found_iso (to_mp @@ (Cat.invert to_inf), mp))
+                  | _ -> failwith "invariant violation"
+                else
+                  (root_to_mp,mp,mp_to_i,mp_to_w)::cut
+              ) [] cut
+          in
+          Lib.IntMap.add i cut' m
         in
         let get_best_inf i m =
           try
@@ -371,7 +382,7 @@ module Make (Node:Node.NodeType) =
            let inf_list = get_best_inf k best_inf in
            let actions',visited',best_inf',next_layer',todo' =
              List.fold_left
-               (fun (actions,visited,best_inf,next_layer,todo) (ext_inf_k,inf,ext_inf_w) ->
+               (fun (actions,visited,best_inf,next_layer,todo) (root_to_inf,ext_inf_k,inf,ext_inf_w) ->
                 let ext_inf_i = step_ki @@ ext_inf_k in
                 let _ = if db() then Printf.printf "Visiting (%d --> %d |-> %d )\n" inf k i in
                 List.fold_left
@@ -392,7 +403,7 @@ module Make (Node:Node.NodeType) =
                      let actions' =
                        (fun w ext_base best_inf -> add_conflict i w ext_base)::actions
                      in
-                     let best_inf' = update_best_inf i (ext_inf_i,inf,ext_inf_w) best_inf in
+                     let best_inf' = update_best_inf i (root_to_inf,ext_inf_i,inf,ext_inf_w) best_inf in
                      let visited' = Lib.IntSet.add i visited in
                      (actions',visited',best_inf',next_layer',todo)
 

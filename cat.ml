@@ -40,6 +40,7 @@ module type Category =
     val (|/) : arrows -> arrows -> (arrows * arrows) list
     val (===) : arrows -> arrows -> bool
     val (-->) : obj -> arrows -> obj list
+    val (=~=) : arrows -> arrows -> bool
 
     (**Exceptions*)
     exception Undefined
@@ -597,7 +598,7 @@ module Make (Node:Node.NodeType) =
         Undefined -> false
       | Exit -> true
 
-    let (^~^) = fun f g -> is_ext_equal f g
+    let (=~=) = fun f g -> is_ext_equal f g
 
 
     let share f g =
@@ -633,7 +634,7 @@ module Make (Node:Node.NodeType) =
       in
       List.fold_left
         (fun cont (f,tile) ->
-         if List.for_all (fun (f',_) -> (not (f ^~^ f'))) cont
+         if List.for_all (fun (f',_) -> (not (f =~= f'))) cont
          then (f,tile)::cont
          else cont
         ) [] sh_tiles
@@ -677,7 +678,7 @@ module Make (Node:Node.NodeType) =
              assert (Graph.is_equal left_to_sup.src left_to_sup'.src
                      && Graph.is_equal right_to_sup.src right_to_sup'.src) ;
 
-           if obs_right then (left_to_sup  ^~^ left_to_sup') else (right_to_sup  ^~^ right_to_sup')
+           if obs_right then (left_to_sup  =~= left_to_sup') else (right_to_sup  =~= right_to_sup')
         in
         List.fold_left
           (fun cont (f,tile) ->
