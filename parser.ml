@@ -27,6 +27,7 @@ let inst name alt ret =
 
 let mode mlist = inst "mode" mlist (fun x -> Mode x)
 let load = inst "load" [] (fun x -> Load x)
+
 let output olist = inst "output" olist (fun x -> Output (if x="positive" then true else false))
 
 let exit_p = inst "exit" [] (fun _ -> Exit)
@@ -79,6 +80,17 @@ let build =
 let global p = ws *> p <* end_of_input
 let reset = string "reset" *> ws *> return Reset
 
-let line = choice (List.map global [mode legal_modes; add; debug ; add_named; list; build ; load ; output legal_output ; exit_p ; shell ;reset])
+let line = choice
+             (List.map global [mode legal_modes;
+                               add;
+                               debug ;
+                               add_named;
+                               list;
+                               build ;
+                               load ;
+                               output legal_output ;
+                               exit_p ;
+                               shell ;
+                               reset])
 
 let parse = parse_string line

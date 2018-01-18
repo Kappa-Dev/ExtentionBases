@@ -145,16 +145,11 @@ let rec process_command env = function
      log (String.concat "\n" (proj_right (Model.list env.model))) ;
      env
   | Parser.Build (l,r) ->
-     (try
-        log (Printf.sprintf "Generating extension basis for rule %s -> %s" l r);
-        let env = {env with rule = Some (l,r) ; eb = None} in
-        let env = build_base env in
-        output env ;
-        env
-      with Not_found ->
-        log "Unrecognized rule shapes" ;
-        env
-     )
+     log (Printf.sprintf "Generating extension basis for rule %s -> %s" l r);
+     let env = {env with rule = Some (l,r) ; eb = None} in
+     let env = build_base env in
+     output env ;
+     env
   | Parser.Add v ->
      if Lib.StringMap.mem v Node.library then
        let graph = graph_of_library v in
@@ -201,7 +196,9 @@ let rec process_command env = function
 
   let interactive debug =
     let rec session env =
-    (match (LNoise.linenoise "> ") with
+      let _ = Unix.waitpid [Unix.WNOHANG] in
+      let prompt () = if db() then "db> " else "> " in
+      (match (LNoise.linenoise (prompt debug)) with
      | None ->
        log "Attempting to save session history";
        ignore (LNoise.history_save histfile);
@@ -210,19 +207,12 @@ let rec process_command env = function
        ignore (LNoise.history_add line);
        (match Parser.parse line with
         | Result.Ok command ->
-           (try session (process_command env command) with exn -> log (Printexc.to_string exn) ; session env)
+           if db() then session (process_command env command)
+           else
+             (try session (process_command env command) with exn -> log (Printexc.to_string exn) ; session env)
         | Result.Error s -> log ("Parse error "^s); session env);
     )
     in
-    (*let pid = Unix.fork () in
-    if pid = 0 then (*child process*)
-      try
-        Unix.execvp "node" [|"web/server.js"|]
-      with
-        exn -> log (Printexc.to_string exn)
-    else (*parent process*)
-      session Model.empty
-     *)
     session empty
   end:InteractiveType)
 

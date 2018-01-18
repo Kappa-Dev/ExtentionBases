@@ -224,9 +224,18 @@ module Make (Node:Node.NodeType) =
         with
           Exit -> true
 
-      let add_step ?(check=false) i j emb_ij ext_base =
+      let add_step ?(check=false) ?(aliases=Lib.IntMap.empty) i j emb_ij ext_base =
         if db() then Printf.printf "Checking whether step %d |-> %d should be added\n" i j ;
-        let ext_base = if i <> 0 then remove_step 0 j ext_base else ext_base
+        let j,emb_ij =
+          try
+            let j_to_k,k = Lib.IntMap.find j aliases in
+            let () = if db() then Printf.printf "Aliasing %d |-> %d to %d |-> %d\n " i j i k
+            in
+            (k,j_to_k @@ emb_ij)
+          with
+            Not_found -> (j,emb_ij)
+        in
+        let ext_base = if i <> 0 then remove_step 0 j ext_base else ext_base (*This is weird, not the general case...*)
         in
         if (check && is_below i j ext_base) then ext_base
         else
@@ -349,11 +358,14 @@ module Make (Node:Node.NodeType) =
         (************* DEBUGING INFO ***************)
         let update_best_inf ?(replace_if_found=true) i (root_to_inf,inf_to_i,inf,inf_to_w as new_inf) m a =
           try
+            let _ = if db() then Printf.printf "Adding %d as best inf for %d...\n" inf i in
             let cut = try Lib.IntMap.find i m with Not_found -> [] in
             let cut',aliasing_opt =
               List.fold_left
                 (fun (cut,aliasing_opt) (root_to_mp,_,mp,_ as old_inf) ->
                   if mp = inf then
+                    let () = if db() then Printf.printf "%d already present\n" inf ; flush stdout ;
+                    in
                     raise Exit (*to avoid auto aliasing*)
                   else
                       if root_to_mp =~= root_to_inf then
@@ -363,8 +375,11 @@ module Make (Node:Node.NodeType) =
                            in
                            assert (Cat.is_iso to_mp && Cat.is_iso to_inf) ;
                            if replace_if_found then
+                             let () = if db() then Printf.printf "aliasing %d (replaced) -> %d \n" mp inf
+                             in
                              (new_inf::cut, Some (mp, to_inf @@ (Cat.invert to_mp), inf)) (* (old_inf -~-> new_inf, old_inf) *)
                            else
+                             let () = if db() then Printf.printf "aliasing %d (not inserted) -> %d \n" inf mp in
                              (old_inf::cut, Some (inf, to_mp @@ (Cat.invert to_inf), mp)) (* (new_inf -~-> old_inf, old_inf) *)
                         | _ -> failwith "invariant violation"
                       else
@@ -414,7 +429,7 @@ module Make (Node:Node.NodeType) =
                            aliases
                        in
                        let dry_run' =
-                         (fun w ext_base _ _ -> add_conflict i w ext_base)::dry_run
+                         (fun w ext_base _ -> add_conflict i w ext_base)::dry_run
                        in
 
                        let next_layer' =
@@ -444,8 +459,8 @@ module Make (Node:Node.NodeType) =
                             aliases
                         in
                         let dry_run' =
-		          ((fun w ext_base _ _ ->
-                            remove_step inf i (add_step w i w_to_i ext_base)
+		          ((fun w ext_base _ ->
+                            remove_step inf i (add_step w i w_to_i ext_base) (*no check and no aliasing necessary here*)
                            )::dry_run)
                         in
                         let visited' = Lib.IntSet.add i visited in
@@ -513,7 +528,7 @@ module Make (Node:Node.NodeType) =
                           in
                           let dry_run' =
                             if not sh_info.has_sup then
-                              (fun w ext_base _ _ -> add_conflict i w ext_base)::dry_run
+                              (fun w ext_base  _ -> add_conflict i w ext_base)::dry_run
                             else
                               dry_run
 		          in
@@ -538,46 +553,29 @@ module Make (Node:Node.NodeType) =
                                             aliases
                           in
                           let dry_run' =
-                            (fun w ext_base best_inf aliases ->
-                              if not (Lib.IntMap.mem fresh_id aliases) then (*fresh_id is still the best inf*)
-                                let () =
-                                  if db() then
-                                    Printf.printf
-                                      "\t midpoint %d is still the best predecessor of witness %d wrt %d\n"
-                                      fresh_id w i
-                                in
-                                let mp = point (Cat.trg sh_info.to_midpoint) in
-                                let ext_base =
-                                  try
+                            (fun w ext_base aliases ->
+                              let skip_midpoint = Lib.IntMap.mem fresh_id aliases in
+                              let ext_base =
+                                if skip_midpoint then ext_base
+                                else
+                                  let mp = point (Cat.trg sh_info.to_midpoint) in
+                                  let ext_base =
                                     add fresh_id
                                       mp
                                       (sh_info.to_midpoint @@ (find_extension inf ext_base))
                                       ext_base
-                                  with Cat.Undefined ->
-                                    (Printf.printf "Cannot compose %s and %s"
-                                       (Cat.string_of_arrows ~full:true (find_extension inf ext_base))
-                                       (Cat.string_of_arrows ~full:true sh_info.to_midpoint) ; flush stdout ;
-                                     failwith "Invariant violation"
-                                    )
-                                in
-                                let ext_base = add_step inf fresh_id sh_info.to_midpoint ext_base in
-                                let ext_base = add_step fresh_id i sh_info.to_base ext_base in
-		                let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
-                                remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
-                              else
-                                let () =
-                                  if db() then
-                                    let ids =
-                                      String.concat
-                                        ","
-                                        (List.fold_left (fun cont (_,id,_) -> (string_of_int id)::cont) [] inf_list)
-                                    in
-                                    Printf.printf
-                                      "\t midpoint %d is no longer the best predecessor ({%s}) of witness %d wrt %d\n" fresh_id ids w i
-                                in
-                               (*TODO compute and add step inf |-> id (requires knowning the best intersection between inf and id)*)
-                               (*However not adding all possible sharings implies that not all best inf will be isomorphic*)
-                               ext_base
+                                  in
+                                  add_step fresh_id i sh_info.to_base ext_base
+                              in
+                              (*adding step from inf to midpoint or its alias (in this case verify that inf is not already below the alias*)
+                              let ext_base =
+                                add_step
+                                  ~check:skip_midpoint
+                                  ~aliases:aliases
+                                  inf fresh_id sh_info.to_midpoint ext_base
+                              in
+		              let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
+                              remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
                             )::dry_run
                           in
 		          (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',next_layer',todo)
@@ -590,17 +588,18 @@ module Make (Node:Node.NodeType) =
         let p0 = find 0 ext_base in
         let id_0 = Cat.identity p0.value p0.value in
         try
-          let best_inf_0 = Lib.IntMap.add 0 [(id_0,0,ext_w)] Lib.IntMap.empty in
+          let best_inf_0 = Lib.IntMap.add 0 [(id_0,id_0,0,ext_w)] Lib.IntMap.empty in
           let todo_0 = [(0,id_0,0)] in
           let best_inf,aliases,dry_run = progress ext_base [] Lib.IntSet.empty best_inf_0 Lib.IntMap.empty [] todo_0 in
 
+          
           (* 1. Adding witness point *)
           let w = get_fresh ext_base in
           let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ; flush stdout in
           let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
           let ext_base = add_obs w obs_emb obs_id ext_base in
           (* 2. Executing dry run, i.e inserting midpoints *)
-          let ext_base = List.fold_left (fun ext_base act -> act w ext_base best_inf) ext_base (List.rev dry_run) in
+          let ext_base = List.fold_left (fun ext_base act -> act w ext_base aliases) ext_base (List.rev dry_run) in
 
           (* 3. Connecting witness w to its best predecessors in the base*)
           let ext_base = Lib.IntSet.fold
@@ -613,14 +612,16 @@ module Make (Node:Node.NodeType) =
                                                  ("Invariant violation: best_inf not defined for point "^(string_of_int i))
                               in
                               List.fold_left
-                                (fun ext_base (_,inf,inf_to_w) ->
+                                (fun ext_base (_,_,inf,inf_to_w) ->
                                  let () =
                                    if db() then print_string
                                                   (blue (Printf.sprintf
                                                            "\t Adding best inf %d for %d and witness %d\n" inf i w)
                                                   ) ; flush stdout
                                  in
-                                 add_step ~check:true inf w inf_to_w ext_base
+                                 (*no need to check aliasing since best_inf should only contain inf to be kept*)
+                                 try add_step ~check:true inf w inf_to_w ext_base with
+                                   Not_found -> (failwith (Printf.sprintf "Point %d (best inf for %d) is no longer in the base\n" inf i))
                                 ) ext_base inf_list
                            ) ext_base.max_elements ext_base
           in
