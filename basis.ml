@@ -225,7 +225,10 @@ module Make (Node:Node.NodeType) =
           Exit -> true
 
       let add_step ?(check=false) ?(aliases=Lib.IntMap.empty) i j emb_ij ext_base =
-        if db() then Printf.printf "Checking whether step %d |-> %d should be added\n" i j ;
+        if db() then
+          (assert (not (Lib.IntMap.mem i aliases)) ;
+           Printf.printf "Checking whether step %d |-> %d should be added\n" i j
+          ) ;
         let j,emb_ij =
           try
             let j_to_k,k = Lib.IntMap.find j aliases in
@@ -235,7 +238,9 @@ module Make (Node:Node.NodeType) =
           with
             Not_found -> (j,emb_ij)
         in
-        let ext_base = if i <> 0 then remove_step 0 j ext_base else ext_base (*This is weird, not the general case...*)
+        let ext_base =
+          if i <> 0 then remove_step 0 j ext_base
+          else ext_base (*This is weird, not the general case...*)
         in
         if (check && is_below i j ext_base) then ext_base
         else
@@ -261,6 +266,12 @@ module Make (Node:Node.NodeType) =
         | Incomp of sharing_info
         | Conflicting
 
+      let string_of_comparison = function
+          Iso _ -> "Iso"
+        | Below _ -> "Below"
+        | Above _ -> "Above"
+        | Incomp _ -> "Incomp"
+        | Conflicting -> "Conflict"
 
       let compare inf_to_i inf_to_w ext_base =
         if db() then
@@ -279,7 +290,7 @@ module Make (Node:Node.NodeType) =
                       )
            in
            (*let lcomp = [List.hd lcomp] in*)
-
+           let lcomp =
            List.fold_left
              (fun cont (inf_to_sh,sharing_tile) ->
               let sh_to_base,sh_to_w = Cat.lower_bound sharing_tile in
@@ -297,13 +308,12 @@ module Make (Node:Node.NodeType) =
               let iso_to_base = Cat.is_iso sh_to_base in
               if iso_to_w then
                 if iso_to_base then
-                  (if db() then
-                     Printf.printf
-                       "Trying to compose obs_emb : %s o %s \n"
-                       (Cat.string_of_arrows ~full:true sh_to_base)
-                       (Cat.string_of_arrows ~full:true (Cat.invert sh_to_w)) ;
-                   (Iso (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Iso: w (<)--> i *)
-                  )
+                  let () = if db() then
+                             assert (
+                                 inf_to_i =~= inf_to_w
+                               )
+                  in
+                  (Iso (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Iso: w (<)--> i *)
                 else
                   (Below (sh_to_base @@ (Cat.invert sh_to_w) ))::cont (*Below wit -> i*)
               else
@@ -321,6 +331,13 @@ module Make (Node:Node.NodeType) =
                                        to_midpoint = inf_to_sh ;
                                        has_sup = true})::cont
              ) [] lcomp
+           in
+           if db() then
+             assert (
+                 List.length lcomp <=1
+                 || List.for_all (function Incomp _ -> true | _ -> false) lcomp
+               ) ;
+           lcomp
 
 
       exception Found_iso of Cat.arrows * int
@@ -392,7 +409,7 @@ module Make (Node:Node.NodeType) =
                 ) ([],None) cut
             in
             match aliasing_opt with
-              None -> let m,a = Lib.IntMap.add i (new_inf::cut) m, a in if db() then (print (m,a) ; print_endline "here") ; (m,a)
+              None -> let m,a = Lib.IntMap.add i (new_inf::cut) m, a in if db() then print (m,a) ; (m,a)
             | Some (k,to_j,j) -> let m,a = (Lib.IntMap.add i cut' m, Lib.IntMap.add k (to_j,j) a) in if db() then print (m,a) ; (m,a)
           with
             Exit -> (m,a)
@@ -597,7 +614,6 @@ module Make (Node:Node.NodeType) =
           let todo_0 = [(0,id_0,0)] in
           let best_inf,aliases,dry_run = progress ext_base [] Lib.IntSet.empty best_inf_0 Lib.IntMap.empty [] todo_0 in
 
-          
           (* 1. Adding witness point *)
           let w = get_fresh ext_base in
           let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ; flush stdout in
