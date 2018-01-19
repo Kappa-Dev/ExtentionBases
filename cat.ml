@@ -33,6 +33,7 @@ module type Category =
     val flatten : arrows -> arrows list
     val extension_class : arrows -> arrows
     val matching_class : arrows -> arrows
+    val equalize : arrows -> arrows -> arrows option
 
     (**Operators*)
     val (@@) : arrows -> arrows -> arrows
@@ -584,21 +585,23 @@ module Make (Node:Node.NodeType) =
       else
         raise Undefined
 
-    let is_ext_equal f f' =
+    exception Found of arrows
+
+    let equalize f f' =
       try
         if Graph.is_equal f.src f'.src then
           let arrows = flatten (f.trg => f'.trg) in
           List.iter
             (fun phi ->
-             if (phi @@ f) === f' then raise Exit
+             if (phi @@ f) === f' then raise (Found phi)
              else ()
-            ) arrows ; false
-        else false
+            ) arrows ; None
+        else None
       with
-        Undefined -> false
-      | Exit -> true
+        Undefined -> None
+      | Found phi -> Some phi
 
-    let (=~=) = fun f g -> is_ext_equal f g
+    let (=~=) = fun f g -> match equalize f g with None -> false | Some _ -> true
 
 
     let share f g =

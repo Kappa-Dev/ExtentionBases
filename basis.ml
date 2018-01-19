@@ -357,6 +357,16 @@ module Make (Node:Node.NodeType) =
         in
         (************* DEBUGING INFO ***************)
         let update_best_inf ?(replace_if_found=true) i (root_to_inf,inf_to_i,inf,inf_to_w as new_inf) m a =
+          let print (m,a) =
+            Lib.IntMap.iter
+              (fun i l ->
+                Printf.printf "Beta(%d):={%s}\n" i (String.concat "," (List.map (fun (f,g,j,h) -> string_of_int j) l))
+              ) m ;
+            Lib.IntMap.iter
+              (fun i (f,j) ->
+                Printf.printf "%d ~> %d\n" i j
+              ) a
+          in
           try
             let _ = if db() then Printf.printf "Adding %d as best inf for %d...\n" inf i in
             let cut = try Lib.IntMap.find i m with Not_found -> [] in
@@ -368,27 +378,22 @@ module Make (Node:Node.NodeType) =
                     in
                     raise Exit (*to avoid auto aliasing*)
                   else
-                      if root_to_mp =~= root_to_inf then
-                        match Cat.share root_to_mp root_to_inf with
-                          (_,sh_tile)::_ ->
-                           let (to_mp,to_inf) = Cat.lower_bound sh_tile
+                      match Cat.equalize root_to_mp root_to_inf with
+                        Some mp_to_inf ->
+                         let () = if db() then Printf.printf "isomorphic best inf detected: %d\n" mp in
+                         if replace_if_found then
+                           let () = if db() then Printf.printf "aliasing %d (replaced) -> %d \n" mp inf
                            in
-                           assert (Cat.is_iso to_mp && Cat.is_iso to_inf) ;
-                           if replace_if_found then
-                             let () = if db() then Printf.printf "aliasing %d (replaced) -> %d \n" mp inf
-                             in
-                             (new_inf::cut, Some (mp, to_inf @@ (Cat.invert to_mp), inf)) (* (old_inf -~-> new_inf, old_inf) *)
-                           else
-                             let () = if db() then Printf.printf "aliasing %d (not inserted) -> %d \n" inf mp in
-                             (old_inf::cut, Some (inf, to_mp @@ (Cat.invert to_inf), mp)) (* (new_inf -~-> old_inf, old_inf) *)
-                        | _ -> failwith "invariant violation"
-                      else
-                        (old_inf::cut,aliasing_opt)
+                           (new_inf::cut, Some (mp, mp_to_inf, inf)) (* (old_inf -~-> new_inf, old_inf) *)
+                         else
+                           let () = if db() then Printf.printf "aliasing %d (not inserted) -> %d \n" inf mp in
+                           (old_inf::cut, Some (inf, Cat.invert mp_to_inf, mp)) (* (new_inf -~-> old_inf, old_inf) *)
+                      | None -> (old_inf::cut,aliasing_opt)
                 ) ([],None) cut
             in
             match aliasing_opt with
-              None -> (Lib.IntMap.add i (new_inf::cut) m, a)
-            | Some (i,to_j,j) -> (Lib.IntMap.add i cut' m, Lib.IntMap.add i (to_j,j) a)
+              None -> let m,a = Lib.IntMap.add i (new_inf::cut) m, a in if db() then (print (m,a) ; print_endline "here") ; (m,a)
+            | Some (k,to_j,j) -> let m,a = (Lib.IntMap.add i cut' m, Lib.IntMap.add k (to_j,j) a) in if db() then print (m,a) ; (m,a)
           with
             Exit -> (m,a)
         in
