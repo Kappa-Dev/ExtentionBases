@@ -5,6 +5,7 @@ module type Category =
     type obj
 
     (**Constructors*)
+    val unit : arrows
     val identity : obj -> obj -> arrows
     val (=>) : obj -> obj -> arrows
     val (|>) : obj -> obj -> tile list
@@ -61,6 +62,7 @@ module Make (Node:Node.NodeType) =
     exception Undefined
 
     type arrows = {src : obj ; trg : obj ; maps : Hom.t list ; partial : bool}
+    let unit = {src = Graph.empty ; trg = Graph.empty ; maps = [] ; partial = false}
 
     type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
 
@@ -589,7 +591,10 @@ module Make (Node:Node.NodeType) =
 
     let equalize f f' =
       try
-        if Graph.is_equal f.src f'.src then
+        if Graph.is_equal f.src f'.src
+           && Graph.size_edge f.trg = Graph.size_edge f'.trg
+           && Graph.size_node f.trg = Graph.size_node f'.trg
+        then
           let arrows = flatten (f.trg => f'.trg) in
           List.iter
             (fun phi ->
