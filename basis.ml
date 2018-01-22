@@ -598,7 +598,7 @@ module Make (Node:Node.NodeType) =
                                    ~aliases:aliases
                                    inf fresh_id sh_info.to_midpoint ext_base
                                with
-                                 Invariant_failure str -> print_endline (red str) ; ext_base
+                                 Invariant_failure str | Failure str -> print_endline (red str) ; ext_base
                              in
 		             let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
                              remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
@@ -651,7 +651,7 @@ module Make (Node:Node.NodeType) =
                                  in
                                  try add_step ~check:true ~aliases:aliases inf w inf_to_w ext_base with
                                    Not_found -> (failwith (Printf.sprintf "Point %d (best inf for %d) is no longer in the base\n" inf i))
-                                 | Invariant_failure str -> print_endline str ; ext_base
+                                 | Invariant_failure str | Failure str -> print_endline str ; ext_base
                                ) ext_base inf_list
                          ) ext_base.max_elements ext_base
         in
