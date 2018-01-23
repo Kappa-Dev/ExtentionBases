@@ -129,7 +129,7 @@ let init = (cyd_basis,cyd_graphs) => {
       autoungrabify: true,
       autounselectify: true,
       maxZoom: 1.8,
-      minZoom: 0.4,
+      minZoom: 0.1,
 
       style: [ // the stylesheet for the graph
       {
