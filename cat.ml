@@ -35,6 +35,7 @@ module type Category =
     val extension_class : arrows -> arrows
     val matching_class : arrows -> arrows
     val equalize : arrows -> arrows -> arrows option
+    val compare : arrows -> arrows -> int
 
     (**Operators*)
     val (@@) : arrows -> arrows -> arrows
@@ -589,37 +590,48 @@ module Make (Node:Node.NodeType) =
 
     exception Found of arrows
 
+    (**returns g -if it exists- s.t gf = f'*)
+    let complete f f' =
+      try
+        let arrows = flatten (f.trg => f'.trg) in
+        List.iter
+          (fun g ->
+            if (g @@ f) === f' then raise (Found g)
+            else ()
+          ) arrows ; raise Undefined
+      with
+      | Found g -> g
+
+    (**returns Some iso phi -if it exists- s.t (phi o f) = f', None otherwise*)
     let equalize f f' =
       try
         if Graph.is_equal f.src f'.src
            && Graph.size_edge f.trg = Graph.size_edge f'.trg
            && Graph.size_node f.trg = Graph.size_node f'.trg
         then
-          let arrows = flatten (f.trg => f'.trg) in
-          List.iter
-            (fun phi ->
-             if (phi @@ f) === f' then raise (Found phi)
-             else ()
-            ) arrows ; None
-        else None
+          Some (complete f f')
+        else
+          None
       with
         Undefined -> None
-      | Found phi -> Some phi
+
+    let compare f f' =
+      try
+        let _ = complete f f' in
+        (-1)
+      with Undefined ->
+            try
+              let _ = complete f' f in
+              1
+            with
+              Undefined -> 0
 
     let (=~=) = fun f g -> match equalize f g with None -> false | Some _ -> true
 
 
     let share f g =
       let compare_sharing (f,tile) (f',tile') =
-        match upper_bound tile,upper_bound tile' with
-          None,Some _ -> 1
-        | Some _ ,None -> -1
-        | Some (f,_), Some (g,_) ->
-           compare (Graph.size_node f.trg,Graph.size_edge f.trg)
-                   (Graph.size_node g.trg,Graph.size_edge g.trg)
-        | (None,None) ->
-           compare (Graph.size_node f'.trg,Graph.size_edge f'.trg)
-                   (Graph.size_node f.trg,Graph.size_edge f.trg)
+        compare f' f
       in
       let ipos =
         List.filter
