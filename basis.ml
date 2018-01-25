@@ -1,17 +1,5 @@
-module type ExtensionBasisType =
-  sig
-    type t
-    type arrows
-    type obj
-    val to_dot : ?show_conflict:bool -> Lib.Dict.t -> t -> string
-    val to_dot_corresp : t -> string
-    val to_dot_content : t -> string
-    val insert : arrows -> arrows -> int -> t -> t
-    val empty : obj -> t
-  end
-
 module Make (Node:Node.NodeType) =
-  (struct
+  struct
     module Graph = Graph.Make (Node)
     module Cat = Cat.Make (Node)
 
@@ -19,7 +7,6 @@ module Make (Node:Node.NodeType) =
     let (|/) = Cat.(|/)
     let (=~=) = Cat.(=~=)
 
-    exception Invariant_failure of string
     type arrows = Cat.arrows
     type obj = Cat.obj
     open Lib.Util
@@ -39,6 +26,7 @@ module Make (Node:Node.NodeType) =
               mutable fresh : int
              }
 
+    exception Invariant_failure of string * t
 
     let point g =
       {value = g ;
@@ -47,8 +35,15 @@ module Make (Node:Node.NodeType) =
        conflict = Lib.IntSet.empty ;
       }
 
+    let empty h_eps =
+      {points = Lib.IntMap.add 0 (point h_eps) Lib.IntMap.empty ;
+       witnesses = Lib.IntSet.empty;
+       extensions = Lib.IntMap.add 0 (Cat.identity h_eps h_eps) Lib.IntMap.empty ;
+       max_elements = Lib.IntSet.singleton 0 ;
+       fresh = 1
+      }
 
-    let to_dot ?(show_conflict=true) dict ext_base =
+    let to_dot show_conflict dict ext_base =
       let l =
         Lib.IntMap.fold
           (fun i p dot_string ->
@@ -112,14 +107,6 @@ module Make (Node:Node.NodeType) =
       {ext_base with points = Lib.IntMap.add i p ext_base.points}
 
     let mem i ext_base = Lib.IntMap.mem i ext_base.points
-
-    let empty h_eps =
-      {points = Lib.IntMap.add 0 (point h_eps) Lib.IntMap.empty ;
-       witnesses = Lib.IntSet.empty;
-       extensions = Lib.IntMap.add 0 (Cat.identity h_eps h_eps) Lib.IntMap.empty ;
-       max_elements = Lib.IntSet.singleton 0 ;
-       fresh = 1
-      }
 
     let is_empty ext_base = (Lib.IntMap.cardinal ext_base.points = 1)
 
@@ -205,7 +192,7 @@ module Make (Node:Node.NodeType) =
            let _,i = try Lib.IntMap.find i aliases with Not_found -> (Cat.unit,i) in
            let pi = try find i ext_base
                     with Not_found ->
-                      failwith (Printf.sprintf "%d is not in the base..." i)
+                      raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
            in
            if Lib.IntMap.mem j pi.next then raise Exit
            else
@@ -230,7 +217,7 @@ module Make (Node:Node.NodeType) =
       if db() then
         (Printf.printf "Checking whether step %d |-> %d should be added\n" i j;
          (if Lib.IntMap.mem i aliases then
-            raise (Invariant_failure (Printf.sprintf "%d is aliased!" i))
+            raise (Invariant_failure (Printf.sprintf "%d is aliased!" i,ext_base))
         )) ;
       let j,emb_ij =
         try
@@ -247,7 +234,9 @@ module Make (Node:Node.NodeType) =
       in
       if (check && is_below ~aliases:aliases i j ext_base) then ext_base
       else
-        let pi = try find i ext_base with Not_found -> failwith "Invariant violation"
+        let pi =
+          try find i ext_base
+          with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
         in
         if db() then Printf.printf
                        "\t Add Step %d |-> %d = %s-%s->%s\n" i j
@@ -416,17 +405,16 @@ module Make (Node:Node.NodeType) =
         with
           Exit -> (m,a)
       in
-      let get_best_inf i m =
-        try
-          Lib.IntMap.find i m
-        with
-          Not_found -> failwith ("Best inf not initialized for point "^(string_of_int i))
+      let get_best_inf i m = Lib.IntMap.find i m
       in
       if Queue.is_empty queue then
         (best_inf,aliases,dry_run)
       else
         let k,step_ki,i = Queue.pop queue in
-        let inf_list = get_best_inf k best_inf in
+        let inf_list =
+          try get_best_inf k best_inf
+          with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
+        in
         let dry_run',visited',best_inf',aliases',queue'=
           List.fold_left (*folding inf_list*)
             (fun (dry_run,visited,best_inf,aliases,queue) (root_to_inf,inf_to_k,inf,inf_to_w) ->
@@ -592,13 +580,10 @@ module Make (Node:Node.NodeType) =
                              in
                              (*adding step from inf to midpoint or its alias (in this case verify that inf is not already below the alias*)
                              let ext_base =
-                               try
-                                 add_step
-                                   ~check:skip_midpoint
-                                   ~aliases:aliases
-                                   inf fresh_id sh_info.to_midpoint ext_base
-                               with
-                                 Invariant_failure str | Failure str -> print_endline (red str) ; ext_base
+                               add_step
+                                 ~check:skip_midpoint
+                                 ~aliases:aliases
+                                 inf fresh_id sh_info.to_midpoint ext_base
                              in
 		             let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
                              remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
@@ -629,59 +614,114 @@ module Make (Node:Node.NodeType) =
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
         (* 2. Executing dry run, i.e inserting midpoints *)
-        let ext_base = List.fold_left (fun ext_base act -> act w ext_base aliases) ext_base (List.rev dry_run) in
+        let ext_base =
+          List.fold_left
+            (fun ext_base act ->
+              if ext_base.fresh > 15 then raise (Invariant_failure ("max point reached",ext_base))
+              else
+                act w ext_base aliases
+            ) ext_base (List.rev dry_run)
+        in
 
         (* 3. Connecting witness w to its best predecessors in the base*)
-        let ext_base = Lib.IntSet.fold
-                         (fun i ext_base ->
-                           if i=w then ext_base
-                           else
-                             let inf_list = try Lib.IntMap.find i best_inf with
-                                              Not_found ->
-                                              failwith
-                                                ("Invariant violation: best_inf not defined for point "^(string_of_int i))
-                             in
-                             List.fold_left
-                               (fun ext_base (_,_,inf,inf_to_w) ->
-                                 let () =
-                                   if db() then print_string
-                                                  (blue (Printf.sprintf
-                                                           "\t Adding best inf %d for %d and witness %d\n" inf i w)
-                                                  ) ; flush stdout
-                                 in
-                                 try add_step ~check:true ~aliases:aliases inf w inf_to_w ext_base with
-                                   Not_found -> (failwith (Printf.sprintf "Point %d (best inf for %d) is no longer in the base\n" inf i))
-                                 | Invariant_failure str | Failure str -> print_endline str ; ext_base
-                               ) ext_base inf_list
-                         ) ext_base.max_elements ext_base
+        let ext_base =
+          Lib.IntSet.fold
+              (fun i ext_base ->
+                if i=w then ext_base
+                else
+                  let inf_list = try Lib.IntMap.find i best_inf with
+                                   Not_found ->
+                                   failwith
+                                     ("Invariant violation: best_inf not defined for point "^(string_of_int i))
+                  in
+                  List.fold_left
+                    (fun ext_base (_,_,inf,inf_to_w) ->
+                      let () =
+                        if db() then print_string
+                                       (blue (Printf.sprintf
+                                                "\t Adding best inf %d for %d and witness %d\n" inf i w)
+                                       ) ; flush stdout
+                      in
+                      add_step ~check:true ~aliases:aliases inf w inf_to_w ext_base
+                    ) ext_base inf_list
+              ) ext_base.max_elements ext_base
         in
         ext_base
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
-    let to_dot_corresp ext_base =
-      let str_list,_ =
-        Lib.IntMap.fold
-          (fun i p (str_list,fresh) ->
-            let f = find_extension i ext_base in
-            let _G = List.hd ((Cat.src f) --> f) in
-            match p.obs with
-              [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
-                    (str::str_list,fresh)
-            | _ -> (str_list,fresh)
-          ) ext_base.points ([],0)
-      in
-      "digraph G{\n"^(String.concat "\n" str_list)^"\n}"
 
-    let to_dot_content ext_base =
-      let str_list =
-        Lib.IntMap.fold
-          (fun i p str_list ->
-            let f = find_extension i ext_base in
-            let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
-            (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
-          ) ext_base.points []
+    let of_sharings tiles_l =
+      let rec iter_convert z l r tiles ext_base =
+        match tiles with
+          [] -> let z,l,r = get_fresh ext_base, get_fresh ext_base, get_fresh ext_base in (ext_base,z,l,r)
+        | (root_to_inf,tile)::tiles' ->
+           let ext_base =
+             if mem z ext_base then ext_base
+             else
+               let root = Cat.src root_to_inf in
+               add z (point root) (Cat.identity root root) ext_base in
+           let ext_base =
+             let (inf_to_left,inf_to_right) = Cat.lower_bound tile in
+             let i = get_fresh ext_base in
+             let conflict = match Cat.upper_bound tile with None -> true | _ -> false in
+             let inf = point (Cat.src inf_to_left) in
+             let left = point (Cat.trg inf_to_left) in
+             let right = point (Cat.trg inf_to_right) in
+             let ext_base = add i inf root_to_inf ext_base in
+             let ext_base = if mem l ext_base then ext_base else add l left (inf_to_left @@ root_to_inf) ext_base in
+             let ext_base = if mem r ext_base then ext_base else add r right (inf_to_right @@ root_to_inf) ext_base in
+             let ext_base = if conflict then add_conflict l r ext_base else ext_base in
+             let ext_base = add_step z i root_to_inf (add_step i l inf_to_left (add_step i r inf_to_right ext_base))
+             in
+             match Cat.upper_bound tile with
+               None -> ext_base
+             | Some (left_to_sup,right_to_sup) ->
+                let s = get_fresh ext_base in
+                let sup = point (Cat.trg left_to_sup) in
+                let ext_base = add s sup ((Cat.arrows_of_tile tile) @@ root_to_inf) ext_base in
+                add_step l s left_to_sup (add_step r s right_to_sup ext_base)
+           in
+           iter_convert z l r tiles' ext_base
       in
-      (String.concat "\n" str_list)
+      match tiles_l with
+        [] -> empty (Graph.empty)
+      | hd::_ ->
+         match hd with
+           [] -> failwith "error"
+         | (f,_)::_ ->
+            let inf = Cat.src f in
+            let eb,_,_,_ =
+              let eb = empty inf in
+              let l = get_fresh eb in
+              let r = get_fresh eb in
+              List.fold_left (fun (ext_base,z,l,r) tiles -> iter_convert z l r tiles ext_base) (eb,0,l,r) tiles_l
+            in
+            eb
 
-        end:ExtensionBasisType with type arrows = Cat.Make(Node).arrows and type obj = Cat.Make(Node).obj)
+  let to_dot_corresp ext_base =
+    let str_list,_ =
+      Lib.IntMap.fold
+        (fun i p (str_list,fresh) ->
+          let f = find_extension i ext_base in
+          let _G = List.hd ((Cat.src f) --> f) in
+          match p.obs with
+            [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
+                  (str::str_list,fresh)
+          | _ -> (str_list,fresh)
+        ) ext_base.points ([],0)
+    in
+    "digraph G{\n"^(String.concat "\n" str_list)^"\n}"
+
+  let to_dot_content ext_base =
+    let str_list =
+      Lib.IntMap.fold
+        (fun i p str_list ->
+          let f = find_extension i ext_base in
+          let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
+          (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
+        ) ext_base.points []
+    in
+    (String.concat "\n" str_list)
+
+  end

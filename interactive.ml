@@ -45,20 +45,28 @@ module Make (Node:Node.NodeType) =
 
     let (=>) = Cat.(=>)
     let (|>) = Cat.(|>)
+    let (=~=>) g h = Cat.flatten (Cat.extension_class (g => h))
 
     let simple_tests () =
-      let square = graph_of_library "square" in
-      let triangle = graph_of_library "triangle" in
-      let tiles = square |> triangle in
-      List.iter (fun tile ->
-	  Printf.printf "%s\n" (Cat.string_of_tile tile)
-        ) tiles ;
-      print_newline() ;
+      let dsquare = graph_of_library "dsquare" in
       let house = graph_of_library "house" in
-      let tiles = square |> house in
-      List.iter (fun tile ->
-	  Printf.printf "%s\n" (Cat.string_of_tile tile)
-        ) tiles
+      let one = graph_of_library "one" in
+      let sharings =
+        List.fold_left
+          (fun tiles_l one_to_house ->
+            List.fold_left
+              (fun tiles_l one_to_dsquare ->
+                let tiles = Cat.share one_to_house one_to_dsquare in
+                tiles::tiles_l
+            ) tiles_l (one =~=> dsquare)
+          ) [] (one =~=> house)
+      in
+      let ext_base = EB.of_sharings sharings in
+      let d = open_out "web_eb.dot" in
+      let str = EB.to_dot_content ext_base in
+      Printf.fprintf d "%s\n%s" (EB.to_dot false Lib.Dict.empty ext_base) str ;
+      close_out d
+
 
 
     type t = {model : Model.t ; show_positive : bool ; eb : (EB.t * EB.t) option ; rule : (string * string) option}
@@ -73,8 +81,7 @@ module Make (Node:Node.NodeType) =
          in
          let d = open_out "web_eb.dot" in
          Printf.fprintf d "%s\n%s"
-           (EB.to_dot ~show_conflict:false
-              env.model.Model.dict eb)
+           (EB.to_dot false env.model.Model.dict eb)
            (EB.to_dot_content eb) ;
          close_out d
 
@@ -102,19 +109,22 @@ module Make (Node:Node.NodeType) =
            | Some basis -> basis
          in
          let pos_ext_base =
-           List.fold_left
-             (fun ext_base (id_obs,tile) ->
-               match Cat.upper_bound tile with
-                 None -> failwith "no witness"
-               | Some (to_w,from_o) ->
-                  if db() then
-                    Printf.printf "Inserting witness of observable '%s': %s\n"
-                      (Lib.Dict.to_name id_obs env.model.Model.dict)
-                      (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                  EB.insert to_w from_o id_obs ext_base
-             ) eb_pos pw
+           try
+             List.fold_left
+               (fun ext_base (id_obs,tile) ->
+                 match Cat.upper_bound tile with
+                   None -> failwith "no witness"
+                 | Some (to_w,from_o) ->
+                    if db() then
+                      Printf.printf "Inserting witness of observable '%s': %s\n"
+                        (Lib.Dict.to_name id_obs env.model.Model.dict)
+                        (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+                    EB.insert to_w from_o id_obs ext_base
+               ) eb_pos pw
+           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
          in
          let neg_ext_base =
+           try
            List.fold_left
              (fun ext_base (id_obs,tile) ->
                match Cat.upper_bound tile with
@@ -126,6 +136,7 @@ module Make (Node:Node.NodeType) =
                       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
                   EB.insert to_w from_o id_obs ext_base
              ) eb_neg nw
+           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
          in
          {env with eb = Some (pos_ext_base,neg_ext_base)}
 

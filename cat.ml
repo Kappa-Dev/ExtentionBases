@@ -639,18 +639,13 @@ module Make (Node:Node.NodeType) =
             Graph.is_connex f.trg
           ) (f /| g)
       in
-      let sh_tiles = List.fast_sort compare_sharing ipos
-      in
       let sh_tiles =
-        match sh_tiles with
-          [] -> []
-        | _ -> List.fold_left
-                 (fun cont sh ->
-                  let hd = List.hd cont in
-                  if (compare_sharing hd sh) = 0 then sh::cont
-                  else
-                    cont
-                 ) [List.hd sh_tiles] (List.rev sh_tiles)
+        List.fold_left
+          (fun cont sh ->
+            if List.for_all (fun sh' -> (compare_sharing sh sh') = 0) cont
+            then sh::cont
+            else cont
+          ) [] ipos
       in
       List.fold_left
         (fun cont (f,tile) ->
@@ -715,4 +710,5 @@ module Make (Node:Node.NodeType) =
                  else
                    tile::cont
           ) [] (glue h obs)
+
  end:Category with type obj = Graph.Make(Node).t)
