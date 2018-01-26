@@ -9,7 +9,7 @@ type command =
   | Add_named of (int list * int list) list * string
   | List
   | Debug
-  | Build of string*string
+  | Build of string*string*(int option)
   | Load of string
   | Output of bool
   | Shell of string * string array
@@ -34,6 +34,7 @@ let exit_p = inst "exit" [] (fun _ -> Exit)
 
 let list_parser p = char '[' *> ws *> sep_by (ws *> (char ';') *> ws) p <* ws <* char ']'
 let number = take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> int_of_string s
+let number_or_nothing = choice [(number >>| fun i -> Some i) ; ws >>| fun () -> None]
 
 let arg = take_while1 (function ' ' -> false | _ -> true)
 let args_parser = sep_by ws1 arg
@@ -74,7 +75,7 @@ let list = string "list" *> return List
 let debug = string "debug" *> return Debug
 
 let build =
-  string "build" *> ws *> tuple name (fun (x,y) -> Build (x,y))
+  string "build" *> ws1 *> number_or_nothing >>= fun n -> ws *> tuple name (fun (x,y)-> Build (x,y,n))
 
 
 let global p = ws *> p <* end_of_input

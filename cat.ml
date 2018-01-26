@@ -421,7 +421,6 @@ module Make (Node:Node.NodeType) =
       let extend u p_hom sup inf_to_left inf inf_to_right continuation =
         (*list of all possible extensions of p_hom to the association
           u |--> u' (for some u' in sup)*)
-        (*let () = Printf.printf "%s\n" (Hom.to_string ~sub:true p_hom) in*)
         let ext_uu' =
           Graph.fold_ids
             (fun id' cont -> (*for all id' in sup*)
@@ -547,6 +546,7 @@ module Make (Node:Node.NodeType) =
         let hom_p =  hom_of_arrows part_left_to_sup in
         let inf_to_right = hom_of_arrows inf_to_right in
         let inf_to_left = hom_of_arrows inf_to_left in
+        let sharing_tiles = complete left hom_p sup inf_to_left inf inf_to_right in
         List.fold_left
           (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
             let emb_inf_left = {src = inf' ;
@@ -571,7 +571,7 @@ module Make (Node:Node.NodeType) =
             in
             let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
             (identity inf inf',tile)::sharing_tiles
-          ) cont (complete left hom_p sup inf_to_left inf inf_to_right)
+          ) cont sharing_tiles
       in
       close_rs (identity inf_to_right.trg inf_to_right.trg) []
 
@@ -629,7 +629,7 @@ module Make (Node:Node.NodeType) =
     let (=~=) = fun f g -> match equalize f g with None -> false | Some _ -> true
 
 
-    let share f g =
+    let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       let compare_sharing (f,tile) (f',tile') =
         compare f' f
       in
@@ -639,20 +639,12 @@ module Make (Node:Node.NodeType) =
             Graph.is_connex f.trg
           ) (f /| g)
       in
-      let sh_tiles =
-        List.fold_left
-          (fun cont sh ->
-            if List.for_all (fun sh' -> (compare_sharing sh sh') = 0) cont
-            then sh::cont
-            else cont
-          ) [] ipos
-      in
       List.fold_left
-        (fun cont (f,tile) ->
-         if List.for_all (fun (f',_) -> (not (f =~= f'))) cont
-         then (f,tile)::cont
-         else cont
-        ) [] sh_tiles
+        (fun cont (f,tile as sh) ->
+          if List.for_all (fun sh' -> (compare_sharing sh sh') = 0) cont
+          then sh::cont
+          else cont
+        ) [] (List.fast_sort compare_sharing ipos)
 
     let glue g h =
       (*returns spans of the form g <-id- g1 -f-> h where g1 is an edge of g*)

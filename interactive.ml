@@ -48,20 +48,13 @@ module Make (Node:Node.NodeType) =
     let (=~=>) g h = Cat.flatten (Cat.extension_class (g => h))
 
     let simple_tests () =
-      let dsquare = graph_of_library "dsquare" in
-      let house = graph_of_library "house" in
-      let one = graph_of_library "one" in
-      let sharings =
-        List.fold_left
-          (fun tiles_l one_to_house ->
-            List.fold_left
-              (fun tiles_l one_to_dsquare ->
-                let tiles = Cat.share one_to_house one_to_dsquare in
-                tiles::tiles_l
-            ) tiles_l (one =~=> dsquare)
-          ) [] (one =~=> house)
-      in
-      let ext_base = EB.of_sharings sharings in
+      let o8 = draw (Node.tn [([2],[3]);([3],[6]);([6],[5]);([4],[5]);([4],[2])]) Graph.empty in
+      let o2 = draw (Node.tn [([3],[2]);([3],[6]);([2],[4]);([4],[5])]) Graph.empty in
+      let w =  draw (Node.tn [([5],[4]);([5],[6]);([6],[4]);([6],[3]);([3],[2]);([2],[4])]) Graph.empty in
+      let o2_to_o8 = Cat.identity o2 o8 in
+      let o2_to_w = Cat.identity o2 w in
+      let sharings = Cat.share  o2_to_o8 o2_to_w in
+      let ext_base = EB.of_sharings [sharings] in
       let d = open_out "web_eb.dot" in
       let str = EB.to_dot_content ext_base in
       Printf.fprintf d "%s\n%s" (EB.to_dot false Lib.Dict.empty ext_base) str ;
@@ -85,7 +78,7 @@ module Make (Node:Node.NodeType) =
            (EB.to_dot_content eb) ;
          close_out d
 
-    let build_base ?obs_name env =
+    let build_base ?obs_name max_step env =
       match env.rule with
         None -> env
       | Some (l,r) ->
@@ -119,7 +112,7 @@ module Make (Node:Node.NodeType) =
                       Printf.printf "Inserting witness of observable '%s': %s\n"
                         (Lib.Dict.to_name id_obs env.model.Model.dict)
                         (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                    EB.insert to_w from_o id_obs ext_base
+                    EB.insert ~max_step:max_step to_w from_o id_obs ext_base
                ) eb_pos pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
          in
@@ -134,7 +127,7 @@ module Make (Node:Node.NodeType) =
                     Printf.printf "Inserting witness of observable '%s': %s\n"
                       (Lib.Dict.to_name id_obs env.model.Model.dict)
                       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                  EB.insert to_w from_o id_obs ext_base
+                  EB.insert ~max_step:max_step to_w from_o id_obs ext_base
              ) eb_neg nw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
          in
@@ -155,10 +148,10 @@ module Make (Node:Node.NodeType) =
          log ("Rules:\n") ;
          log (String.concat "\n" (proj_right (Model.list env.model))) ;
          env
-      | Parser.Build (l,r) ->
+      | Parser.Build (l,r,mx) ->
          log (Printf.sprintf "Generating extension basis for rule %s -> %s" l r);
          let env = {env with rule = Some (l,r) ; eb = None} in
-         let env = build_base env in
+         let env = build_base mx env in
          output env ;
          env
       | Parser.Add v ->
@@ -168,7 +161,7 @@ module Make (Node:Node.NodeType) =
            match env.eb with
              None -> {env with model = model}
            | Some _ ->
-              let env = build_base ~obs_name:v {env with model = model}
+              let env = build_base ~obs_name:v None {env with model = model}
               in output env ; env
          else
            begin
@@ -180,7 +173,7 @@ module Make (Node:Node.NodeType) =
          let edges = Node.tn lst in
          let graph = draw edges Graph.empty in
          let env = {env with model = Model.add_obs v graph env.model} in
-         let env = build_base ~obs_name:v env in
+         let env = build_base ~obs_name:v None env in
          output env ;
          env
       | Parser.Exit -> log "exiting" ; exit 0

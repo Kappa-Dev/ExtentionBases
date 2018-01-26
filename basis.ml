@@ -324,16 +324,18 @@ module Make (Node:Node.NodeType) =
                                         has_sup = true})::cont
              ) [] lcomp
          in
+         
          if db() then
            assert (
                List.length lcomp <=1
                || List.for_all (function Incomp _ -> true | _ -> false) lcomp
              ) ;
+         
          lcomp
 
     exception Found_iso of Cat.arrows * int
 
-    let rec progress ext_base dry_run visited best_inf aliases queue =
+    let rec progress ext_base dry_run visited best_inf aliases queue max_step =
       (************* DEBUGING INFO ***************)
       let _ = if db() then
                 begin
@@ -355,6 +357,13 @@ module Make (Node:Node.NodeType) =
                 end
       in
       (************* DEBUGING INFO ***************)
+      let dec_step ext_base = function
+          None -> None
+        | Some i ->
+           if i=1 then raise (Invariant_failure (red "Max iteration reached", ext_base))
+           else
+             Some (i-1)
+      in
       let update_best_inf ?(replace_if_found=true) i (root_to_inf,inf_to_i,inf,inf_to_w as new_inf) m a =
         if db() then
           Printf.printf "%s to inf %d\n" (Cat.string_of_arrows ~full:true root_to_inf) inf ;
@@ -415,13 +424,13 @@ module Make (Node:Node.NodeType) =
           try get_best_inf k best_inf
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
         in
-        let dry_run',visited',best_inf',aliases',queue'=
+        let dry_run',visited',best_inf',aliases',queue',max_step'=
           List.fold_left (*folding inf_list*)
-            (fun (dry_run,visited,best_inf,aliases,queue) (root_to_inf,inf_to_k,inf,inf_to_w) ->
+            (fun (dry_run,visited,best_inf,aliases,queue,max_step) (root_to_inf,inf_to_k,inf,inf_to_w) ->
               let inf_to_i = step_ki @@ inf_to_k in
               let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
               List.fold_left (*folding compare inf_to_i inf_to_w*)
-                (fun (dry_run,visited,best_inf,aliases,queue) -> function
+                (fun (dry_run,visited,best_inf,aliases,queue,max_step) -> function
 
                     (************************** Case Conflicting span ********************************)
                     (*1. best_inf,aliases = (root_to_inf,inf_to_i,inf,inf_to w) +!> best_inf (i) *)
@@ -452,7 +461,7 @@ module Make (Node:Node.NodeType) =
                            ) (find i ext_base).next queue
                      in
                      let visited' = Lib.IntSet.add i visited in
-                     (dry_run',visited',best_inf',aliases',queue')
+                     (dry_run',visited',best_inf',aliases',queue',dec_step ext_base max_step)
 
                     (************************** Case inf_to_w factors inf_to_i ********************************)
                     (*1. best_inf,aliases = (root_to_inf,inf_to_i,inf,inf_to w) +!> best_inf (i) *)
@@ -475,7 +484,7 @@ module Make (Node:Node.NodeType) =
                          )::dry_run)
                        in
                        let visited' = Lib.IntSet.add i visited in
-                       (dry_run',visited',best_inf',aliases',queue)
+                       (dry_run',visited',best_inf',aliases',queue,dec_step ext_base max_step)
 
                     (************************** Case inf_to_i factors inf_to_w *******************)
                     (*1. best_inf,_ = (root_to_i,id_i,i,i_to_w) +!> best_inf (i) *)
@@ -499,7 +508,7 @@ module Make (Node:Node.NodeType) =
                            Lib.IntMap.fold
                              (fun j step_ij cont -> Queue.add (i,step_ij,j) cont ; cont) pi.next queue
                        in
-                       (dry_run,(Lib.IntSet.add i visited), best_inf',aliases,queue')
+                       (dry_run,(Lib.IntSet.add i visited), best_inf',aliases,queue',dec_step ext_base max_step)
 
                     (************************** Case inf_to_w =~= inf_to_i *************************)
                     (*NB drop dry_run*)
@@ -543,7 +552,7 @@ module Make (Node:Node.NodeType) =
                            else
                              dry_run
 		         in
-                         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue')
+                         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue',dec_step ext_base max_step)
                        else
                          (*Not a trivial midpoint*)
                          let queue' =
@@ -589,13 +598,13 @@ module Make (Node:Node.NodeType) =
                              remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
                            )::dry_run
                          in
-		         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue')
-                ) (dry_run,visited,best_inf,aliases,queue) (compare inf_to_i inf_to_w ext_base)
-            ) (dry_run,visited,best_inf,aliases,queue) inf_list
+		         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue',dec_step ext_base max_step)
+                ) (dry_run,visited,best_inf,aliases,queue,max_step) (compare inf_to_i inf_to_w ext_base)
+            ) (dry_run,visited,best_inf,aliases,queue,max_step) inf_list
         in
-        progress ext_base dry_run' visited' best_inf' aliases' queue'
+        progress ext_base dry_run' visited' best_inf' aliases' queue' max_step'
 
-    let insert ext_w obs_emb obs_id ext_base =
+    let insert ~max_step ext_w obs_emb obs_id ext_base =
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       try
@@ -605,7 +614,7 @@ module Make (Node:Node.NodeType) =
         let aliases_0 = Lib.IntMap.empty in
         let visited_0 = Lib.IntSet.empty in
         let dry_run_0 = [] in
-        let best_inf,aliases,dry_run = progress ext_base dry_run_0 visited_0 best_inf_0 aliases_0 queue_0
+        let best_inf,aliases,dry_run = progress ext_base dry_run_0 visited_0 best_inf_0 aliases_0 queue_0 max_step
         in
 
         (* 1. Adding witness point *)
@@ -615,14 +624,8 @@ module Make (Node:Node.NodeType) =
         let ext_base = add_obs w obs_emb obs_id ext_base in
         (* 2. Executing dry run, i.e inserting midpoints *)
         let ext_base =
-          List.fold_left
-            (fun ext_base act ->
-              if ext_base.fresh > 15 then raise (Invariant_failure ("max point reached",ext_base))
-              else
-                act w ext_base aliases
-            ) ext_base (List.rev dry_run)
+          List.fold_left (fun ext_base act -> act w ext_base aliases) ext_base (List.rev dry_run)
         in
-
         (* 3. Connecting witness w to its best predecessors in the base*)
         let ext_base =
           Lib.IntSet.fold
@@ -631,18 +634,26 @@ module Make (Node:Node.NodeType) =
                 else
                   let inf_list = try Lib.IntMap.find i best_inf with
                                    Not_found ->
-                                   failwith
-                                     ("Invariant violation: best_inf not defined for point "^(string_of_int i))
+                                   raise (Invariant_failure ("Invariant violation: best_inf not defined for point "^(string_of_int i), ext_base))
                   in
                   List.fold_left
                     (fun ext_base (_,_,inf,inf_to_w) ->
-                      let () =
-                        if db() then print_string
-                                       (blue (Printf.sprintf
-                                                "\t Adding best inf %d for %d and witness %d\n" inf i w)
-                                       ) ; flush stdout
-                      in
-                      add_step ~check:true ~aliases:aliases inf w inf_to_w ext_base
+                      try
+                        (*TODO maintain this incrementally, this is super not efficient*)
+                        let p_inf = find inf ext_base in
+                        Lib.IntMap.fold
+                          (fun i _ () ->
+                            if Lib.IntMap.exists (fun _ l -> List.exists (fun (_,_,j,_) -> i=j) l) best_inf then raise Exit
+                          ) p_inf.next () ;
+                        let () =
+                          if db() then print_string
+                                         (blue (Printf.sprintf
+                                                  "\t Adding best inf %d for %d and witness %d\n" inf i w)
+                                         ) ; flush stdout
+                        in
+                        add_step ~check:true ~aliases:aliases inf w inf_to_w ext_base
+                      with
+                        Exit -> ext_base
                     ) ext_base inf_list
               ) ext_base.max_elements ext_base
         in

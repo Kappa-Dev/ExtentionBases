@@ -1,4 +1,5 @@
+debug
 add one
 add dsquare
 add house
-build (empty,one)
+build 50 (empty,one)
