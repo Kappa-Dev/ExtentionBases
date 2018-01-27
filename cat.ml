@@ -630,7 +630,7 @@ module Make (Node:Node.NodeType) =
 
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
-      let compare_sharing (f,tile) (f',tile') =
+      let compare_sharing (f,_) (f',_) =
         compare f' f
       in
       let ipos =

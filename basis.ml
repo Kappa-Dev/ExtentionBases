@@ -271,17 +271,6 @@ module Make (Node:Node.NodeType) =
       match Cat.share inf_to_i inf_to_w with
         [] -> [Conflicting]
       | lcomp ->
-         let () = if db() then
-                    (
-                      if List.length lcomp > 1 then
-                        print_string "Multiple sharings detected!\n" ;
-                      (List.iter (fun (_,sharing_tile) ->
-                           Printf.printf "%s\n" (Cat.string_of_tile sharing_tile)) lcomp ;
-                       print_newline()
-                      )
-                    )
-         in
-         (*let lcomp = [List.hd lcomp] in*)
          let lcomp =
            List.fold_left
              (fun cont (inf_to_sh,sharing_tile) ->
@@ -324,13 +313,11 @@ module Make (Node:Node.NodeType) =
                                         has_sup = true})::cont
              ) [] lcomp
          in
-         
          if db() then
            assert (
                List.length lcomp <=1
                || List.for_all (function Incomp _ -> true | _ -> false) lcomp
              ) ;
-         
          lcomp
 
     exception Found_iso of Cat.arrows * int
