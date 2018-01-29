@@ -615,22 +615,28 @@ module Make (Node:Node.NodeType) =
       with
         Undefined -> None
 
+    (*[compare f f'] = -1 if exists h: h.f = f', +1 if f = h.f' and 0 otherwise (incomp or iso)*)
     let compare f f' =
-      try
-        let _ = complete f f' in
-        (-1)
-      with Undefined ->
-            try
-              let _ = complete f' f in
-              1
-            with
-              Undefined -> 0
+      let opt = try Some (complete f f') with Undefined -> None
+      in
+      let inf,iso =
+        match opt with
+          Some g -> if not (is_iso g) then true,false else false,true
+        | None -> false,false
+      in
+      if inf then -1 else if iso then 0
+      else
+        try
+          let _ = complete f' f in
+          1
+        with
+          Undefined -> 0
 
     let (=~=) = fun f g -> match equalize f g with None -> false | Some _ -> true
 
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
-      let compare_sharing (f,_) (f',_) =
+      let compare_sharing (f,tile) (f',tile') =
         compare f' f
       in
       let ipos =
@@ -642,7 +648,8 @@ module Make (Node:Node.NodeType) =
       List.fold_left
         (fun cont (f,tile as sh) ->
           if List.for_all (fun sh' -> (compare_sharing sh sh') = 0) cont
-          then sh::cont
+          then
+            sh::cont
           else cont
         ) [] (List.fast_sort compare_sharing ipos)
 

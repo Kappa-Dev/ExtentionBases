@@ -114,50 +114,14 @@ module Make (Node:Node.NodeType) =
 
     let (@@) = Cat.(@@)
 
-    let find_extension i ext_base =
+    let find_extension i aliases ext_base =
+      let i = try let _,j = Lib.IntMap.find i aliases in j with Not_found -> i in
       if not (mem i ext_base) then
         failwith ("Unkown point "^(string_of_int i)^" in extension base")
       else
         Lib.IntMap.find i ext_base.extensions
 
     exception Found of Cat.arrows list
-
-    let delta i j ext_base =
-      let rec compose emb_list acc =
-        match emb_list with
-          [] -> acc
-        | emb::tl -> compose tl (acc @@ emb)
-      in
-      let rec dfs i ext visited =
-        if db() then Printf.printf "Exploring %d...\n" i ;
-        if i = j then (ext,visited)
-        else
-          if Lib.IntSet.mem i ext_base.max_elements then ([],visited)
-          else
-            let pi = find i ext_base in
-            let ext,visited =
-              Lib.IntMap.fold
-                (fun k hom_ik (ext,visited) ->
-                  match ext with
-                    [] -> if Lib.IntSet.mem k visited then (ext,visited)
-                          else dfs k (hom_ik::ext) (Lib.IntSet.add k visited)
-                  | _ -> raise (Found ext)
-                ) pi.next (ext,visited)
-            in
-            if ext <> [] then raise (Found ext)
-            else
-              (ext,visited)
-      in
-      if i = 0 then Some (find_extension j ext_base) (*optim!*)
-      else
-        try
-          let _ = dfs i [] Lib.IntSet.empty
-          in
-          None
-        with
-          Found ext ->
-          let pi = find i ext_base in
-          Some (compose ext (Cat.identity pi.value pi.value))
 
 
     let add_conflict i j ext_base =
@@ -176,7 +140,13 @@ module Make (Node:Node.NodeType) =
       in
       replace i pi ext_base
 
-    let remove_step i j ext_base =
+    let remove_step aliases i j ext_base =
+      let i =
+        try let _,j = Lib.IntMap.find i aliases in j with Not_found -> i
+      in
+      let j =
+        try let _,k = Lib.IntMap.find j aliases in k with Not_found -> j
+      in
       let pi = find i ext_base in
       let _ = if db() then
                 if Lib.IntMap.mem j pi.next then
@@ -185,7 +155,7 @@ module Make (Node:Node.NodeType) =
       in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
-    let is_below ?(aliases=Lib.IntMap.empty) i j ext_base =
+    let is_below aliases i j ext_base =
       let rec search ext_base = function
           [] -> false
         | i::cont ->
@@ -213,12 +183,14 @@ module Make (Node:Node.NodeType) =
       with
         Exit -> true
 
-    let add_step ?(check=false) ?(aliases=Lib.IntMap.empty) i j emb_ij ext_base =
-      if db() then
-        (Printf.printf "Checking whether step %d |-> %d should be added\n" i j;
-         (if Lib.IntMap.mem i aliases then
-            raise (Invariant_failure (Printf.sprintf "%d is aliased!" i,ext_base))
-        )) ;
+    let add_step ?(check=false) aliases i j emb_ij ext_base =
+      let i,emb_ij =
+        try
+          let i_to_k,k = Lib.IntMap.find i aliases in
+          (k, emb_ij @@ (Cat.invert i_to_k))
+        with
+          Not_found -> (i,emb_ij)
+      in
       let j,emb_ij =
         try
           let j_to_k,k = Lib.IntMap.find j aliases in
@@ -229,10 +201,10 @@ module Make (Node:Node.NodeType) =
           Not_found -> (j,emb_ij)
       in
       let ext_base =
-        if i <> 0 then remove_step 0 j ext_base
+        if i <> 0 then remove_step aliases 0 j ext_base
         else ext_base (*This is weird, not the general case...*)
       in
-      if (check && is_below ~aliases:aliases i j ext_base) then ext_base
+      if (check && is_below aliases i j ext_base) then ext_base
       else
         let pi =
           try find i ext_base
@@ -314,10 +286,7 @@ module Make (Node:Node.NodeType) =
              ) [] lcomp
          in
          if db() then
-           assert (
-               List.length lcomp <=1
-               || List.for_all (function Incomp _ -> true | _ -> false) lcomp
-             ) ;
+         Printf.printf "Comparisons found : {%s}\n" (String.concat "," (List.map string_of_comparison lcomp)) ;
          lcomp
 
     exception Found_iso of Cat.arrows * int
@@ -467,7 +436,7 @@ module Make (Node:Node.NodeType) =
                        let dry_run' =
 		         ((fun w ext_base _ ->
                            (*no check and no aliasing necessary here*)
-                           remove_step inf i (add_step ~aliases:aliases w i w_to_i ext_base)
+                           remove_step aliases inf i (add_step aliases w i w_to_i ext_base)
                          )::dry_run)
                        in
                        let visited' = Lib.IntSet.add i visited in
@@ -569,20 +538,20 @@ module Make (Node:Node.NodeType) =
                                  let ext_base =
                                    add fresh_id
                                      mp
-                                     (sh_info.to_midpoint @@ (find_extension inf ext_base))
+                                     (sh_info.to_midpoint @@ (find_extension inf aliases ext_base))
                                      ext_base
                                  in
-                                 add_step ~aliases:aliases fresh_id i sh_info.to_base ext_base
+                                 add_step aliases fresh_id i sh_info.to_base ext_base
                              in
                              (*adding step from inf to midpoint or its alias (in this case verify that inf is not already below the alias*)
                              let ext_base =
                                add_step
                                  ~check:skip_midpoint
-                                 ~aliases:aliases
+                                 aliases
                                  inf fresh_id sh_info.to_midpoint ext_base
                              in
 		             let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
-                             remove_step inf i ext_base (*will remove steps only if they exists and they are direct*)
+                             remove_step aliases inf i ext_base (*will remove steps only if they exists and they are direct*)
                            )::dry_run
                          in
 		         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue',dec_step ext_base max_step)
@@ -638,7 +607,7 @@ module Make (Node:Node.NodeType) =
                                                   "\t Adding best inf %d for %d and witness %d\n" inf i w)
                                          ) ; flush stdout
                         in
-                        add_step ~check:true ~aliases:aliases inf w inf_to_w ext_base
+                        add_step ~check:true aliases inf w inf_to_w ext_base
                       with
                         Exit -> ext_base
                     ) ext_base inf_list
@@ -670,7 +639,9 @@ module Make (Node:Node.NodeType) =
              let ext_base = if mem l ext_base then ext_base else add l left (inf_to_left @@ root_to_inf) ext_base in
              let ext_base = if mem r ext_base then ext_base else add r right (inf_to_right @@ root_to_inf) ext_base in
              let ext_base = if conflict then add_conflict l r ext_base else ext_base in
-             let ext_base = add_step z i root_to_inf (add_step i l inf_to_left (add_step i r inf_to_right ext_base))
+             let ext_base = add_step Lib.IntMap.empty z i root_to_inf
+                              (add_step Lib.IntMap.empty i l inf_to_left
+                                 (add_step Lib.IntMap.empty i r inf_to_right ext_base))
              in
              match Cat.upper_bound tile with
                None -> ext_base
@@ -678,7 +649,7 @@ module Make (Node:Node.NodeType) =
                 let s = get_fresh ext_base in
                 let sup = point (Cat.trg left_to_sup) in
                 let ext_base = add s sup ((Cat.arrows_of_tile tile) @@ root_to_inf) ext_base in
-                add_step l s left_to_sup (add_step r s right_to_sup ext_base)
+                add_step Lib.IntMap.empty l s left_to_sup (add_step Lib.IntMap.empty r s right_to_sup ext_base)
            in
            iter_convert z l r tiles' ext_base
       in
@@ -701,7 +672,7 @@ module Make (Node:Node.NodeType) =
     let str_list,_ =
       Lib.IntMap.fold
         (fun i p (str_list,fresh) ->
-          let f = find_extension i ext_base in
+          let f = find_extension  i Lib.IntMap.empty ext_base in
           let _G = List.hd ((Cat.src f) --> f) in
           match p.obs with
             [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
@@ -715,7 +686,7 @@ module Make (Node:Node.NodeType) =
     let str_list =
       Lib.IntMap.fold
         (fun i p str_list ->
-          let f = find_extension i ext_base in
+          let f = find_extension i Lib.IntMap.empty ext_base in
           let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
           (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
         ) ext_base.points []
