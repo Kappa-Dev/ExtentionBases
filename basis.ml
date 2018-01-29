@@ -74,7 +74,7 @@ module Make (Node:Node.NodeType) =
                    (fun j dot_string ->
                      if i < j then
                        (Printf.sprintf
-                          "%d -> %d [style = \"dotted\", dir = \"none\", constraint = false];" i j)::dot_string
+                          "%d -> %d [conflict = \"true\" style = \"dotted\", dir = \"none\", constraint = false];" i j)::dot_string
                      else
                        dot_string
                    ) p.conflict [])

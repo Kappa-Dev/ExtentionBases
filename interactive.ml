@@ -45,6 +45,7 @@ module Make (Node:Node.NodeType) =
 
     let (=>) = Cat.(=>)
     let (|>) = Cat.(|>)
+
     let (=~=>) g h = Cat.flatten (Cat.extension_class (g => h))
 
     let simple_tests () =

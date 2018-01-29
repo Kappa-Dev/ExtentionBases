@@ -12,6 +12,14 @@ let clear = () => {
   }
 }
 
+
+let getConflict = () => localStorage.getItem('show_conflict')
+let setConflict = (col,b) => {
+  col.toggleClass('visible',b);
+  localStorage.setItem('show_conflict',b);
+}
+let toggleConflict = col => setConflict(col, getConflict() === "false")
+
 // websocket callback
 let websocket_callback = (type,content) => {
 
@@ -149,20 +157,39 @@ let init = (cyd_basis,cyd_graphs) => {
         }
       },
 
+
       {
         selector: 'edge',
         style: {
-          'source-label': 'data(sourceLabel)',
-          'target-label': 'data(targetLabel)',
+          //'source-label': 'data(sourceLabel)',
+          //'target-label': 'data(targetLabel)',
           'width': 2,
           'line-color': '#1a8416',
-          'line-style': 'dashed',
+          'line-style': 'solid',
           //'line-opacity': '0.2',
           'target-arrow-color': '#ccc',
           'target-arrow-shape': 'triangle',
           //'source-endpoint': 'outside-to-node',
           //'target-endpoint': 'outside-to-line',
           'curve-style': 'unbundled-bezier'
+        }
+      },
+
+      {
+        selector: "edge[conflict]",
+        style: {
+          'line-style': 'dashed',
+          'width': 1,
+          'line-color': '#A0A0A0',
+          'visibility': 'hidden'
+          //'curve-style': 'unbundled-bezier'
+        }
+
+      },
+      {
+        selector: "edge[conflict].visible",
+        style: {
+          'visibility': 'visible'
         }
       },
       {
@@ -175,26 +202,26 @@ let init = (cyd_basis,cyd_graphs) => {
       ],
 
 
-      layout: {
-        name: 'breadthfirst',
-        //roots: ['arc'],
-        directed: true,
-        spacingFactor: 1.5,
-        fit: true,
-        //circle: true,
-        maximalAdjustments: 100,
-        transform: (node,position) => { return {x: position.x, y: node.cy().height()-position.y} }
-      },
-      //layout: { name: 'cose' }
-
-      layout: { name: 'dagre',
-        spacingFactor: 1.5,
-        padding: 60,
-        //fit: false,
-        transform: (node,position) => { return {x: position.x, y: node.cy().height()-position.y} }
-
-      }
   });
+
+  let dagre_data = { name: 'dagre',
+    spacingFactor: 1.5,
+    padding: 60,
+    transform: (node,position) => { return {x: position.x, y: node.cy().height()-position.y} }
+
+  };
+
+  let conflict_data = dagre_data;
+
+  cy_basis.collection('[^conflict]').layout(dagre_data).run();
+
+  let conflicts = cy_basis.collection('[conflict]');
+
+  if (getConflict() === null || getConflict() === "true") {
+    setConflict(conflicts,true);
+  }
+
+  conflicts.layout(conflict_data).run();
 
 cy_basis.collection('edge').on('mouseover', evt => evt.target.addClass('hover'));
 
@@ -252,6 +279,26 @@ cy_basis.on('zoom', () =>  {
 
 adjust(true);
 };
+
+document.addEventListener('keypress', e => {
+  if (e.key === 'c') {
+    toggleConflict(cy_basis.collection('[conflict]'));
+  }
+  if (e.key === 'r') {
+    cy_basis.fit();
+  }
+});
+
+ document.addEventListener("DOMContentLoaded", function(event) {
+   let help = document.getElementsByClassName('help')[0];
+   help.addEventListener('mouseenter', e => help.classList.remove('idle'));
+   help.addEventListener('mouseleave', e => help.classList.add('idle'));
+
+//document.getElementsByClassName('help')[0].addEventListener('mousemove', e => {
+  //console.log('screen',e.screenX, e.screenY);
+  //console.log('client',e.clientX,e.clientY);
+//});
+  });
 
 
 // Performance links for later:
