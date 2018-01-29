@@ -1,7 +1,9 @@
 let cytoscape = require('./vendor/cytoscape');
 let graph = require('./lib/graph');
+let domtoimage = require('./vendor/dom-to-image');
 
 let WS = require('./lib/ws-client');
+
 
 let clear = () => {
   if (window.cy_graphs) {
@@ -76,11 +78,14 @@ window.kelly_colors_hex = [
     ];
 
 let init = (cyd_basis,cyd_graphs) => {
+  clear();
 
 
-  window.cy = document.createElement("div");
-  cy.setAttribute('id','cy');
-  document.body.appendChild(cy);
+  if (!window.cy) {
+    window.cy = document.createElement("div");
+    cy.setAttribute('id','cy');
+    document.body.appendChild(cy);
+  }
 
   window.cy_graphs = _.object(_.map(cyd_graphs, ({info,elements}) => {
     let id = info.id;
@@ -287,18 +292,28 @@ document.addEventListener('keypress', e => {
   if (e.key === 'r') {
     cy_basis.fit();
   }
+  if (e.key === 'p') {
+    let node = window.cy;
+    let screenlink = document.getElementById('screenlink');
+
+    domtoimage.toPng(node)
+    .then(dataUrl => {
+      screenlink.classList.add('ready');
+      screenlink.href = dataUrl;
+      screenlink.click();
+    })
+    .catch(error => {
+      console.error('oops, something went wrong!', error);
+    });
+  }
 });
 
- document.addEventListener("DOMContentLoaded", function(event) {
-   let help = document.getElementsByClassName('help')[0];
-   help.addEventListener('mouseenter', e => help.classList.remove('idle'));
-   help.addEventListener('mouseleave', e => help.classList.add('idle'));
 
-//document.getElementsByClassName('help')[0].addEventListener('mousemove', e => {
-  //console.log('screen',e.screenX, e.screenY);
-  //console.log('client',e.clientX,e.clientY);
-//});
-  });
+document.addEventListener("DOMContentLoaded", function(event) {
+  let help = document.getElementsByClassName('help')[0];
+  help.addEventListener('mouseenter', e => help.classList.remove('idle'));
+  help.addEventListener('mouseleave', e => help.classList.add('idle'));
+});
 
 
 // Performance links for later:

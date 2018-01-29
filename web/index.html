@@ -52,6 +52,9 @@
   height: 0px;
   visibility: hidden;
 }
+#screenlink:not(.ready) {
+  visibility: hidden;
+}
 
 </style>
   </head>
@@ -67,7 +70,7 @@
       <div>HELP</div>
       <div><b>c</b>&nbsp;toggle conflict</div>
       <div><b>r</b>&nbsp;reset zoom</div>
+      <div><b>p</b>&nbsp;save picture <a download="basis.png" id="screenlink">[download]</a></div>
     </div>
-
   </body>
 </html>
