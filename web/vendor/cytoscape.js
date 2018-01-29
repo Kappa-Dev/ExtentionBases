@@ -1186,7 +1186,7 @@ math.intersectLineEllipse = function (x, y, centerX, centerY, ellipseWradius, el
   return [(centerX - x) * lenProportion + x, (centerY - y) * lenProportion + y];
 };
 
-math.checkInEllipse = function (x, y, padding, width, height, centerX, centerY) {
+math.checkInEllipse = function (x, y, width, height, centerX, centerY, padding) {
   x -= centerX;
   y -= centerY;
 
@@ -2836,7 +2836,7 @@ var util = __webpack_require__(1);
 var is = __webpack_require__(0);
 var Event = __webpack_require__(15);
 
-var eventRegex = /(\w+)(\.(?:\w+|\*))?/; // regex for matching event strings (e.g. "click.namespace")
+var eventRegex = /^([^.]+)(\.(?:[^.]+))?$/; // regex for matching event strings (e.g. "click.namespace")
 var universalNamespace = '.*'; // matches as if no namespace specified and prevents users from unbinding accidentally
 
 var defaults = {
@@ -3621,7 +3621,8 @@ var Element = function Element(cy, params, restore) {
     edges: [], // array of connected edges
     children: [], // array of children
     parent: null, // parent ref
-    traversalCache: {} // cache of output of traversal functions
+    traversalCache: {}, // cache of output of traversal functions
+    backgrounding: false // whether background images are loading
   };
 
   // renderedPosition overrides if specified
@@ -4744,7 +4745,7 @@ module.exports = Stylesheet;
 "use strict";
 
 
-module.exports = "3.2.4";
+module.exports = "3.2.8";
 
 /***/ }),
 /* 24 */
@@ -13677,6 +13678,12 @@ BreadthFirstLayout.prototype.run = function () {
       for (var j = 0; j < _eles.length; j++) {
         var _ele2 = _eles[j];
 
+        if (_ele2 == null) {
+          _eles.splice(j, 1);
+          j--;
+          continue;
+        }
+
         _ele2._private.scratch.breadthfirst = {
           depth: _i4,
           index: j
@@ -13735,9 +13742,7 @@ BreadthFirstLayout.prototype.run = function () {
       var _intEle = _info.intEle;
       var intInfo = _intEle._private.scratch.breadthfirst;
 
-
-
-      depths[_info.depth].splice(_info.index, 1); // remove from old depth & index
+      depths[_info.depth][_info.index] = null; // remove from old depth & index (create hole to be cleaned)
 
       // add to end of new depth
       var newDepth = intInfo.depth + 1;
@@ -13745,10 +13750,6 @@ BreadthFirstLayout.prototype.run = function () {
         depths.push([]);
       }
       depths[newDepth].push(_ele4);
-
-      for (var _i71 = _info.index; _i71 < depths[_info.depth].length; _i71++) {
-        depths[_info.depth][_i71]._private.scratch.breadthfirst.index--;
-      }
 
       _info.depth = newDepth;
       _info.index = depths[newDepth].length - 1;
@@ -18498,24 +18499,26 @@ BRp.registerCalculationListeners = function () {
   var elesToUpdate = cy.collection();
   var r = this;
 
-  var enqueue = function enqueue(eles, e, dirtyStyleCaches) {
+  var enqueue = function enqueue(eles, e) {
+    var dirtyStyleCaches = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+
     elesToUpdate.merge(eles);
 
-    if (dirtyStyleCaches === true || dirtyStyleCaches === undefined) {
-      for (var i = 0; i < eles.length; i++) {
-        var ele = eles[i];
-        var _p = ele._private;
-        var rstyle = _p.rstyle;
+    for (var i = 0; i < eles.length; i++) {
+      var ele = eles[i];
+      var _p = ele._private;
+      var rstyle = _p.rstyle;
 
+      if (dirtyStyleCaches) {
         rstyle.clean = false;
         _p.bbCache = null;
+      }
 
-        var evts = rstyle.dirtyEvents = rstyle.dirtyEvents || { length: 0 };
+      var evts = rstyle.dirtyEvents = rstyle.dirtyEvents || { length: 0 };
 
-        if (!evts[e.type]) {
-          evts[e.type] = true;
-          evts.length++;
-        }
+      if (!evts[e.type]) {
+        evts[e.type] = true;
+        evts.length++;
       }
     }
   };
@@ -19770,7 +19773,7 @@ BRp.load = function () {
         r.hoverData.last = near;
       }
 
-      if (down && r.nodeIsDraggable(down)) {
+      if (down) {
 
         if (isOverThresholdDrag) {
           // then we can take action
@@ -19784,8 +19787,8 @@ BRp.load = function () {
             }
 
             goIntoBoxMode();
-          } else {
-            // otherwise drag
+          } else if (down && down.grabbed() && r.nodeIsDraggable(down)) {
+            // drag node
             var justStartedDrag = !r.dragData.didDrag;
 
             if (justStartedDrag) {
@@ -20034,7 +20037,6 @@ BRp.load = function () {
   }, false);
 
   var wheelHandler = function wheelHandler(e) {
-    // searchwheel?
 
     if (r.scrollingPage) {
       return;
@@ -21140,7 +21142,7 @@ BRp.generateEllipse = function () {
     },
 
     checkPoint: function checkPoint(x, y, padding, width, height, centerX, centerY) {
-      return math.checkInEllipse(x, y, padding, width, height, centerX, centerY);
+      return math.checkInEllipse(x, y, width, height, centerX, centerY, padding);
     }
   };
 };
@@ -21164,37 +21166,38 @@ BRp.generateRoundRectangle = function () {
     checkPoint: function checkPoint(x, y, padding, width, height, centerX, centerY) {
 
       var cornerRadius = math.getRoundRectangleRadius(width, height);
+      var diam = cornerRadius * 2;
 
       // Check hBox
-      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width, height - 2 * cornerRadius, [0, -1], padding)) {
+      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width, height - diam, [0, -1], padding)) {
         return true;
       }
 
       // Check vBox
-      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width - 2 * cornerRadius, height, [0, -1], padding)) {
+      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width - diam, height, [0, -1], padding)) {
         return true;
       }
 
       // Check top left quarter circle
-      if (math.checkInEllipse(x, y, centerX - width / 2 + cornerRadius, centerY - height / 2 + cornerRadius, cornerRadius * 2, cornerRadius * 2, padding)) {
+      if (math.checkInEllipse(x, y, diam, diam, centerX - width / 2 + cornerRadius, centerY - height / 2 + cornerRadius, padding)) {
 
         return true;
       }
 
       // Check top right quarter circle
-      if (math.checkInEllipse(x, y, centerX + width / 2 - cornerRadius, centerY - height / 2 + cornerRadius, cornerRadius * 2, cornerRadius * 2, padding)) {
+      if (math.checkInEllipse(x, y, diam, diam, centerX + width / 2 - cornerRadius, centerY - height / 2 + cornerRadius, padding)) {
 
         return true;
       }
 
       // Check bottom right quarter circle
-      if (math.checkInEllipse(x, y, centerX + width / 2 - cornerRadius, centerY + height / 2 - cornerRadius, cornerRadius * 2, cornerRadius * 2, padding)) {
+      if (math.checkInEllipse(x, y, diam, diam, centerX + width / 2 - cornerRadius, centerY + height / 2 - cornerRadius, padding)) {
 
         return true;
       }
 
       // Check bottom left quarter circle
-      if (math.checkInEllipse(x, y, centerX - width / 2 + cornerRadius, centerY + height / 2 - cornerRadius, cornerRadius * 2, cornerRadius * 2, padding)) {
+      if (math.checkInEllipse(x, y, diam, diam, centerX - width / 2 + cornerRadius, centerY + height / 2 - cornerRadius, padding)) {
 
         return true;
       }
@@ -21411,14 +21414,15 @@ BRp.generateBottomRoundrectangle = function () {
     checkPoint: function checkPoint(x, y, padding, width, height, centerX, centerY) {
 
       var cornerRadius = math.getRoundRectangleRadius(width, height);
+      var diam = 2 * cornerRadius;
 
       // Check hBox
-      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width, height - 2 * cornerRadius, [0, -1], padding)) {
+      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width, height - diam, [0, -1], padding)) {
         return true;
       }
 
       // Check vBox
-      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width - 2 * cornerRadius, height, [0, -1], padding)) {
+      if (math.pointInsidePolygon(x, y, this.points, centerX, centerY, width - diam, height, [0, -1], padding)) {
         return true;
       }
 
@@ -21431,13 +21435,13 @@ BRp.generateBottomRoundrectangle = function () {
       }
 
       // Check bottom right quarter circle
-      if (math.checkInEllipse(x, y, centerX + width / 2 - cornerRadius, centerY + height / 2 - cornerRadius, cornerRadius * 2, cornerRadius * 2, padding)) {
+      if (math.checkInEllipse(x, y, diam, diam, centerX + width / 2 - cornerRadius, centerY + height / 2 - cornerRadius, padding)) {
 
         return true;
       }
 
       // Check bottom left quarter circle
-      if (math.checkInEllipse(x, y, centerX - width / 2 + cornerRadius, centerY + height / 2 - cornerRadius, cornerRadius * 2, cornerRadius * 2, padding)) {
+      if (math.checkInEllipse(x, y, diam, diam, centerX - width / 2 + cornerRadius, centerY + height / 2 - cornerRadius, padding)) {
 
         return true;
       }
@@ -22746,8 +22750,6 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
   nodeWidth = node.width() + 2 * padding;
   nodeHeight = node.height() + 2 * padding;
 
-  context.lineWidth = node.pstyle('border-width').pfValue;
-
   //
   // setup shift
 
@@ -22763,15 +22765,17 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
 
   var bgImgProp = node.pstyle('background-image');
   var urls = bgImgProp.value;
-  var url = void 0;
-  var urlDefined = [];
-  var image = [];
-  var numImages = urls.length;
-  for (var i = 0; i < numImages; i++) {
-    url = urls[i];
-    urlDefined[i] = url != null && url !== 'none';
-    if (urlDefined[i]) {
+  var urlDefined = new Array(urls.length);
+  var image = new Array(urls.length);
+  var numImages = 0;
+  for (var i = 0; i < urls.length; i++) {
+    var url = urls[i];
+    var defd = urlDefined[i] = url != null && url !== 'none';
+
+    if (defd) {
       var bgImgCrossOrigin = node.cy().style().getIndexedStyle(node, 'background-image-crossorigin', 'value', i);
+
+      numImages++;
 
       // get image, and if not loaded then ask to redraw when later loaded
       image[i] = r.getCachedImage(url, bgImgCrossOrigin, function () {
@@ -22792,24 +22796,6 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
   var borderOpacity = node.pstyle('border-opacity').value * parentOpacity;
 
   context.lineJoin = 'miter'; // so borders are square with the node shape
-
-  if (context.setLineDash) {
-    // for very outofdate browsers
-    switch (borderStyle) {
-      case 'dotted':
-        context.setLineDash([1, 1]);
-        break;
-
-      case 'dashed':
-        context.setLineDash([4, 2]);
-        break;
-
-      case 'solid':
-      case 'double':
-        context.setLineDash([]);
-        break;
-    }
-  }
 
   var setupShapeColor = function setupShapeColor() {
     var bgOpy = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : bgOpacity;
@@ -22872,7 +22858,7 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
     var prevBging = _p.backgrounding;
     var totalCompleted = 0;
 
-    for (var _i = 0; _i < numImages; _i++) {
+    for (var _i = 0; _i < image.length; _i++) {
       if (urlDefined[_i] && image[_i].complete && !image[_i].error) {
         totalCompleted++;
         r.drawInscribedImage(context, image[_i], node, _i, nodeOpacity);
@@ -22923,6 +22909,27 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
   var drawBorder = function drawBorder() {
     if (borderWidth > 0) {
 
+      context.lineWidth = borderWidth;
+      context.lineCap = 'butt';
+
+      if (context.setLineDash) {
+        // for very outofdate browsers
+        switch (borderStyle) {
+          case 'dotted':
+            context.setLineDash([1, 1]);
+            break;
+
+          case 'dashed':
+            context.setLineDash([4, 2]);
+            break;
+
+          case 'solid':
+          case 'double':
+            context.setLineDash([]);
+            break;
+        }
+      }
+
       if (usePaths) {
         context.stroke(path);
       } else {
@@ -22942,6 +22949,12 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
         }
 
         context.globalCompositeOperation = gco;
+      }
+
+      // reset in case we changed the border style
+      if (context.setLineDash) {
+        // for very outofdate browsers
+        context.setLineDash([]);
       }
     }
   };
@@ -22999,12 +23012,6 @@ CRp.drawNode = function (context, node, shiftToOriginWithBb, drawLabel) {
 
   drawText();
   drawOverlay();
-
-  // reset in case we changed the border style
-  if (context.setLineDash) {
-    // for very outofdate browsers
-    context.setLineDash([]);
-  }
 
   //
   // clean up shift
@@ -24027,7 +24034,7 @@ ETCp.getElement = function (ele, bb, pxRatio, lvl, reason) {
 
       downscale();
     } else {
-      self.queueElement(ele, bb, higherCache.level - 1);
+      self.queueElement(ele, higherCache.level - 1);
 
       return higherCache;
     }
@@ -24047,7 +24054,7 @@ ETCp.getElement = function (ele, bb, pxRatio, lvl, reason) {
     if (scalableFrom(lowerCache)) {
       // then use the lower quality cache for now and queue the better one for later
 
-      self.queueElement(ele, bb, lvl);
+      self.queueElement(ele, lvl);
 
       return lowerCache;
     }
@@ -24098,6 +24105,9 @@ ETCp.invalidateElement = function (ele) {
         // remove refs with the element
         caches[lvl] = null;
         util.removeFromArray(txr.eleCaches, cache);
+
+        // remove from queue since the old req was for the old state
+        self.removeFromQueue(ele);
 
         // might have to remove the entire texture if it's not efficiently using its space
         self.checkTextureUtility(txr);
@@ -24214,7 +24224,7 @@ ETCp.recycleTexture = function (txrH, minW) {
   }
 };
 
-ETCp.queueElement = function (ele, bb, lvl) {
+ETCp.queueElement = function (ele, lvl) {
   var self = this;
   var q = self.getElementQueue();
   var id2q = self.getElementIdToQueue();
@@ -24230,18 +24240,9 @@ ETCp.queueElement = function (ele, bb, lvl) {
   } else {
     var req = {
       ele: ele,
-      bb: bb,
-      position: math.copyPosition(ele.position()),
       level: lvl,
       reqs: 1
     };
-
-    if (ele.isEdge()) {
-      req.positions = {
-        source: math.copyPosition(ele.source().position()),
-        target: math.copyPosition(ele.target().position())
-      };
-    }
 
     q.push(req);
 
@@ -24258,27 +24259,44 @@ ETCp.dequeue = function (pxRatio /*, extent*/) {
   for (var i = 0; i < maxDeqSize; i++) {
     if (q.size() > 0) {
       var req = q.pop();
+      var ele = req.ele;
+      var caches = ele._private.rscratch.imgCaches;
 
-      id2q[req.ele.id()] = null;
+      // dequeueing isn't necessary when an existing cache exists
+      if (caches[req.level] != null) {
+        continue;
+      }
+
+      id2q[ele.id()] = null;
 
       dequeued.push(req);
 
-      var ele = req.ele;
-      var bb;
+      var bb = ele.boundingBox();
 
-      if (ele.isEdge() && (!math.arePositionsSame(ele.source().position(), req.positions.source) || !math.arePositionsSame(ele.target().position(), req.positions.target)) || !math.arePositionsSame(ele.position(), req.position)) {
-        bb = ele.boundingBox();
-      } else {
-        bb = req.bb;
-      }
-
-      self.getElement(req.ele, bb, pxRatio, req.level, getTxrReasons.dequeue);
+      self.getElement(ele, bb, pxRatio, req.level, getTxrReasons.dequeue);
     } else {
       break;
     }
   }
 
   return dequeued;
+};
+
+ETCp.removeFromQueue = function (ele) {
+  var self = this;
+  var q = self.getElementQueue();
+  var id2q = self.getElementIdToQueue();
+  var req = id2q[ele.id()];
+
+  if (req != null) {
+    // bring to front of queue
+    req.reqs = util.MAX_INT;
+    q.updateItem(req);
+
+    q.pop(); // remove from queue
+
+    id2q[ele.id()] = null; // remove from lookup map
+  }
 };
 
 ETCp.onDequeue = function (fn) {
@@ -24306,7 +24324,7 @@ ETCp.setupDequeueing = defs.setupDequeueing({
   },
   shouldRedraw: function shouldRedraw(self, deqd, pxRatio, extent) {
     for (var i = 0; i < deqd.length; i++) {
-      var bb = deqd[i].bb;
+      var bb = deqd[i].ele.boundingBox();
 
       if (math.boundingBoxesIntersect(bb, extent)) {
         return true;
