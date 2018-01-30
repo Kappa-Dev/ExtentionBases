@@ -6,7 +6,7 @@ let ws_client = ({url,cb}) => {
   let retry = () => {
     ready = false;
     if(!interval) {
-      interval = setInterval(connect,300);
+      interval = setInterval(connect,500);
     }
   }
 
@@ -20,14 +20,14 @@ let ws_client = ({url,cb}) => {
     let that = connection;
 
     connection.onopen = () => {
-      console.log("Connected 0");
+      console.log("Connection opened");
       if (that.obsolete) { console.log("open: obsolete"); return; }
       ready = true;
       if (interval) {
         clearInterval(interval);
         interval = null;
       }
-      console.log("Connected");
+      console.log("New connection confirmed");
       connection.send('Connected');
     }
 

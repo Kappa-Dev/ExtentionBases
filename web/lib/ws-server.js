@@ -8,6 +8,7 @@ let ws_server = function({port, on_connect}) {
   let handle = null;
 
   let send = (_type,_data=null) => {
+    if (!handle) return;
     try {
       let [type,data] = (_data===null) ? ['log',_type] : [_type,_data];
       let msg = JSON.stringify({type,data});
