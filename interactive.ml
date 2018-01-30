@@ -49,12 +49,18 @@ module Make (Node:Node.NodeType) =
 
     let simple_tests () =
       let o8 = draw (Node.tn [([2],[3]);([3],[6]);([6],[5]);([4],[5]);([4],[2])]) Graph.empty in
-      let o2 = draw (Node.tn [([3],[2]);([3],[6]);([2],[4]);([4],[5])]) Graph.empty in
+      let o2 = draw (Node.tn [([3],[2])]) Graph.empty in
       let w =  draw (Node.tn [([5],[4]);([5],[6]);([6],[4]);([6],[3]);([3],[2]);([2],[4])]) Graph.empty in
-      let o2_to_o8 = Cat.identity o2 o8 in
-      let o2_to_w = Cat.identity o2 w in
-      let sharings = Cat.share  o2_to_o8 o2_to_w in
-      let ext_base = EB.of_sharings [sharings] in
+      let o2_to_o8 = o2 =~=> o8 in
+      let o2_to_w = o2 =~=> w in
+      let sharings =
+        List.fold_left (fun sharings o2_o8 ->
+            List.fold_left (fun sharings o2_w ->
+                (Cat.share o2_o8 o2_w)::sharings
+              ) sharings o2_to_w
+          ) [] o2_to_o8
+      in
+      let ext_base = EB.of_sharings sharings in
       let d = open_out "web_eb.dot" in
       let str = EB.to_dot_content ext_base in
       Printf.fprintf d "%s\n%s" (EB.to_dot false Lib.Dict.empty ext_base) str ;
