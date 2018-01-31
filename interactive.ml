@@ -81,7 +81,7 @@ module Make (Node:Node.NodeType) =
          in
          let d = open_out "web_eb.dot" in
          Printf.fprintf d "%s\n%s"
-           (EB.to_dot false env.model.Model.dict eb)
+           (EB.to_dot true env.model.Model.dict eb)
            (EB.to_dot_content eb) ;
          close_out d
 

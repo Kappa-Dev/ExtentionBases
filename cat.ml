@@ -637,7 +637,10 @@ module Make (Node:Node.NodeType) =
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       let compare_sharing (f,tile) (f',tile') =
-        compare f' f
+        match upper_bound tile,upper_bound tile' with
+          Some _, None -> 1
+        | None, Some _ -> -1
+        | _ -> compare f' f
       in
       let ipos =
         List.filter
@@ -651,7 +654,7 @@ module Make (Node:Node.NodeType) =
           then
             sh::cont
           else cont
-        ) [] (List.fast_sort compare_sharing ipos)
+        ) [] (List.rev (List.fast_sort compare_sharing ipos))
 
     let glue g h =
       (*returns spans of the form g <-id- g1 -f-> h where g1 is an edge of g*)
