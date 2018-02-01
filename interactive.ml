@@ -220,7 +220,7 @@ module Make (Node:Node.NodeType) =
              | Result.Ok command ->
                 if db() then session (process_command env command)
                 else
-                  (try session (process_command env command) with exn -> log (Printexc.to_string exn) ; session env)
+                  (try session (process_command env command) with exn -> if db() then raise exn else log (Printexc.to_string exn) ; session env)
              | Result.Error s -> log ("Parse error "^s); session env);
         )
       in

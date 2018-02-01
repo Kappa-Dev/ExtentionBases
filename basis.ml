@@ -337,7 +337,7 @@ module Make (Node:Node.NodeType) =
           List.fold_left
             (fun (add,alpha) (oldp,root_to_oldp,oldp_to_i,_) ->
               match List.hd (compare root_to_newp root_to_oldp) with
-                Iso new_to_old -> (false, Lib.IntMap.add newp (oldp,new_to_old) alpha)
+                Iso old_to_new -> if oldp = newp then (false,alpha) else (false, Lib.IntMap.add newp (oldp,Cat.invert old_to_new) alpha)
               | Incomp _ -> (add,alpha)
               | _ -> raise (Invariant_failure ("best inf is above or below another best_inf",ext_base))
             ) (true,inf_path.alpha) inf_list
@@ -363,7 +363,15 @@ module Make (Node:Node.NodeType) =
         let dry_run',visited',inf_path',queue',max_step'=
           List.fold_left (*folding inf_list*)
             (fun (dry_run,visited,inf_path,queue,max_step) (inf,root_to_inf,inf_to_k,inf_to_w) ->
-              let inf_to_i = step_ki @@ inf_to_k in
+              let inf_to_i = try step_ki @@ inf_to_k
+                             with
+                               Cat.Undefined ->
+                               print_endline ("cannot compose "
+                                              ^(Cat.string_of_arrows ~full:true inf_to_k)
+                                              ^" and "
+                                              ^(Cat.string_of_arrows ~full:true step_ki)) ;
+                               raise Cat.Undefined
+              in
               let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
               List.fold_left (*folding compare inf_to_i inf_to_w*)
                 (fun (dry_run,visited,inf_path,queue,max_step) -> function
