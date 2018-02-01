@@ -400,7 +400,41 @@ module Make (Node:Node.NodeType) =
         f'
       with Not_found -> {f' with partial = true}
 
-    let complete left ls sup0 il inf ir =
+    let arrows_of_tile tile =
+      match tile.cospan with
+        None -> raise Undefined
+      | Some (ls,_) ->
+         let (il,_) = tile.span in
+         ls @@ il
+
+    exception Found of arrows
+
+    (**returns g -if it exists- s.t gf = f'*)
+    let complete f f' =
+      try
+        let arrows = flatten (f.trg => f'.trg) in
+        List.iter
+          (fun g ->
+            if (g @@ f) === f' then raise (Found g)
+            else ()
+          ) arrows ; raise Undefined
+      with
+      | Found g -> g
+
+    (**returns Some iso phi -if it exists- s.t (phi o f) = f', None otherwise*)
+    let equalize f f' =
+      try
+        if Graph.is_equal f.src f'.src
+           && Graph.size_edge f.trg = Graph.size_edge f'.trg
+           && Graph.size_node f.trg = Graph.size_node f'.trg
+        then
+          Some (complete f f')
+        else
+          None
+      with
+        Undefined -> None
+
+    let extend left ls sup0 il inf ir =
       let comp u u' h =
         if Hom.mem u h then u' = Hom.find u h
         else
@@ -535,9 +569,10 @@ module Make (Node:Node.NodeType) =
             ) pb right_to_sup.maps
         ) [] left_to_sup.maps
 
-    (*given a span, returns a cospan where the left upper map is a partial morphism*)
+    let (=~=) f f' = match equalize f f' with Some _ -> true | None -> false
+
     let (/|) inf_to_left inf_to_right =
-      let close_rs right_to_sup cont =
+      let close_rs right_to_sup =
         let part_left_to_sup = inf_to_right @@ (invert inf_to_left) in
         let inf = inf_to_left.src in
         let left = inf_to_left.trg in
@@ -546,9 +581,9 @@ module Make (Node:Node.NodeType) =
         let hom_p =  hom_of_arrows part_left_to_sup in
         let inf_to_right = hom_of_arrows inf_to_right in
         let inf_to_left = hom_of_arrows inf_to_left in
-        let sharing_tiles = complete left hom_p sup inf_to_left inf inf_to_right in
+        let sharing_tiles = extend left hom_p sup inf_to_left inf inf_to_right in
         List.fold_left
-          (fun sharing_tiles (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
+          (fun (sharing_tiles,exts) (left_to_sup',sup',inf_to_left',inf',inf_to_right') ->
             let emb_inf_left = {src = inf' ;
                                 trg = left ;
                                 maps = [inf_to_left'] ;
@@ -570,50 +605,20 @@ module Make (Node:Node.NodeType) =
                 None
             in
             let tile = {span = (emb_inf_left,emb_inf_right) ; cospan = csp_opt} in
-            (identity inf inf',tile)::sharing_tiles
-          ) cont sharing_tiles
+            let inf_to_tile = identity inf inf' in
+            let arr = try (arrows_of_tile tile) @@ inf_to_tile with Undefined -> inf_to_tile in
+            if List.exists (fun arr' -> arr' =~= arr) exts then (sharing_tiles,exts)
+            else ((inf_to_tile, tile)::sharing_tiles, arr::exts)
+          ) ([],[]) sharing_tiles
       in
-      close_rs (identity inf_to_right.trg inf_to_right.trg) []
-
-    let arrows_of_tile tile =
-      match tile.cospan with
-        None -> raise Undefined
-      | Some (ls,_) ->
-         let (il,_) = tile.span in
-         ls @@ il
+      let sharings,_ = close_rs (identity inf_to_right.trg inf_to_right.trg) in
+      sharings
 
     let merge_arrows f f' =
       if (Graph.is_equal f.src f'.src && Graph.is_equal f.trg f'.trg) then
         extension_class {src = f.src ; trg = f.trg ; maps = f.maps@f'.maps; partial = false}
       else
         raise Undefined
-
-    exception Found of arrows
-
-    (**returns g -if it exists- s.t gf = f'*)
-    let complete f f' =
-      try
-        let arrows = flatten (f.trg => f'.trg) in
-        List.iter
-          (fun g ->
-            if (g @@ f) === f' then raise (Found g)
-            else ()
-          ) arrows ; raise Undefined
-      with
-      | Found g -> g
-
-    (**returns Some iso phi -if it exists- s.t (phi o f) = f', None otherwise*)
-    let equalize f f' =
-      try
-        if Graph.is_equal f.src f'.src
-           && Graph.size_edge f.trg = Graph.size_edge f'.trg
-           && Graph.size_node f.trg = Graph.size_node f'.trg
-        then
-          Some (complete f f')
-        else
-          None
-      with
-        Undefined -> None
 
     (*[compare f f'] = -1 if exists h: h.f = f', +1 if f = h.f' and 0 otherwise (incomp or iso)*)
     let compare f f' =
@@ -632,15 +637,16 @@ module Make (Node:Node.NodeType) =
         with
           Undefined -> 0
 
-    let (=~=) = fun f g -> match equalize f g with None -> false | Some _ -> true
-
-
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       let compare_sharing (f,tile) (f',tile') =
-        match upper_bound tile,upper_bound tile' with
-          Some _, None -> 1
-        | None, Some _ -> -1
-        | _ -> compare f' f
+        let n = compare f f' in
+        if n = 0 then
+          match upper_bound tile, upper_bound tile' with
+            None, None | Some _, Some _ -> 0
+            | None, Some _ -> -1
+            | Some _ , None -> 1
+        else
+          n
       in
       let ipos =
         List.filter

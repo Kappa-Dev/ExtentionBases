@@ -114,8 +114,7 @@ module Make (Node:Node.NodeType) =
 
     let (@@) = Cat.(@@)
 
-    let find_extension i aliases ext_base =
-      let i = try let _,j = Lib.IntMap.find i aliases in j with Not_found -> i in
+    let find_extension i ext_base =
       if not (mem i ext_base) then
         failwith ("Unkown point "^(string_of_int i)^" in extension base")
       else
@@ -140,13 +139,7 @@ module Make (Node:Node.NodeType) =
       in
       replace i pi ext_base
 
-    let remove_step aliases i j ext_base =
-      let i =
-        try let _,j = Lib.IntMap.find i aliases in j with Not_found -> i
-      in
-      let j =
-        try let _,k = Lib.IntMap.find j aliases in k with Not_found -> j
-      in
+    let remove_step i j ext_base =
       let pi = find i ext_base in
       let _ = if db() then
                 if Lib.IntMap.mem j pi.next then
@@ -155,69 +148,24 @@ module Make (Node:Node.NodeType) =
       in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
-    let is_below aliases i j ext_base =
-      let rec search ext_base = function
-          [] -> false
-        | i::cont ->
-           let _,i = try Lib.IntMap.find i aliases with Not_found -> (Cat.unit,i) in
-           let pi = try find i ext_base
-                    with Not_found ->
-                      raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
-           in
-           if Lib.IntMap.mem j pi.next then raise Exit
-           else
-             let cont' =
-               Lib.IntMap.fold (fun k _ cont -> k::cont) pi.next cont
-             in
-             search ext_base cont'
-      in
-      try
-        let pi = find i ext_base
-        in
-        let next =
-          Lib.IntMap.fold
-            (fun k _ cont -> if k=j then raise Exit else k::cont
-            ) pi.next []
-        in
-        search ext_base next
-      with
-        Exit -> true
 
-    let add_step ?(check=false) aliases i j emb_ij ext_base =
-      let i,emb_ij =
-        try
-          let i_to_k,k = Lib.IntMap.find i aliases in
-          (k, emb_ij @@ (Cat.invert i_to_k))
-        with
-          Not_found -> (i,emb_ij)
-      in
-      let j,emb_ij =
-        try
-          let j_to_k,k = Lib.IntMap.find j aliases in
-          let () = if db() then Printf.printf "Aliasing %d |-> %d to %d |-> %d\n " i j i k
-          in
-          (k,j_to_k @@ emb_ij)
-        with
-          Not_found -> (j,emb_ij)
-      in
+    let add_step i j emb_ij ext_base =
       let ext_base =
-        if i <> 0 then remove_step aliases 0 j ext_base
+        if i <> 0 then remove_step 0 j ext_base
         else ext_base (*This is weird, not the general case...*)
       in
-      if (check && is_below aliases i j ext_base) then ext_base
-      else
-        let pi =
-          try find i ext_base
-          with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
-        in
-        if db() then Printf.printf
-                       "\t Add Step %d |-> %d = %s-%s->%s\n" i j
-                       (Graph.to_string (Cat.src emb_ij))
-                       (Cat.string_of_arrows emb_ij)
-                       (Graph.to_string (Cat.trg emb_ij)) ;
-        replace i
-          {pi with next = Lib.IntMap.add j emb_ij pi.next}
-          {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
+      let pi =
+        try find i ext_base
+        with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
+      in
+      if db() then Printf.printf
+                     "\t Add Step %d |-> %d = %s-%s->%s\n" i j
+                     (Graph.to_string (Cat.src emb_ij))
+                     (Cat.string_of_arrows emb_ij)
+                     (Graph.to_string (Cat.trg emb_ij)) ;
+      replace i
+        {pi with next = Lib.IntMap.add j emb_ij pi.next}
+        {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
 
     type sharing_info = {to_w : Cat.arrows ;
                          to_base : Cat.arrows ;
@@ -237,7 +185,7 @@ module Make (Node:Node.NodeType) =
       | Incomp _ -> "Incomp"
       | Conflicting -> "Conflict"
 
-    let compare inf_to_i inf_to_w ext_base =
+    let compare inf_to_i inf_to_w =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ;
       match Cat.share inf_to_i inf_to_w with
@@ -291,7 +239,57 @@ module Make (Node:Node.NodeType) =
 
     exception Found_iso of Cat.arrows * int
 
-    let rec progress ext_base dry_run visited best_inf aliases queue max_step =
+    type inf_path = {beta : (int*arrows*arrows*arrows) list Lib.IntMap.t ; alpha: (int*arrows) Lib.IntMap.t}
+
+    let empty_path =
+      let em = Lib.IntMap.empty in
+      {beta = em ; alpha = em}
+
+    let alias i inf_path =
+      try Lib.Util.proj_left (Lib.IntMap.find i inf_path.alpha) with Not_found -> i
+
+    let add_step_alpha i j a_ij ext_base inf_path =
+      let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
+      let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.src a_ij)) in
+      add_step i' j' (to_j' @@ a_ij @@ to_i') ext_base
+
+    let rm_step_alpha i j ext_base inf_path =
+      remove_step (alias i inf_path) (alias j inf_path) ext_base
+
+    let find_extension_alpha i ext_base inf_path =
+      find_extension (alias i inf_path) ext_base
+
+    let add_conflict_alpha i j ext_base inf_path =
+      add_conflict (alias i inf_path) (alias j inf_path) ext_base
+
+    let is_below_alpha i j ext_base inf_path =
+      let rec search ext_base = function
+          [] -> false
+        | i::cont ->
+           let pi = try find (alias i inf_path) ext_base
+                    with Not_found ->
+                      raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
+           in
+           if Lib.IntMap.mem (alias j inf_path) pi.next then raise Exit
+           else
+             let cont' =
+               Lib.IntMap.fold (fun k _ cont -> k::cont) pi.next cont
+             in
+             search ext_base cont'
+      in
+      try
+        let pi = find (alias i inf_path) ext_base
+        in
+        let next =
+          Lib.IntMap.fold
+            (fun k _ cont -> if (alias k inf_path) = (alias j inf_path) then raise Exit else k::cont
+            ) pi.next []
+        in
+        search ext_base next
+      with
+        Exit -> true
+
+    let rec progress ext_base dry_run visited inf_path queue max_step =
       (************* DEBUGING INFO ***************)
       let _ = if db() then
                 begin
@@ -320,73 +318,55 @@ module Make (Node:Node.NodeType) =
            else
              Some (i-1)
       in
-      let update_best_inf ?(replace_if_found=true) i (root_to_inf,inf_to_i,inf,inf_to_w as new_inf) m a =
+      let update_inf i (newp,root_to_newp,newp_to_i,newp_to_w as new_inf) inf_path ext_base =
         if db() then
-          Printf.printf "%s to inf %d\n" (Cat.string_of_arrows ~full:true root_to_inf) inf ;
-        let print (m,a) =
+          Printf.printf "%s to inf %d\n" (Cat.string_of_arrows ~full:true root_to_newp) newp ;
+        let print ip =
           Lib.IntMap.iter
             (fun i l ->
-              Printf.printf "Beta(%d):={%s}\n" i (String.concat "," (List.map (fun (f,g,j,h) -> string_of_int j) l))
-            ) m ;
+              Printf.printf "Beta(%d):={%s}\n" i (String.concat "," (List.map (fun (j,f,g,h) -> string_of_int j) l))
+            ) ip.beta ;
           Lib.IntMap.iter
-            (fun i (f,j) ->
+            (fun i (j,f) ->
               Printf.printf "%d ~> %d\n" i j
-            ) a
+            ) ip.alpha
         in
-        try
-          let _ = if db() then Printf.printf "Adding %d as best inf for %d...\n" inf i in
-          let cut = try Lib.IntMap.find i m with Not_found -> [] in
-          let cut',aliasing_opt =
-            List.fold_left
-              (fun (cut,aliasing_opt) (root_to_mp,_,mp,_ as old_inf) ->
-                if mp = inf then
-                  let () = if db() then Printf.printf "%d already present\n" inf ; flush stdout ;
-                  in
-                  raise Exit (*to avoid auto aliasing*)
-                else
-                  match Cat.equalize root_to_mp root_to_inf with
-                    Some mp_to_inf ->
-                     let () = if db() then
-                                (assert (Cat.is_iso mp_to_inf) ;
-                                 Printf.printf "isomorphic best inf detected: %d\n" mp)
-                     in
-                     if replace_if_found then
-                       let () = if db() then Printf.printf "aliasing %d (replaced) -> %d \n" mp inf
-                       in
-                       (new_inf::cut, Some (mp, mp_to_inf, inf)) (* (old_inf -~-> new_inf, old_inf) *)
-                     else
-                       let () = if db() then Printf.printf "aliasing %d (not inserted) -> %d \n" inf mp in
-                       (old_inf::cut, Some (inf, Cat.invert mp_to_inf, mp)) (* (new_inf -~-> old_inf, old_inf) *)
-                  | None -> if db() then assert (not (root_to_mp =~= root_to_inf)); (old_inf::cut,aliasing_opt)
-              ) ([],None) cut
-          in
-          match aliasing_opt with
-            None -> let m,a = Lib.IntMap.add i (new_inf::cut) m, a in if db() then print (m,a) ; (m,a)
-            | Some (k,to_j,j) ->
-               (*k~>j but there might exists X, s.t  for x in X: x~>k however there should be no y s.t y~>x*)
-               let a = Lib.IntMap.fold (fun x (to_y,y) a -> if y=k then Lib.IntMap.add x (to_j@@to_y,j) a else a) a a
-               in
-               let m,a = (Lib.IntMap.add i cut' m, Lib.IntMap.add k (to_j,j) a) in if db() then print (m,a) ; (m,a)
-        with
-          Exit -> (m,a)
+        let _ = if db() then Printf.printf "Adding %d as best inf for %d...\n" newp i in
+        let inf_list = try Lib.IntMap.find i inf_path.beta with Not_found -> [] in
+        let add,alpha' =
+          List.fold_left
+            (fun (add,alpha) (oldp,root_to_oldp,oldp_to_i,_) ->
+              match List.hd (compare root_to_newp root_to_oldp) with
+                Iso new_to_old -> (false, Lib.IntMap.add newp (oldp,new_to_old) alpha)
+              | Incomp _ -> (add,alpha)
+              | _ -> raise (Invariant_failure ("best inf is above or below another best_inf",ext_base))
+            ) (true,inf_path.alpha) inf_list
+        in
+        let beta' =
+          if add then Lib.IntMap.add i (new_inf::inf_list) inf_path.beta
+          else inf_path.beta
+        in
+        let inf_path' = {beta = beta' ; alpha = alpha'} in
+        if db() then print inf_path' ;
+        inf_path'
       in
-      let get_best_inf i m = Lib.IntMap.find i m
+
+      let get_best_inf i ip = Lib.IntMap.find i ip.beta
       in
-      if Queue.is_empty queue then
-        (best_inf,aliases,dry_run)
+      if Queue.is_empty queue then (inf_path,dry_run)
       else
         let k,step_ki,i = Queue.pop queue in
         let inf_list =
-          try get_best_inf k best_inf
+          try get_best_inf k inf_path
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
         in
-        let dry_run',visited',best_inf',aliases',queue',max_step'=
+        let dry_run',visited',inf_path',queue',max_step'=
           List.fold_left (*folding inf_list*)
-            (fun (dry_run,visited,best_inf,aliases,queue,max_step) (root_to_inf,inf_to_k,inf,inf_to_w) ->
+            (fun (dry_run,visited,inf_path,queue,max_step) (inf,root_to_inf,inf_to_k,inf_to_w) ->
               let inf_to_i = step_ki @@ inf_to_k in
               let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
               List.fold_left (*folding compare inf_to_i inf_to_w*)
-                (fun (dry_run,visited,best_inf,aliases,queue,max_step) -> function
+                (fun (dry_run,visited,inf_path,queue,max_step) -> function
 
                     (************************** Case Conflicting span ********************************)
                     (*1. best_inf,aliases = (root_to_inf,inf_to_i,inf,inf_to w) +!> best_inf (i) *)
@@ -396,15 +376,15 @@ module Make (Node:Node.NodeType) =
 
                     Conflicting ->
                      if db() then print_string (red "Conflicting points\n");
-                     let best_inf',aliases' =
-                       update_best_inf
+                     let inf_path'=
+                       update_inf
                          i
-                         (root_to_inf,inf_to_i,inf,inf_to_w)
-                         best_inf
-                         aliases
+                         (inf,root_to_inf,inf_to_i,inf_to_w)
+                         inf_path
+                         ext_base
                      in
                      let dry_run' =
-                       (fun w ext_base _ -> add_conflict i w ext_base)::dry_run
+                       (fun w ext_base inf_path -> add_conflict_alpha i w ext_base inf_path)::dry_run
                      in
 
                      let queue' =
@@ -417,7 +397,7 @@ module Make (Node:Node.NodeType) =
                            ) (find i ext_base).next queue
                      in
                      let visited' = Lib.IntSet.add i visited in
-                     (dry_run',visited',best_inf',aliases',queue',dec_step ext_base max_step)
+                     (dry_run',visited',inf_path',queue',dec_step ext_base max_step)
 
                     (************************** Case inf_to_w factors inf_to_i ********************************)
                     (*1. best_inf,aliases = (root_to_inf,inf_to_i,inf,inf_to w) +!> best_inf (i) *)
@@ -426,21 +406,21 @@ module Make (Node:Node.NodeType) =
                     (*NB no todo list to update here*)
                     | Below w_to_i -> (* w --w_to_i--> i *)
                        if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
-                       let best_inf',aliases' =
-                         update_best_inf
+                       let inf_path' =
+                         update_inf
                            i
-                           (root_to_inf,inf_to_i,inf,inf_to_w)
-                           best_inf
-                           aliases
+                           (inf,root_to_inf,inf_to_i,inf_to_w)
+                           inf_path
+                           ext_base
                        in
                        let dry_run' =
-		         ((fun w ext_base _ ->
+		         ((fun w ext_base inf_path ->
                            (*no check and no aliasing necessary here*)
-                           remove_step aliases inf i (add_step aliases w i w_to_i ext_base)
+                           rm_step_alpha inf i (add_step_alpha w i w_to_i ext_base inf_path) inf_path
                          )::dry_run)
                        in
                        let visited' = Lib.IntSet.add i visited in
-                       (dry_run',visited',best_inf',aliases',queue,dec_step ext_base max_step)
+                       (dry_run',visited',inf_path',queue,dec_step ext_base max_step)
 
                     (************************** Case inf_to_i factors inf_to_w *******************)
                     (*1. best_inf,_ = (root_to_i,id_i,i,i_to_w) +!> best_inf (i) *)
@@ -451,11 +431,11 @@ module Make (Node:Node.NodeType) =
                     | Above i_to_w -> (* i --i_to_w--> w *)
                        if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
                        let pi = find i ext_base in
-                       let best_inf',_ =
-                         update_best_inf i
-                           (inf_to_i @@ root_to_inf,Cat.identity pi.value pi.value,i,i_to_w)
-                           best_inf
-                           aliases
+                       let inf_path' =
+                         update_inf i
+                           (i,inf_to_i @@ root_to_inf,Cat.identity pi.value pi.value,i_to_w)
+                           inf_path
+                           ext_base
                        in
                        let queue' =
                          if Lib.IntSet.mem i visited then
@@ -464,7 +444,7 @@ module Make (Node:Node.NodeType) =
                            Lib.IntMap.fold
                              (fun j step_ij cont -> Queue.add (i,step_ij,j) cont ; cont) pi.next queue
                        in
-                       (dry_run,(Lib.IntSet.add i visited), best_inf',aliases,queue',dec_step ext_base max_step)
+                       (dry_run,(Lib.IntSet.add i visited), inf_path' ,queue', dec_step ext_base max_step)
 
                     (************************** Case inf_to_w =~= inf_to_i *************************)
                     (*NB drop dry_run*)
@@ -490,8 +470,8 @@ module Make (Node:Node.NodeType) =
                        (*4. mark i as visited *)
                        if Cat.is_iso sh_info.to_midpoint then
                          let () = if db() then print_string (green "...that is not worth adding\n") in
-                         let best_inf',aliases' =
-                           update_best_inf i (root_to_inf,inf_to_i,inf,inf_to_w) best_inf aliases
+                         let inf_path' =
+                           update_inf i (inf,root_to_inf,inf_to_i,inf_to_w) inf_path ext_base
                          in
 		         let queue' =
                            if Lib.IntSet.mem i visited then
@@ -504,11 +484,11 @@ module Make (Node:Node.NodeType) =
                          in
                          let dry_run' =
                            if not sh_info.has_sup then
-                             (fun w ext_base  _ -> add_conflict i w ext_base)::dry_run
+                             (fun w ext_base inf_path -> add_conflict_alpha i w ext_base inf_path)::dry_run
                            else
                              dry_run
 		         in
-                         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue',dec_step ext_base max_step)
+                         (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step)
                        else
                          (*Not a trivial midpoint*)
                          let queue' =
@@ -521,16 +501,15 @@ module Make (Node:Node.NodeType) =
                                ) (find i ext_base).next queue
                          in
                          let fresh_id = get_fresh ext_base in
-                         let best_inf',aliases' =
-                           update_best_inf ~replace_if_found:false
-                             i
-                             (sh_info.to_midpoint @@ root_to_inf,sh_info.to_base,fresh_id,sh_info.to_w)
-                             best_inf
-                             aliases
+                         let inf_path' =
+                           update_inf i
+                             (fresh_id,sh_info.to_midpoint @@ root_to_inf,sh_info.to_base,sh_info.to_w)
+                             inf_path
+                             ext_base
                          in
                          let dry_run' =
-                           (fun w ext_base aliases ->
-                             let skip_midpoint = Lib.IntMap.mem fresh_id aliases in
+                           (fun w ext_base inf_path ->
+                             let skip_midpoint = (alias fresh_id inf_path) <> fresh_id in
                              let ext_base =
                                if skip_midpoint then ext_base
                                else
@@ -538,39 +517,45 @@ module Make (Node:Node.NodeType) =
                                  let ext_base =
                                    add fresh_id
                                      mp
-                                     (sh_info.to_midpoint @@ (find_extension inf aliases ext_base))
+                                     (sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path))
                                      ext_base
                                  in
-                                 add_step aliases fresh_id i sh_info.to_base ext_base
+                                 add_step_alpha fresh_id i sh_info.to_base ext_base inf_path
                              in
                              (*adding step from inf to midpoint or its alias (in this case verify that inf is not already below the alias*)
                              let ext_base =
-                               add_step
-                                 ~check:skip_midpoint
-                                 aliases
-                                 inf fresh_id sh_info.to_midpoint ext_base
+                               if skip_midpoint && (is_below_alpha inf fresh_id ext_base inf_path)
+                               then ext_base
+                               else
+                                 add_step_alpha
+                                   inf
+                                   fresh_id
+                                   sh_info.to_midpoint
+                                   ext_base
+                                   inf_path
                              in
 		             let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
-                             remove_step aliases inf i ext_base (*will remove steps only if they exists and they are direct*)
+                             rm_step_alpha inf i ext_base inf_path (*will remove steps only if they exists and they are direct*)
                            )::dry_run
                          in
-		         (dry_run',(Lib.IntSet.add i visited),best_inf',aliases',queue',dec_step ext_base max_step)
-                ) (dry_run,visited,best_inf,aliases,queue,max_step) (compare inf_to_i inf_to_w ext_base)
-            ) (dry_run,visited,best_inf,aliases,queue,max_step) inf_list
+		         (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step)
+                ) (dry_run,visited,inf_path,queue,max_step) (compare inf_to_i inf_to_w)
+            ) (dry_run,visited,inf_path,queue,max_step) inf_list
         in
-        progress ext_base dry_run' visited' best_inf' aliases' queue' max_step'
+        progress ext_base dry_run' visited' inf_path' queue' max_step'
 
     let insert ~max_step ext_w obs_emb obs_id ext_base =
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       try
-        let best_inf_0 = Lib.IntMap.add 0 [(id_0,id_0,0,ext_w)] Lib.IntMap.empty in
+        let beta_0 = Lib.IntMap.add 0 [(0,id_0,id_0,ext_w)] Lib.IntMap.empty in
+        let alpha_0 = Lib.IntMap.empty in
+        let inf_path_0 = {beta = beta_0 ; alpha = alpha_0} in
         let queue_0 = Queue.create () in
         Queue.add (0,id_0,0) queue_0 ;
-        let aliases_0 = Lib.IntMap.empty in
         let visited_0 = Lib.IntSet.empty in
         let dry_run_0 = [] in
-        let best_inf,aliases,dry_run = progress ext_base dry_run_0 visited_0 best_inf_0 aliases_0 queue_0 max_step
+        let inf_path,dry_run = progress ext_base dry_run_0 visited_0 inf_path_0 queue_0 max_step
         in
 
         (* 1. Adding witness point *)
@@ -580,7 +565,7 @@ module Make (Node:Node.NodeType) =
         let ext_base = add_obs w obs_emb obs_id ext_base in
         (* 2. Executing dry run, i.e inserting midpoints *)
         let ext_base =
-          List.fold_left (fun ext_base act -> act w ext_base aliases) ext_base (List.rev dry_run)
+          List.fold_left (fun ext_base act -> act w ext_base inf_path) ext_base (List.rev dry_run)
         in
         (* 3. Connecting witness w to its best predecessors in the base*)
         let ext_base =
@@ -588,18 +573,18 @@ module Make (Node:Node.NodeType) =
               (fun i ext_base ->
                 if i=w then ext_base
                 else
-                  let inf_list = try Lib.IntMap.find i best_inf with
+                  let inf_list = try Lib.IntMap.find i inf_path.beta with
                                    Not_found ->
                                    raise (Invariant_failure ("Invariant violation: best_inf not defined for point "^(string_of_int i), ext_base))
                   in
                   List.fold_left
-                    (fun ext_base (_,_,inf,inf_to_w) ->
+                    (fun ext_base (inf,_,_,inf_to_w) ->
                       try
                         (*TODO maintain this incrementally, this is super not efficient*)
                         let p_inf = find inf ext_base in
                         Lib.IntMap.fold
                           (fun i _ () ->
-                            if Lib.IntMap.exists (fun _ l -> List.exists (fun (_,_,j,_) -> i=j) l) best_inf then raise Exit
+                            if Lib.IntMap.exists (fun _ l -> List.exists (fun (j,_,_,_) -> i=j) l) inf_path.beta then raise Exit
                           ) p_inf.next () ;
                         let () =
                           if db() then print_string
@@ -607,7 +592,9 @@ module Make (Node:Node.NodeType) =
                                                   "\t Adding best inf %d for %d and witness %d\n" inf i w)
                                          ) ; flush stdout
                         in
-                        add_step ~check:true aliases inf w inf_to_w ext_base
+                        if is_below_alpha inf w ext_base inf_path then ext_base
+                        else
+                          add_step_alpha inf w inf_to_w ext_base inf_path
                       with
                         Exit -> ext_base
                     ) ext_base inf_list
@@ -639,9 +626,9 @@ module Make (Node:Node.NodeType) =
              let ext_base = if mem l ext_base then ext_base else add l left (inf_to_left @@ root_to_inf) ext_base in
              let ext_base = if mem r ext_base then ext_base else add r right (inf_to_right @@ root_to_inf) ext_base in
              let ext_base = if conflict then add_conflict l r ext_base else ext_base in
-             let ext_base = add_step Lib.IntMap.empty z i root_to_inf
-                              (add_step Lib.IntMap.empty i l inf_to_left
-                                 (add_step Lib.IntMap.empty i r inf_to_right ext_base))
+             let ext_base = add_step z i root_to_inf
+                              (add_step i l inf_to_left
+                                 (add_step i r inf_to_right ext_base))
              in
              match Cat.upper_bound tile with
                None -> ext_base
@@ -649,7 +636,7 @@ module Make (Node:Node.NodeType) =
                 let s = get_fresh ext_base in
                 let sup = point (Cat.trg left_to_sup) in
                 let ext_base = add s sup ((Cat.arrows_of_tile tile) @@ root_to_inf) ext_base in
-                add_step Lib.IntMap.empty l s left_to_sup (add_step Lib.IntMap.empty r s right_to_sup ext_base)
+                add_step l s left_to_sup (add_step r s right_to_sup ext_base)
            in
            iter_convert z l r tiles' ext_base
       in
@@ -672,7 +659,7 @@ module Make (Node:Node.NodeType) =
     let str_list,_ =
       Lib.IntMap.fold
         (fun i p (str_list,fresh) ->
-          let f = find_extension  i Lib.IntMap.empty ext_base in
+          let f = find_extension i ext_base in
           let _G = List.hd ((Cat.src f) --> f) in
           match p.obs with
             [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
@@ -686,7 +673,7 @@ module Make (Node:Node.NodeType) =
     let str_list =
       Lib.IntMap.fold
         (fun i p str_list ->
-          let f = find_extension i Lib.IntMap.empty ext_base in
+          let f = find_extension i ext_base in
           let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
           (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
         ) ext_base.points []
