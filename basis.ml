@@ -331,7 +331,6 @@ module Make (Node:Node.NodeType) =
               Printf.printf "%d ~> %d\n" i j
             ) ip.alpha
         in
-        let _ = if db() then Printf.printf "Adding %d as best inf for %d...\n" newp i in
         let inf_list = try Lib.IntMap.find i inf_path.beta with Not_found -> [] in
         let add,alpha' =
           List.fold_left
