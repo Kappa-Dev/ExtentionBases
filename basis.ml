@@ -233,8 +233,6 @@ module Make (Node:Node.NodeType) =
                                         has_sup = true})::cont
              ) [] lcomp
          in
-         if db() then
-         Printf.printf "Comparisons found : {%s}\n" (String.concat "," (List.map string_of_comparison lcomp)) ;
          lcomp
 
     exception Found_iso of Cat.arrows * int
@@ -251,7 +249,7 @@ module Make (Node:Node.NodeType) =
     let add_step_alpha i j a_ij ext_base inf_path =
       let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
       let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.src a_ij)) in
-      add_step i' j' (to_j' @@ a_ij @@ to_i') ext_base
+      add_step i' j' (to_j' @@ (a_ij @@ to_i')) ext_base
 
     let rm_step_alpha i j ext_base inf_path =
       remove_step (alias i inf_path) (alias j inf_path) ext_base
@@ -336,7 +334,8 @@ module Make (Node:Node.NodeType) =
           List.fold_left
             (fun (add,alpha) (oldp,root_to_oldp,oldp_to_i,_) ->
               match List.hd (compare root_to_newp root_to_oldp) with
-                Iso old_to_new -> if oldp = newp then (false,alpha) else (false, Lib.IntMap.add newp (oldp,Cat.invert old_to_new) alpha)
+                Iso old_to_new -> if oldp = newp then (false,alpha)
+                                  else (false, Lib.IntMap.add newp (oldp,Cat.invert old_to_new) alpha)
               | Incomp _ -> (add,alpha)
               | _ -> raise (Invariant_failure ("best inf is above or below another best_inf",ext_base))
             ) (true,inf_path.alpha) inf_list
@@ -372,6 +371,11 @@ module Make (Node:Node.NodeType) =
                                raise Cat.Undefined
               in
               let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
+              let lcomp = compare inf_to_i inf_to_w in
+              let () =
+                if db() then
+                  Printf.printf "Comparisons found : {%s}\n" (String.concat "," (List.map string_of_comparison lcomp))
+              in
               List.fold_left (*folding compare inf_to_i inf_to_w*)
                 (fun (dry_run,visited,inf_path,queue,max_step) -> function
 
@@ -436,11 +440,16 @@ module Make (Node:Node.NodeType) =
                     (*3. add i to visited *)
 
                     | Above i_to_w -> (* i --i_to_w--> w *)
-                       if db() then print_string (yellow ("above "^(string_of_int i)^"\n"));
-                       let pi = find i ext_base in
+                       if db() then print_string
+                                      ((yellow ("above "))
+                                       ^(string_of_int i)
+                                       ^" through "^
+                                         (Cat.string_of_arrows ~full:true i_to_w)^"\n") ;
+                       assert (alias i inf_path = i) ;
+                       let g_i = Cat.src i_to_w in
                        let inf_path' =
                          update_inf i
-                           (i,inf_to_i @@ root_to_inf,Cat.identity pi.value pi.value,i_to_w)
+                           (i,inf_to_i @@ root_to_inf, Cat.identity g_i g_i, i_to_w)
                            inf_path
                            ext_base
                        in
@@ -449,7 +458,11 @@ module Make (Node:Node.NodeType) =
                            queue
                          else
                            Lib.IntMap.fold
-                             (fun j step_ij cont -> Queue.add (i,step_ij,j) cont ; cont) pi.next queue
+                             (fun j step_ij cont ->
+                               let () =
+                                 Printf.printf "Adding step %d|->%d: %s\n" i j (Cat.string_of_arrows ~full:true step_ij)
+                               in
+                               Queue.add (i,step_ij,j) cont ; cont) (find i ext_base).next queue
                        in
                        (dry_run,(Lib.IntSet.add i visited), inf_path' ,queue', dec_step ext_base max_step)
 
@@ -529,7 +542,8 @@ module Make (Node:Node.NodeType) =
                                  in
                                  add_step_alpha fresh_id i sh_info.to_base ext_base inf_path
                              in
-                             (*adding step from inf to midpoint or its alias (in this case verify that inf is not already below the alias*)
+                             (*adding step from inf to midpoint or its alias
+                               (in this case verify that inf is not already below the alias*)
                              let ext_base =
                                if skip_midpoint && (is_below_alpha inf fresh_id ext_base inf_path)
                                then ext_base
@@ -546,7 +560,7 @@ module Make (Node:Node.NodeType) =
                            )::dry_run
                          in
 		         (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step)
-                ) (dry_run,visited,inf_path,queue,max_step) (compare inf_to_i inf_to_w)
+                ) (dry_run,visited,inf_path,queue,max_step) lcomp
             ) (dry_run,visited,inf_path,queue,max_step) inf_list
         in
         progress ext_base dry_run' visited' inf_path' queue' max_step'
@@ -582,7 +596,9 @@ module Make (Node:Node.NodeType) =
                 else
                   let inf_list = try Lib.IntMap.find i inf_path.beta with
                                    Not_found ->
-                                   raise (Invariant_failure ("Invariant violation: best_inf not defined for point "^(string_of_int i), ext_base))
+                                   raise
+                                     (Invariant_failure
+                                        ("Invariant violation: best_inf not defined for point "^(string_of_int i), ext_base))
                   in
                   List.fold_left
                     (fun ext_base (inf,_,_,inf_to_w) ->
