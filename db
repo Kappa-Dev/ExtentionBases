@@ -1,6 +1,6 @@
-debug
 add empty
 add one
-add dsquare
+build (empty,one)
+add triangle
+debug
 add house
-build 50 (empty,one)

@@ -239,17 +239,26 @@ module Make (Node:Node.NodeType) =
 
     type inf_path = {beta : (int*arrows*arrows*arrows) list Lib.IntMap.t ; alpha: (int*arrows) Lib.IntMap.t}
 
-    let empty_path =
-      let em = Lib.IntMap.empty in
-      {beta = em ; alpha = em}
+    let print_inf_path ip =
+      Lib.IntMap.iter
+        (fun i l ->
+          Printf.printf "Beta(%d):=[%s]\n" i
+            (String.concat ","
+               (List.map (fun (j,f,g,h) -> (string_of_int j) ^":"^ (Cat.string_of_arrows ~full:true h)) l))
+        ) ip.beta ;
+      Lib.IntMap.iter
+        (fun i (j,f) ->
+          Printf.printf "%d ~> %d\n" i j
+        ) ip.alpha
 
     let alias i inf_path =
       try Lib.Util.proj_left (Lib.IntMap.find i inf_path.alpha) with Not_found -> i
 
     let add_step_alpha i j a_ij ext_base inf_path =
       let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
-      let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.src a_ij)) in
-      add_step i' j' (to_j' @@ (a_ij @@ to_i')) ext_base
+      let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij)) in
+      Printf.printf "Aliasing %d~>%d and %d~>%d\n" i i' j j' ;
+      add_step i' j' (to_j' @@ (a_ij @@ (Cat.invert to_i'))) ext_base
 
     let rm_step_alpha i j ext_base inf_path =
       remove_step (alias i inf_path) (alias j inf_path) ext_base
@@ -316,36 +325,37 @@ module Make (Node:Node.NodeType) =
            else
              Some (i-1)
       in
+      let add_alias i i' to_i' alpha =
+        let alpha =
+          Lib.IntMap.fold
+            (fun j (j',to_j') alpha ->
+              if j'=i then Lib.IntMap.add j (i', to_j' @@ to_i') alpha
+              else alpha
+            ) alpha alpha
+        in
+        Lib.IntMap.add i (i',to_i') alpha
+      in
       let update_inf i (newp,root_to_newp,newp_to_i,newp_to_w as new_inf) inf_path ext_base =
-        if db() then
-          Printf.printf "%s to inf %d\n" (Cat.string_of_arrows ~full:true root_to_newp) newp ;
-        let print ip =
-          Lib.IntMap.iter
-            (fun i l ->
-              Printf.printf "Beta(%d):={%s}\n" i (String.concat "," (List.map (fun (j,f,g,h) -> string_of_int j) l))
-            ) ip.beta ;
-          Lib.IntMap.iter
-            (fun i (j,f) ->
-              Printf.printf "%d ~> %d\n" i j
-            ) ip.alpha
-        in
-        let inf_list = try Lib.IntMap.find i inf_path.beta with Not_found -> [] in
-        let add,alpha' =
+        let alpha',infs_i =
           List.fold_left
-            (fun (add,alpha) (oldp,root_to_oldp,oldp_to_i,_) ->
-              match List.hd (compare root_to_newp root_to_oldp) with
-                Iso old_to_new -> if oldp = newp then (false,alpha)
-                                  else (false, Lib.IntMap.add newp (oldp,Cat.invert old_to_new) alpha)
-              | Incomp _ -> (add,alpha)
-              | _ -> raise (Invariant_failure ("best inf is above or below another best_inf",ext_base))
-            ) (true,inf_path.alpha) inf_list
+            (fun (alpha,infs_i) (oldp,root_to_oldp,oldp_to_i,oldp_to_w as old_inf) ->
+              Printf.printf "Comparing %s with %s\n" (Cat.string_of_arrows root_to_newp) (Cat.string_of_arrows root_to_oldp) ;
+              let (to_oldp,to_newp) = try List.hd (oldp_to_i |/ newp_to_i) with _ -> failwith "could not compute pullback"
+              in
+              if Cat.is_iso to_oldp && Cat.is_iso to_newp then
+                if oldp = newp then (alpha, old_inf::infs_i)
+                else
+                  if oldp < newp then (*aliasing newp ~> oldp and not modifying beta*)
+                    (add_alias newp oldp (to_oldp @@ (Cat.invert to_newp)) alpha, old_inf::infs_i)
+                  else (*aliasing oldp ~> newp and replacing old_inf by new_inf in beta*)
+                    (add_alias oldp newp (to_newp @@ (Cat.invert to_oldp)) alpha, new_inf::infs_i)
+              else
+                (alpha,old_inf::infs_i)
+            ) (inf_path.alpha,[]) (try Lib.IntMap.find i inf_path.beta with Not_found -> [])
         in
-        let beta' =
-          if add then Lib.IntMap.add i (new_inf::inf_list) inf_path.beta
-          else inf_path.beta
-        in
-        let inf_path' = {beta = beta' ; alpha = alpha'} in
-        if db() then print inf_path' ;
+        let infs_i = if infs_i = [] then [new_inf] else infs_i in
+        let inf_path' = {beta = Lib.IntMap.add i infs_i inf_path.beta ; alpha = alpha'} in
+        if db() then print_inf_path inf_path' ;
         inf_path'
       in
 
@@ -449,7 +459,7 @@ module Make (Node:Node.NodeType) =
                        let g_i = Cat.src i_to_w in
                        let inf_path' =
                          update_inf i
-                           (i,inf_to_i @@ root_to_inf, Cat.identity g_i g_i, i_to_w)
+                           (i, inf_to_i @@ root_to_inf, Cat.identity g_i g_i, i_to_w)
                            inf_path
                            ext_base
                        in
@@ -578,7 +588,7 @@ module Make (Node:Node.NodeType) =
         let dry_run_0 = [] in
         let inf_path,dry_run = progress ext_base dry_run_0 visited_0 inf_path_0 queue_0 max_step
         in
-
+        let () = if db() then print_inf_path inf_path in
         (* 1. Adding witness point *)
         let w = get_fresh ext_base in
         let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ; flush stdout in
@@ -595,10 +605,7 @@ module Make (Node:Node.NodeType) =
                 if i=w then ext_base
                 else
                   let inf_list = try Lib.IntMap.find i inf_path.beta with
-                                   Not_found ->
-                                   raise
-                                     (Invariant_failure
-                                        ("Invariant violation: best_inf not defined for point "^(string_of_int i), ext_base))
+                                   Not_found -> []
                   in
                   List.fold_left
                     (fun ext_base (inf,_,_,inf_to_w) ->
@@ -612,7 +619,12 @@ module Make (Node:Node.NodeType) =
                         let () =
                           if db() then print_string
                                          (blue (Printf.sprintf
-                                                  "\t Adding best inf %d for %d and witness %d\n" inf i w)
+                                                  "\t Adding best inf %d:%s for %d and witness %d\n"
+                                                  inf
+                                                  (Cat.string_of_arrows ~full:true inf_to_w)
+                                                  i
+                                                  w
+                                            )
                                          ) ; flush stdout
                         in
                         if is_below_alpha inf w ext_base inf_path then ext_base
