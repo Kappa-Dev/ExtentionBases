@@ -102,7 +102,7 @@ let init = (cyd_basis,cyd_graphs) => {
         {
           selector: 'node',
           style: {
-          'label': 'data(id)',
+          'label': 'data(label)',
           'text-halign': 'center',
           'text-valign': 'center'
           }
