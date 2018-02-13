@@ -26,4 +26,4 @@ Navigate to
 
   localhost:3000
 
-Whenever pos_web.dot changes, the display on localhost:3000 wil update.
+Whenever web_eb.dot changes, the display on localhost:3000 wil update.
