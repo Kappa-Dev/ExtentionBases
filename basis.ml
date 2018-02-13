@@ -328,7 +328,7 @@ module Make (Node:Node.NodeType) =
         let alpha =
           Lib.IntMap.fold
             (fun j (j',to_j') alpha ->
-              if j'=i then Lib.IntMap.add j (i', to_j' @@ to_i') alpha
+              if j'=i then Lib.IntMap.add j (i', to_i' @@ to_j') alpha
               else alpha
             ) alpha alpha
         in
