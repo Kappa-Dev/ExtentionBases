@@ -257,7 +257,6 @@ module Make (Node:Node.NodeType) =
     let add_step_alpha i j a_ij ext_base inf_path =
       let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
       let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij)) in
-      Printf.printf "Aliasing %d~>%d and %d~>%d\n" i i' j j' ;
       add_step i' j' (to_j' @@ (a_ij @@ (Cat.invert to_i'))) ext_base
 
     let rm_step_alpha i j ext_base inf_path =
@@ -304,10 +303,10 @@ module Make (Node:Node.NodeType) =
                     "Queue: {%s}\n"
                     (String.concat
                        ","
-                       (Queue.fold
-                          (fun cont (i,_,j) ->
+                       (QueueList.fold
+                          (fun (i,_,j) cont ->
                             ("("^(string_of_int i)^"|->"^(string_of_int j)^")")::cont
-                          ) [] queue)
+                          ) queue [])
                     ) ;
                   Printf.printf
                     "Visited {%s}\n"
@@ -339,7 +338,6 @@ module Make (Node:Node.NodeType) =
         let alpha',infs_i =
           List.fold_left
             (fun (alpha,infs_i) (oldp,root_to_oldp,oldp_to_i,oldp_to_w as old_inf) ->
-              Printf.printf "Comparing %s with %s\n" (Cat.string_of_arrows root_to_newp) (Cat.string_of_arrows root_to_oldp) ;
               let (to_oldp,to_newp) = try List.hd (oldp_to_i |/ newp_to_i) with _ -> failwith "could not compute pullback"
               in
               if Cat.is_iso to_oldp && Cat.is_iso to_newp then
@@ -361,9 +359,10 @@ module Make (Node:Node.NodeType) =
 
       let get_best_inf i ip = Lib.IntMap.find i ip.beta
       in
-      if Queue.is_empty queue then (inf_path,dry_run)
+
+      if QueueList.is_empty queue then (inf_path,dry_run)
       else
-        let k,step_ki,i = Queue.pop queue in
+        let k,step_ki,i = QueueList.pop queue in
         let inf_list =
           try get_best_inf k inf_path
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
@@ -414,7 +413,7 @@ module Make (Node:Node.NodeType) =
                        else
                          Lib.IntMap.fold
                            (fun j step_ij cont ->
-                             Queue.add (i,step_ij,j) cont ; cont
+                             QueueList.add_fifo (i,step_ij,j) cont ; cont
                            ) (find i ext_base).next queue
                      in
                      let visited' = Lib.IntSet.add i visited in
@@ -469,10 +468,8 @@ module Make (Node:Node.NodeType) =
                          else
                            Lib.IntMap.fold
                              (fun j step_ij cont ->
-                               let () =
-                                 Printf.printf "Adding step %d|->%d: %s\n" i j (Cat.string_of_arrows ~full:true step_ij)
-                               in
-                               Queue.add (i,step_ij,j) cont ; cont) (find i ext_base).next queue
+                               QueueList.add_lifo (i,step_ij,j) cont ; cont
+                             ) (find i ext_base).next queue
                        in
                        (dry_run,(Lib.IntSet.add i visited), inf_path' ,queue', dec_step ext_base max_step)
 
@@ -509,7 +506,7 @@ module Make (Node:Node.NodeType) =
                            else
                              Lib.IntMap.fold
                                (fun j step_ij cont ->
-                                 Queue.add (i,step_ij,j) cont ; cont
+                                 QueueList.add_fifo (i,step_ij,j) cont ; cont
                                ) (find i ext_base).next queue
                          in
                          let dry_run' =
@@ -527,7 +524,7 @@ module Make (Node:Node.NodeType) =
                            else
                              Lib.IntMap.fold
                                (fun j step_ij cont ->
-                                 Queue.add (i, step_ij, j) cont ; cont
+                                 QueueList.add_fifo (i, step_ij, j) cont ; cont
                                ) (find i ext_base).next queue
                          in
                          let fresh_id = get_fresh ext_base in
@@ -582,8 +579,8 @@ module Make (Node:Node.NodeType) =
         let beta_0 = Lib.IntMap.add 0 [(0,id_0,id_0,ext_w)] Lib.IntMap.empty in
         let alpha_0 = Lib.IntMap.empty in
         let inf_path_0 = {beta = beta_0 ; alpha = alpha_0} in
-        let queue_0 = Queue.create () in
-        Queue.add (0,id_0,0) queue_0 ;
+        let queue_0 = QueueList.create () in
+        QueueList.add_fifo (0,id_0,0) queue_0 ;
         let visited_0 = Lib.IntSet.empty in
         let dry_run_0 = [] in
         let inf_path,dry_run = progress ext_base dry_run_0 visited_0 inf_path_0 queue_0 max_step

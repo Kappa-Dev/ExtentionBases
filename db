@@ -1,6 +1,7 @@
 add empty
 add one
-build (empty,one)
 add triangle
-debug
 add house
+add osquare
+add dsquare
+build (empty,one)

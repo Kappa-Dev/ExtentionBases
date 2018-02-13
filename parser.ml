@@ -33,8 +33,12 @@ let output olist = inst "output" olist (fun x -> Output (if x="positive" then tr
 let exit_p = inst "exit" [] (fun _ -> Exit)
 
 let list_parser p = char '[' *> ws *> sep_by (ws *> (char ';') *> ws) p <* ws <* char ']'
-let number = take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> int_of_string s
+let pos_number = take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> int_of_string s
+let neg_number = char '-' *> take_while1 (function '0'..'9' -> true | _ -> false) >>| fun s -> -(int_of_string s)
+let number = choice [pos_number ; neg_number]
+
 let number_or_nothing = choice [(number >>| fun i -> Some i) ; ws >>| fun () -> None]
+
 
 let arg = take_while1 (function ' ' -> false | _ -> true)
 let args_parser = sep_by ws1 arg
@@ -57,7 +61,7 @@ let tuple elt_parser ret =
   ws *> char ')' *> return (ret (elt1,elt2))
 
 
-let name = take_while (function 'a'..'z' | 'A'..'Z' | '0'..'9' -> true | _ -> false)
+let name = take_while (function 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '^' | '-' | '\'' -> true | _ -> false)
 
 let int_list_tuple = tuple (list_parser number) (fun x -> x)
 

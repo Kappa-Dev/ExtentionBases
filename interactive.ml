@@ -89,7 +89,16 @@ module Make (Node:Node.NodeType) =
       match env.rule with
         None -> env
       | Some (l,r) ->
-         let (lg,rg) = graph_of_library l, graph_of_library r in
+         let lg =
+           try graph_of_library l
+           with Not_found ->
+             Model.get_obs (Lib.Dict.to_id l env.model.Model.dict) env.model
+         in
+         let rg = try graph_of_library r
+                  with
+                    Not_found ->
+                    Model.get_obs (Lib.Dict.to_id r env.model.Model.dict) env.model
+         in
          let nw,pw =
            match obs_name with
              None -> Model.witnesses_of_rule (lg,rg) env.model
