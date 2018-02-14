@@ -66,4 +66,52 @@ let gl_to_cy_data = (gl) => {
   return loaded
 }
 
-module.exports = { gl_to_cy_data, demo: {basis} };
+
+let filteredTraverse = function (params) {
+  return function (initial, selector) {
+    const cy = initial.cy();
+    let eles = initial;
+    let sEles = [];
+    let sElesIds = {};
+
+    for (;;) {
+      let edges = (params.outgoing ? eles.outgoers() : eles.incomers()).filter('edge').filter(selector);
+      nextEles = [];
+
+      if (edges.length === 0) {
+        break;
+      } // done if none left
+
+      for (let i = 0; i < edges.length; i++) {
+        let e = edges[i];
+        let eid = e.id();
+        let n = params.outgoing ? e.target() : e.source();
+        let nid = n.id();
+
+        if (!sElesIds[eid]) {
+          sElesIds[eid] = true;
+          sEles.push(e);
+        }
+
+        if (!sElesIds[nid]) {
+          sElesIds[nid] = true;
+          sEles.push(n);
+          nextEles.push(n)
+        }
+      }
+      eles = cy.collection(nextEles);
+    }
+
+    return initial.spawn(sEles, { unique: true });
+  };
+};
+
+let filteredSuccessors = filteredTraverse({outgoing:true});
+let filteredPredecessors = filteredTraverse({incoming:true});
+
+module.exports = {
+  gl_to_cy_data,
+  demo: {basis},
+  filteredSuccessors,
+  filteredPredecessors
+};

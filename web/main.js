@@ -139,8 +139,29 @@ let init = (cyd_basis,cyd_graphs) => {
           'label': 'data(label)',
         }
       },
-
-
+      {
+        selector: 'node.activeCC, node.activeCCLong',
+        style: {
+          'background-color': '#2ba7ef',
+          'background-opacity': 0.1,
+        }
+      },
+      {
+        selector: 'node.activeCC',
+        style: {
+          'border-opacity': 1
+        }
+      },
+      {
+        selector: 'node.hover',
+        style: {
+          //'border-color': '#0654d3',
+          'background-color': '#0654d3',
+          //'border-width': '10px',
+          'background-opacity': 0.3,
+          'border-opacity': 1
+        }
+      },
       {
         selector: 'edge',
         style: {
@@ -149,7 +170,7 @@ let init = (cyd_basis,cyd_graphs) => {
           'width': 2,
           'line-color': '#1a8416',
           'line-style': 'solid',
-          //'line-opacity': '0.2',
+          'opacity': '0.7',
           'target-arrow-color': '#ccc',
           'target-arrow-shape': 'triangle',
           //'source-endpoint': 'outside-to-node',
@@ -170,19 +191,58 @@ let init = (cyd_basis,cyd_graphs) => {
 
       },
       {
-        selector: "edge[conflict].visible",
+        selector: "edge[conflict].activeCC.visible, edge[conflict].activeCCLong.visible",
         style: {
           'visibility': 'visible'
         }
       },
       {
-        selector: 'edge.hover',
+        selector: 'edge[^conflict].hover',
         style: {
-          width: 5,
-          'line-style': 'solid'
+          opacity: 0.9,
+          width: 7,
+          color: '#27db20'
         }
-      }
-      ],
+      },
+      {
+        selector: 'edge[conflict].hover',
+        style: {
+          opacity: 0.9,
+          width: 7,
+          color: '#505050'
+        }
+      },
+      {
+        selector: 'edge.activeCC, edge.activeCCLong',
+        style: {
+          opacity: 0.8,
+          width: 7,
+        }
+      },
+      {
+        selector: 'edge.activeCC',
+        style: {
+          opacity: 1,
+          color: '#0e540b',
+          width: 7,
+        }
+      },
+      {
+        selector: 'edge[conflict].activeCC, edge[conflict].activeCCLong',
+        style: {
+          'line-color': '#808080',
+          width: 7,
+        }
+      },
+      {
+        selector: 'edge[conflict].activeCC',
+        style: {
+          'line-color': '#404040',
+          width: 7,
+        }
+      },
+
+    ],
 
 
   });
@@ -207,6 +267,38 @@ let init = (cyd_basis,cyd_graphs) => {
   conflicts.layout(conflict_data).run();
 
 cy_basis.collection('edge').on('mouseover', evt => evt.target.addClass('hover'));
+
+  let activationZone = node => {
+    let c = node
+    c = c.union(node.neighborhood('edge[conflict]'));
+    c = c.union(graph.filteredSuccessors(node, '[^conflict]'));
+    return c.union(graph.filteredPredecessors(node, '[^conflict]'));
+  }
+
+  let actives = cy_basis.collection();
+
+  cy_basis.collection('node').on('mouseover', evt => {
+    evt.target.addClass('hover');
+    activationZone(evt.target).addClass('activeCC');
+  });
+
+  cy_basis.collection('node').on('mouseout', evt => {
+    evt.target.removeClass('hover');
+    activationZone(evt.target).removeClass('activeCC');
+  });
+
+  cy_basis.collection('node').on('tap', evt => {
+    actives.removeClass('activeCCLong');
+    actives = activationZone(evt.target);
+    actives.addClass('activeCCLong');
+  });
+
+  cy_basis.on('tap', evt => {
+    if (evt.target == cy_basis) {
+      actives.removeClass('activeCCLong');
+      actives = cy_basis.collection();
+    }
+  });
 
 cy_basis.collection('edge').on('mouseout', evt => evt.target.removeClass('hover'));
 

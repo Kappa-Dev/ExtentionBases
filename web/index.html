@@ -52,6 +52,11 @@
   height: 0px;
   visibility: hidden;
 }
+
+.help:not(.idle) .end {
+  margin-bottom: 0.3em;
+}
+
 #screenlink:not(.ready) {
   visibility: hidden;
 }
@@ -68,6 +73,7 @@
     <script src="main.js"></script>
     <div class="help idle">
       <div>HELP</div>
+      <div class="end"><b>Tap node to keep highlight</b></div>
       <div><b>c</b>&nbsp;toggle conflict</div>
       <div><b>r</b>&nbsp;reset zoom</div>
       <div><b>p</b>&nbsp;save picture <a download="basis.png" id="screenlink">[download]</a></div>
