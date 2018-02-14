@@ -4,8 +4,10 @@ module Make (Node:Node.NodeType) =
     module Cat = Cat.Make (Node)
 
     let (-->) = Cat.(-->)
+    let (@@) = Cat.(@@)
     let (|/) = Cat.(|/)
     let (=~=) = Cat.(=~=)
+    let (++) = Lib.IntSet.union
 
     type arrows = Cat.arrows
     type obj = Cat.obj
@@ -15,6 +17,7 @@ module Make (Node:Node.NodeType) =
                   next : Cat.arrows Lib.IntMap.t ;
                   obs : (Cat.arrows * int) list ;
                   conflict : Lib.IntSet.t ;
+                  down : Lib.IntSet.t
                  }
 
     type t = {points : point Lib.IntMap.t ; (*corresp int -> point *)
@@ -23,7 +26,7 @@ module Make (Node:Node.NodeType) =
               (* i |-->  (0 -->i) --extension from root to i*)
               extensions : Cat.arrows Lib.IntMap.t ;
               max_elements : Lib.IntSet.t ;
-              mutable fresh : int
+              mutable fresh : int ;
              }
 
     exception Invariant_failure of string * t
@@ -33,6 +36,7 @@ module Make (Node:Node.NodeType) =
        next = Lib.IntMap.empty ;
        obs = [] ;
        conflict = Lib.IntSet.empty ;
+       down = Lib.IntSet.empty
       }
 
     let empty h_eps =
@@ -85,7 +89,7 @@ module Make (Node:Node.NodeType) =
       "digraph G{\n"^(String.concat "\n" l)^"\n}"
 
     let add i p ext_p ext_base =
-      {points = Lib.IntMap.add i p ext_base.points ;
+      {points = Lib.IntMap.add i {p with down = Lib.IntSet.singleton 0} ext_base.points ;
        witnesses =
          begin
            match p.obs with
@@ -111,8 +115,6 @@ module Make (Node:Node.NodeType) =
     let is_empty ext_base = (Lib.IntMap.cardinal ext_base.points = 1)
 
     let find i ext_base = Lib.IntMap.find i ext_base.points
-
-    let (@@) = Cat.(@@)
 
     let find_extension i ext_base =
       if not (mem i ext_base) then
@@ -140,7 +142,11 @@ module Make (Node:Node.NodeType) =
       replace i pi ext_base
 
     let remove_step i j ext_base =
-      let pi = find i ext_base in
+      let pi =
+        try
+          find i ext_base
+        with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
+      in
       let _ = if db() then
                 if Lib.IntMap.mem j pi.next then
                   print_string
@@ -158,14 +164,26 @@ module Make (Node:Node.NodeType) =
         try find i ext_base
         with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
       in
-      if db() then Printf.printf
-                     "\t Add Step %d |-> %d = %s-%s->%s\n" i j
-                     (Graph.to_string (Cat.src emb_ij))
-                     (Cat.string_of_arrows emb_ij)
-                     (Graph.to_string (Cat.trg emb_ij)) ;
-      replace i
-        {pi with next = Lib.IntMap.add j emb_ij pi.next}
-        {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
+      let pj =
+        try find j ext_base
+        with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" j,ext_base))
+      in
+      if Lib.IntSet.mem j pi.down then ext_base
+      else
+        let () = if db() then Printf.printf
+                                "\t Add Step %d |-> %d = %s-%s->%s\n" i j
+                                (Graph.to_string (Cat.src emb_ij))
+                                (Cat.string_of_arrows emb_ij)
+                                (Graph.to_string (Cat.trg emb_ij))
+        in
+        let ext_base =
+          replace i
+            {pi with next = Lib.IntMap.add j emb_ij pi.next}
+            {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
+        in
+        replace j
+          {pj with down = pj.down ++ pi.down ++ (Lib.IntSet.singleton i)}
+          ext_base
 
     type sharing_info = {to_w : Cat.arrows ;
                          to_base : Cat.arrows ;
@@ -268,7 +286,7 @@ module Make (Node:Node.NodeType) =
     let add_conflict_alpha i j ext_base inf_path =
       add_conflict (alias i inf_path) (alias j inf_path) ext_base
 
-    let is_below_alpha i j ext_base inf_path =
+(*    let is_below_alpha i j ext_base inf_path =
       let rec search ext_base = function
           [] -> false
         | i::cont ->
@@ -294,6 +312,7 @@ module Make (Node:Node.NodeType) =
         search ext_base next
       with
         Exit -> true
+ *)
 
     let rec progress ext_base dry_run visited inf_path queue max_step =
       (************* DEBUGING INFO ***************)
@@ -552,9 +571,9 @@ module Make (Node:Node.NodeType) =
                              (*adding step from inf to midpoint or its alias
                                (in this case verify that inf is not already below the alias*)
                              let ext_base =
-                               if skip_midpoint && (is_below_alpha inf fresh_id ext_base inf_path)
+                               (*if skip_midpoint && (is_below_alpha inf fresh_id ext_base inf_path)
                                then ext_base
-                               else
+                               else*)
                                  add_step_alpha
                                    inf
                                    fresh_id
@@ -596,43 +615,27 @@ module Make (Node:Node.NodeType) =
           List.fold_left (fun ext_base act -> act w ext_base inf_path) ext_base (List.rev dry_run)
         in
         (* 3. Connecting witness w to its best predecessors in the base*)
-        let ext_base =
+        let inf_list =
           Lib.IntSet.fold
-              (fun i ext_base ->
-                if i=w then ext_base
-                else
-                  let inf_list = try Lib.IntMap.find i inf_path.beta with
-                                   Not_found -> []
-                  in
-                  List.fold_left
-                    (fun ext_base (inf,_,_,inf_to_w) ->
-                      try
-                        (*TODO maintain this incrementally, this is super not efficient*)
-                        let p_inf = find inf ext_base in
-                        Lib.IntMap.fold
-                          (fun i _ () ->
-                            if Lib.IntMap.exists (fun _ l -> List.exists (fun (j,_,_,_) -> i=j) l) inf_path.beta then raise Exit
-                          ) p_inf.next () ;
-                        let () =
-                          if db() then print_string
-                                         (blue (Printf.sprintf
-                                                  "\t Adding best inf %d:%s for %d and witness %d\n"
-                                                  inf
-                                                  (Cat.string_of_arrows ~full:true inf_to_w)
-                                                  i
-                                                  w
-                                            )
-                                         ) ; flush stdout
-                        in
-                        if is_below_alpha inf w ext_base inf_path then ext_base
-                        else
-                          add_step_alpha inf w inf_to_w ext_base inf_path
-                      with
-                        Exit -> ext_base
-                    ) ext_base inf_list
-              ) ext_base.max_elements ext_base
+          (fun i inf_list ->
+            let infs_i = try Lib.IntMap.find i inf_path.beta with Not_found -> []
+            in
+            infs_i @ inf_list
+          ) ext_base.max_elements []
         in
-        ext_base
+        let compare_infs (i,_,_,_) (j,_,_,_) =
+          if Lib.IntSet.mem i (find j ext_base).down then -1
+          else
+            if Lib.IntSet.mem j (find i ext_base).down then 1
+            else 0
+        in
+        let inf_list = List.fast_sort compare_infs inf_list in
+        List.fold_left
+          (fun ext_base (inf,_,_,inf_to_w) ->
+            if inf=w then ext_base
+            else
+              add_step_alpha inf w inf_to_w ext_base inf_path
+          ) ext_base inf_list
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
@@ -687,29 +690,29 @@ module Make (Node:Node.NodeType) =
             in
             eb
 
-  let to_dot_corresp ext_base =
-    let str_list,_ =
-      Lib.IntMap.fold
-        (fun i p (str_list,fresh) ->
-          let f = find_extension i ext_base in
-          let _G = List.hd ((Cat.src f) --> f) in
-          match p.obs with
-            [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
-                  (str::str_list,fresh)
-          | _ -> (str_list,fresh)
-        ) ext_base.points ([],0)
-    in
-    "digraph G{\n"^(String.concat "\n" str_list)^"\n}"
+    let to_dot_corresp ext_base =
+      let str_list,_ =
+        Lib.IntMap.fold
+          (fun i p (str_list,fresh) ->
+            let f = find_extension i ext_base in
+            let _G = List.hd ((Cat.src f) --> f) in
+            match p.obs with
+              [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
+                    (str::str_list,fresh)
+            | _ -> (str_list,fresh)
+          ) ext_base.points ([],0)
+      in
+      "digraph G{\n"^(String.concat "\n" str_list)^"\n}"
 
-  let to_dot_content ext_base =
-    let str_list =
-      Lib.IntMap.fold
-        (fun i p str_list ->
-          let f = find_extension i ext_base in
-          let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
-          (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
-        ) ext_base.points []
-    in
-    (String.concat "\n" str_list)
+    let to_dot_content ext_base =
+      let str_list =
+        Lib.IntMap.fold
+          (fun i p str_list ->
+            let f = find_extension i ext_base in
+            let pairs = List.map (fun (u,v) -> (v,u)) (Cat.fold_arrow f) in
+            (Graph.to_dot p.value ~highlights:pairs (string_of_int i))::str_list
+          ) ext_base.points []
+      in
+      (String.concat "\n" str_list)
 
   end
