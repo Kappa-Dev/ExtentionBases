@@ -31,3 +31,9 @@ app.use('/',Express.static(__dirname));
 app.listen(config.ports.http, () => {
   console.log('Web server listening on port %d.',config.ports.http)
 });
+
+process.on('uncaughtException', function(err) {
+  console.log("UNCAUGHT EXCEPTION");
+  console.log(err.stack)
+  console.log("_______________________");
+});
