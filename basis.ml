@@ -89,7 +89,7 @@ module Make (Node:Node.NodeType) =
       "digraph G{\n"^(String.concat "\n" l)^"\n}"
 
     let add i p ext_p ext_base =
-      {points = Lib.IntMap.add i {p with down = Lib.IntSet.singleton 0} ext_base.points ;
+      {points = Lib.IntMap.add i p ext_base.points ;
        witnesses =
          begin
            match p.obs with
@@ -154,11 +154,9 @@ module Make (Node:Node.NodeType) =
       in
       replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
 
-
     let add_step i j emb_ij ext_base =
-      let ext_base =
-        if i <> 0 then remove_step 0 j ext_base
-        else ext_base (*This is weird, not the general case...*)
+      let () =
+        if db() then Printf.printf "Verifying if %d|->%d should be added...\n" i j
       in
       let pi =
         try find i ext_base
@@ -168,7 +166,7 @@ module Make (Node:Node.NodeType) =
         try find j ext_base
         with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" j,ext_base))
       in
-      if Lib.IntSet.mem j pi.down then ext_base
+      if Lib.IntSet.mem i pj.down then (if db() then print_endline "No!" ; ext_base)
       else
         let () = if db() then Printf.printf
                                 "\t Add Step %d |-> %d = %s-%s->%s\n" i j
@@ -344,11 +342,17 @@ module Make (Node:Node.NodeType) =
              Some (i-1)
       in
       let add_alias i i' to_i' alpha =
+        let i',to_i' =
+          try
+            let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
+          with Not_found -> (i',to_i')
+        in
         let alpha =
           Lib.IntMap.fold
             (fun j (j',to_j') alpha ->
               if j'=i then Lib.IntMap.add j (i', to_i' @@ to_j') alpha
-              else alpha
+              else
+                alpha
             ) alpha alpha
         in
         Lib.IntMap.add i (i',to_i') alpha
@@ -624,18 +628,29 @@ module Make (Node:Node.NodeType) =
           ) ext_base.max_elements []
         in
         let compare_infs (i,_,_,_) (j,_,_,_) =
+          let i = alias i inf_path in
+          let j = alias j inf_path in
           if Lib.IntSet.mem i (find j ext_base).down then -1
           else
             if Lib.IntSet.mem j (find i ext_base).down then 1
             else 0
         in
         let inf_list = List.fast_sort compare_infs inf_list in
-        List.fold_left
-          (fun ext_base (inf,_,_,inf_to_w) ->
-            if inf=w then ext_base
-            else
-              add_step_alpha inf w inf_to_w ext_base inf_path
-          ) ext_base inf_list
+        let () =
+          if db() then
+            Printf.printf "best infs for witness %d are {%s}\n"
+              w
+              (String.concat "," (List.map (fun (i,_,_,_) -> string_of_int i) inf_list))
+        in
+        let ext_base =
+          List.fold_left
+            (fun ext_base (inf,_,_,inf_to_w) ->
+              if inf=w then ext_base
+              else
+                add_step_alpha inf w inf_to_w ext_base inf_path
+            ) ext_base inf_list
+        in
+        add_step 0 w ext_w ext_base
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
