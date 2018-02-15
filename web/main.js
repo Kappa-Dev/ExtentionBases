@@ -303,9 +303,17 @@ let init = (cyd_basis,cyd_graphs) => {
   });
 
 
-  adjust = (zoom) => {
-    let wHeight = window.innerHeight;
-    let wWidth = window.innerWidth;
+
+  let is_contained = (out_h, out_w, in_x, in_y, in_w, in_h) => {
+    return in_x + in_w >= 0
+        && in_x <= out_w
+        && in_y + in_h >= 0
+        && in_y <= out_h;
+  }
+
+  let adjust = (zoom) => {
+    const wHeight = window.innerHeight;
+    const wWidth = window.innerWidth;
 
     _.each(cy_graphs, (g,id) => {
 
@@ -317,30 +325,24 @@ let init = (cyd_basis,cyd_graphs) => {
       w = host_node.renderedWidth(),
       h = host_node.renderedHeight();
 
-      // We don't use is_contained for now because it uses the positions
-      // *before* the zoom; so we are left with dangling midpoints on the
-      // side of the screen. FIXME
-      if (true || is_contained(wHeight,wWidth,pos.x,pos.y,w,h)) {
+      //ccy.zoom({level:cy.zoom(),renderedPosition:{x:pos.x-w/2, y:pos.y-h/2}});
+      g.container().style.left = pos.x - w/2;
+      g.container().style.top = pos.y - h/2;
+      g.container().style.width = w;
+      g.container().style.height = h;
 
-        //ccy.zoom({level:cy.zoom(),renderedPosition:{x:pos.x-w/2, y:pos.y-h/2}});
-        g.container().style.left = pos.x - w/2;
-        g.container().style.top = pos.y - h/2;
-        g.container().style.width = w;
-        g.container().style.height = h;
-
-        if (zoom) {
-          // Somehow doing resize() before fit() makes everything faster (fit() alone is slow)
-          g.resize();
-          g.center();
-          g.fit(0.05*w);
-          // Old method to rezoom fast was
-          //  g.zoom({level:cy_basis.zoom(),renderedPosition:{x:0,y:0}}); // fast
-          //  imperfect but this was incorrect: this assumed the initial zoom level
-          //  (to fit the default 200px * 200px box for inner graphs) was 1. So if
-          //  I go this route again, I need to store, for each inner graph g, their
-          //  initial zoom level z_g and then if cy_basis has zoom level z, I give
-          //  g the zoom level z * z_g.
-        }
+      if (zoom && is_contained(wHeight,wWidth,pos.x,pos.y,w,h)) {
+        // Somehow doing resize() before fit() makes everything faster (fit() alone is slow)
+        g.resize();
+        g.center();
+        g.fit(0.05*w);
+        // Old method to rezoom fast was
+        //  g.zoom({level:cy_basis.zoom(),renderedPosition:{x:0,y:0}}); // fast
+        //  imperfect but this was incorrect: this assumed the initial zoom level
+        //  (to fit the default 200px * 200px box for inner graphs) was 1. So if
+        //  I go this route again, I need to store, for each inner graph g, their
+        //  initial zoom level z_g and then if cy_basis has zoom level z, I give
+        //  g the zoom level z * z_g.
       }
     });
   };
