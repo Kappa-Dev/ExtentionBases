@@ -55,7 +55,6 @@ module Make (Node:Node.NodeType) =
 
     let witnesses_of_rule ?obs r m =
       let enum_witnesses obs_name id_emb obs =
-
 	let h_eps = Cat.src id_emb in
 	List.fold_left
 	  (fun tiles gluing_tile ->

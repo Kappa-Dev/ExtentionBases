@@ -99,6 +99,7 @@ module Make (Node:Node.NodeType) =
                     Not_found ->
                     Model.get_obs (Lib.Dict.to_id r env.model.Model.dict) env.model
          in
+         print_endline "Generating witnesses..." ;
          let nw,pw =
            match obs_name with
              None -> Model.witnesses_of_rule (lg,rg) env.model
@@ -117,6 +118,7 @@ module Make (Node:Node.NodeType) =
               (EB.empty (get_seed pw) , EB.empty (get_seed nw))
            | Some basis -> basis
          in
+         print_endline "Computing sharing..." ;
          let pos_ext_base =
            try
              List.fold_left
