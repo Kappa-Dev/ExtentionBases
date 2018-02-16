@@ -1,5 +1,3 @@
-add one
-add house
-build (empty,one)
-add osquare
-exit
+load big
+debug
+build (empty,pat_1)

@@ -203,7 +203,7 @@ module Make (Node:Node.NodeType) =
 
     let compare inf_to_i inf_to_w =
       if db() then
-        Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ;
+        Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ; flush stdout ;
       match Cat.share inf_to_i inf_to_w with
         [] -> [Conflicting]
       | lcomp ->
@@ -249,6 +249,7 @@ module Make (Node:Node.NodeType) =
                                         has_sup = true})::cont
              ) [] lcomp
          in
+         print_endline "end of compare" ; flush stdout ;
          lcomp
 
     exception Found_iso of Cat.arrows * int
@@ -382,7 +383,6 @@ module Make (Node:Node.NodeType) =
 
       let get_best_inf i ip = Lib.IntMap.find i ip.beta
       in
-
       if QueueList.is_empty queue then (inf_path,dry_run)
       else
         let k,step_ki,i = QueueList.pop queue in
@@ -403,6 +403,7 @@ module Make (Node:Node.NodeType) =
                                raise Cat.Undefined
               in
               let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
+              flush stdout ;
               let lcomp = compare inf_to_i inf_to_w in
               let () =
                 if db() then

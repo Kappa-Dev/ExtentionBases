@@ -68,7 +68,6 @@ module Make (Node:Node.NodeType) =
 
 
     let is_coherent g = g.coherent
-
     module EdgeSet = Set.Make(struct type t = Node.t * Node.t let compare = compare end)
 
     let empty = {nodes = NodeSet.empty ;
@@ -359,7 +358,7 @@ module Make (Node:Node.NodeType) =
     let (str,name,fresh) = to_dot_generic g ~highlights name "digraph" 0
     in str
 
-    let to_dot_cluster ?(sub=empty) g n fresh = 
+    let to_dot_cluster ?(sub=empty) g n fresh =
       to_dot_generic ~sub g ~highlights:[] ("cluster_"^(string_of_int n)) "subgraph" fresh
 
     let sum g h =
@@ -383,7 +382,9 @@ module Make (Node:Node.NodeType) =
 
     let compatible u g =
       let nodes = nodes_of_id (Node.id u) g in
-      List.for_all (fun u' -> Node.gluable u u') nodes
+      match nodes with
+        [] -> true
+      | u'::tl -> Node.gluable u u'
 
   end:GraphType with type node = Node.t and type hom = Homomorphism.Make(Node).t)
 

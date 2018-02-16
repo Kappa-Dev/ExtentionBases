@@ -21,6 +21,7 @@ module type NodeType =
     val compatible : t -> t -> bool
     val gluable : t -> t -> bool
     val tn : (int list * int list) list -> (t*t) list
+    val has_rigid_bonds : bool
   end
 
 
@@ -32,6 +33,7 @@ module SimpleNode =
       let id u = u
       let compatible = fun _ _ -> true
       let gluable = fun u u' -> id u = id u'
+      let has_rigid_bonds = false
 
       let structure_preserving = [||]
 
@@ -121,6 +123,7 @@ module KappaNodeSym =
       type t = {ag_id : int ; port_id : int ; label : int}
 
       let arity = 2
+      let has_rigid_bonds = false
       let structure_preserving = [|
           (*f_port*)
           (fun u v -> (*trying port 0 and 1 of label 1 are indistinguishable*)
@@ -157,7 +160,7 @@ module KappaNodeSym =
           Exit -> false
 
       let gluable u v = (*same id, same label and different ports*)
-        (id u = id v) && (structure_preserving.(0) u v)
+        (id u = id v) && compatible u v
 
       let compare u v = Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)
 
@@ -255,7 +258,7 @@ module KappaNodeSym =
 module KappaNode =
   (struct
       type t = {ag_id : int ; port_id : int ; label : int}
-
+      let has_rigid_bonds = true
       let arity = 2
       let structure_preserving = [|
           (*f_port*)
@@ -288,7 +291,7 @@ module KappaNode =
           Exit -> false
 
       let gluable u v = (*same id, same label and different ports*)
-        (id u = id v) && (u.label = v.label)
+        (id u = id v) && compatible u v
 
       let compare u v =
         Pervasives.compare (u.ag_id,u.port_id,u.label) (v.ag_id,v.port_id,v.label)
@@ -390,7 +393,7 @@ module DegreeNode =
 
       let arity = 1
       let structure_preserving = [|fun u v -> u.max_degree <= v.max_degree|]
-
+      let has_rigid_bonds = false
       let id u = u.id
 
       let rename i u = {u with id = i}
@@ -413,7 +416,7 @@ module DegreeNode =
           Exit -> false
 
       let gluable u v = (*same id, same label and different ports*)
-        (id u = id v) && (u.max_degree = v.max_degree)
+        (id u = id v) && compatible u v
 
 
       let compare u v = Pervasives.compare u.id v.id

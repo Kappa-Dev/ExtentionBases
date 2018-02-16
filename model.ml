@@ -56,6 +56,8 @@ module Make (Node:Node.NodeType) =
     let witnesses_of_rule ?obs r m =
       let enum_witnesses obs_name id_emb obs =
 	let h_eps = Cat.src id_emb in
+        List.map (fun tile -> (obs_name,tile)) (h_eps |> obs)
+                 (*
 	List.fold_left
 	  (fun tiles gluing_tile ->
 	   match Cat.upper_bound gluing_tile with
@@ -68,6 +70,7 @@ module Make (Node:Node.NodeType) =
                  if Cat.upper_bound tile = None then tiles
                  else (obs_name,gluing_tile)::tiles
 	  ) [] (h_eps |> obs)
+                  *)
       in
       let build_witnesses effect observables =
 	Lib.IntMap.fold

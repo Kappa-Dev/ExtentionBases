@@ -112,7 +112,13 @@ module Make (Node:Node.NodeType) =
            match env.eb with
              None ->
               let get_seed = function
-                  (id_obs,tile)::_ -> Cat.left_of_tile tile
+                  (id_obs,tile)::_ ->
+                  (
+                    let g = Cat.left_of_tile tile in
+                    let () = Printf.printf "tile is %s\n" (Cat.string_of_tile tile)
+                    in
+                    g
+                  )
                 | [] -> Graph.empty
               in
               (EB.empty (get_seed pw) , EB.empty (get_seed nw))
