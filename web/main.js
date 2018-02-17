@@ -2,6 +2,7 @@ let cytoscape = require('./vendor/cytoscape');
 let graph = require('./lib/graph');
 let domtoimage = require('./vendor/dom-to-image');
 let colors = require('./lib/colors')();
+let styles = require('./lib/styles');
 
 let WS = require('./lib/ws-client');
 
@@ -58,6 +59,20 @@ cytoscape.use(require('./vendor/cytoscape-cose-bilkent'));
 let init = (cyd_basis,cyd_graphs) => {
   clear();
 
+  // Attach metadata to basis elements (outer) and midpoint elements (inner)
+  _.each(cyd_basis.elements, g => { g.data.outer = true; });
+  _.each(cyd_graphs, ({info,elements}) => {
+    _.each(elements, g => {
+      g.data.inner = true;
+      g.data.fromGraph = info.id;
+      if (g.data.id) g.data.id = `${info.id}/${g.data.id}`;
+      if (g.data.source) g.data.source = `${info.id}/${g.data.source}`;
+      if (g.data.target) g.data.target = `${info.id}/${g.data.target}`;
+    });
+  });
+
+
+  // Setup full graph
 
   if (!window.cy) {
     window.cy = document.createElement("div");
@@ -65,210 +80,64 @@ let init = (cyd_basis,cyd_graphs) => {
     document.body.appendChild(cy);
   }
 
-  window.cy_graphs = _.object(_.map(cyd_graphs, ({info,elements}) => {
-    let id = info.id;
-    let div = document.createElement("div")
-    div.setAttribute('id',id);
-    div.classList.add('innerGraph');
-    cy.appendChild(div);
-    //document.body.appendChild(div);
-    let g = cytoscape({
-      id: id,
-      container: div,
-      elements: elements,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'label': 'data(label)',
-            'text-halign': 'center',
-            'text-valign': 'center'
-          }
-        },
-        {
-          selector: 'node[highlight]',
-          style: {
-            'background-color': e => colors.get(e.data("highlight")),
-          }
-        },
-        {
-          selector: 'edge',
-          style: {
-            //'opacity': 0.6,
-            'source-label': 'data(taillabel)',
-            'target-label': 'data(headlabel)',
-            'curve-style': 'bezier',
-            'source-text-offset': '0.5em',
-            'target-text-offset': '0.5em'
-          }
-        }
-      ],
-      layout: { name: 'cose-bilkent', animate: false},
-      userZoomingEnabled: false,
-    });
-
-
-    //g.center();
-
-    return [id,g];
-  }));
-
-
   window.cy_basis = cytoscape({
     container: cy,
-    elements:cyd_basis.elements,
+    elements:cyd_basis.elements.concat(..._.map(cyd_graphs, ({elements}) => elements)),
     autoungrabify: true,
     autounselectify: true,
     maxZoom: 1.8,
     minZoom: 0.1,
-
-    style: [ // the stylesheet for the graph
-      {
-        selector: 'node',
-        style: {
-          'background-color': '#666',
-          'background-opacity': 0,
-          'border-width': '2px',
-          'border-style': 'solid',
-          'border-color': 'black',
-          'border-opacity': '0.1',
-          'label': 'data(id)',
-          'width': '200px',
-          'height': '200px',
-          'font-size': '28px',
-          'label': 'data(label)',
-        }
-      },
-      {
-        selector: 'node.activeCC, node.activeCCLong',
-        style: {
-          'background-color': '#2ba7ef',
-          'background-opacity': 0.1,
-        }
-      },
-      {
-        selector: 'node.activeCC',
-        style: {
-          'border-opacity': 1
-        }
-      },
-      {
-        selector: 'node.hover',
-        style: {
-          //'border-color': '#0654d3',
-          'background-color': '#0654d3',
-          //'border-width': '10px',
-          'background-opacity': 0.3,
-          'border-opacity': 1
-        }
-      },
-      {
-        selector: 'edge',
-        style: {
-          //'source-label': 'data(sourceLabel)',
-          //'target-label': 'data(targetLabel)',
-          'width': 2,
-          'line-color': '#1a8416',
-          'line-style': 'solid',
-          'opacity': '0.7',
-          'target-arrow-color': '#ccc',
-          'target-arrow-shape': 'triangle',
-          //'source-endpoint': 'outside-to-node',
-          //'target-endpoint': 'outside-to-line',
-          'curve-style': 'unbundled-bezier'
-        }
-      },
-
-      {
-        selector: "edge[conflict]",
-        style: {
-          'line-style': 'dashed',
-          'width': 1,
-          'line-color': '#A0A0A0',
-          'visibility': 'hidden'
-          //'curve-style': 'unbundled-bezier'
-        }
-
-      },
-      {
-        selector: "edge[conflict].activeCC.visible, edge[conflict].activeCCLong.visible",
-        style: {
-          'visibility': 'visible'
-        }
-      },
-      {
-        selector: 'edge[^conflict].hover',
-        style: {
-          opacity: 0.9,
-          width: 7,
-          color: '#27db20'
-        }
-      },
-      {
-        selector: 'edge[conflict].hover',
-        style: {
-          opacity: 0.9,
-          width: 7,
-          color: '#505050'
-        }
-      },
-      {
-        selector: 'edge.activeCC, edge.activeCCLong',
-        style: {
-          opacity: 0.8,
-          width: 7,
-        }
-      },
-      {
-        selector: 'edge.activeCC',
-        style: {
-          opacity: 1,
-          color: '#0e540b',
-          width: 7,
-        }
-      },
-      {
-        selector: 'edge[conflict].activeCC, edge[conflict].activeCCLong',
-        style: {
-          'line-color': '#808080',
-          width: 7,
-        }
-      },
-      {
-        selector: 'edge[conflict].activeCC',
-        style: {
-          'line-color': '#404040',
-          width: 7,
-        }
-      },
-
-    ],
-
-
+    style: styles ,
   });
 
+  // Layout templates
   let dagre_data = { name: 'dagre',
     spacingFactor: 1.5,
     padding: 60,
     transform: (node,position) => { return {x: position.x, y: node.cy().height()-position.y} }
-
   };
-
   let conflict_data = dagre_data;
 
-  cy_basis.collection('[^conflict]').layout(dagre_data).run();
+  // Subsets of the full graph
+  let outers = cy_basis.filter('[outer][^conflict]');
+  let conflicts = cy_basis.filter('[outer][conflict]');
+  let inners = _.object(_.map(cyd_graphs, ({info}) => {
+    const inner = cy_basis.filter(e => e.data().fromGraph == info.id);
+    return [info.id, inner];
+  }));
 
-  let conflicts = cy_basis.collection('[conflict]');
 
+  // Run each layout separately
+  outers.layout(dagre_data).run();
+  conflicts.layout(conflict_data).run();
+
+  let paddingPc = 0.05;
+  _.each(inners, (inner,id) => {
+    const outer = cy_basis.getElementById(id);
+    const pos = outer.position();
+    const w = outer.width();
+    const h = outer.height();
+    inner.layout({
+      name: 'cose-bilkent',
+      animate: false,
+      boundingBox: {
+        x1: pos.x - w/2 + paddingPc*w,
+        y1: pos.y - h/2 + paddingPc*h,
+        w: w - paddingPc*w*2,
+        h: h - paddingPc*h*2
+      }
+    }).run()
+  });
+
+  // show conflicts or not
   if (getConflict() === null || getConflict() === "true") {
     setConflict(conflicts,true);
   }
 
-  conflicts.layout(conflict_data).run();
+  // Interactivity
+  cy_basis.filter('edge[outer]').on('mouseover', evt => evt.target.addClass('hover'));
 
-  cy_basis.collection('edge').on('mouseover', evt => evt.target.addClass('hover'));
-
-  cy_basis.collection('edge').on('mouseout', evt => evt.target.removeClass('hover'));
+  cy_basis.filter('edge[outer]').on('mouseout', evt => evt.target.removeClass('hover'));
 
   let activationZone = node => {
     let c = node
@@ -279,88 +148,36 @@ let init = (cyd_basis,cyd_graphs) => {
 
   let actives = cy_basis.collection();
 
-  cy_basis.collection('node').on('mouseover', evt => {
+  cy_basis.filter('node[outer]').on('mouseover', evt => {
     evt.target.addClass('hover');
     activationZone(evt.target).addClass('activeCC');
   });
 
-  cy_basis.collection('node').on('mouseout', evt => {
+  cy_basis.filter('node[outer]').on('mouseout', evt => {
     evt.target.removeClass('hover');
     activationZone(evt.target).removeClass('activeCC');
   });
 
-  cy_basis.collection('node').on('tap', evt => {
+  cy_basis.filter('node[outer]').on('tap', evt => {
     actives.removeClass('activeCCLong');
+    actives.removeClass('hoverLong');
     actives = activationZone(evt.target);
     actives.addClass('activeCCLong');
+    evt.target.addClass('hoverLong');
   });
 
   cy_basis.on('tap', evt => {
     if (evt.target == cy_basis) {
       actives.removeClass('activeCCLong');
+      actives.removeClass('hoverLong');
       actives = cy_basis.collection();
     }
   });
-
-
-
-  let is_contained = (out_h, out_w, in_x, in_y, in_w, in_h) => {
-    return in_x + in_w >= 0
-        && in_x <= out_w
-        && in_y + in_h >= 0
-        && in_y <= out_h;
-  }
-
-  let adjust = (zoom) => {
-    const wHeight = window.innerHeight;
-    const wWidth = window.innerWidth;
-
-    _.each(cy_graphs, (g,id) => {
-
-      let host_node = cy_basis.nodes('#'+id);
-      if (host_node.length == 0) {
-        return;
-      }
-      let pos = host_node.renderedPosition(),
-      w = host_node.renderedWidth(),
-      h = host_node.renderedHeight();
-
-      //ccy.zoom({level:cy.zoom(),renderedPosition:{x:pos.x-w/2, y:pos.y-h/2}});
-      g.container().style.left = pos.x - w/2;
-      g.container().style.top = pos.y - h/2;
-      g.container().style.width = w;
-      g.container().style.height = h;
-
-      if (zoom && is_contained(wHeight,wWidth,pos.x,pos.y,w,h)) {
-        // Somehow doing resize() before fit() makes everything faster (fit() alone is slow)
-        g.resize();
-        g.center();
-        g.fit(0.05*w);
-        // Old method to rezoom fast was
-        //  g.zoom({level:cy_basis.zoom(),renderedPosition:{x:0,y:0}}); // fast
-        //  imperfect but this was incorrect: this assumed the initial zoom level
-        //  (to fit the default 200px * 200px box for inner graphs) was 1. So if
-        //  I go this route again, I need to store, for each inner graph g, their
-        //  initial zoom level z_g and then if cy_basis has zoom level z, I give
-        //  g the zoom level z * z_g.
-      }
-    });
-  };
-
-  cy_basis.on('pan', () => {
-    adjust(false);
-  });
-
-  cy_basis.on('zoom', () =>  {
-    adjust(true);
-  });
-
-  adjust(true);
 };
 
 document.addEventListener('keypress', e => {
   if (e.key === 'c') {
-    toggleConflict(cy_basis.collection('[conflict]'));
+    toggleConflict(cy_basis.filter('[conflict]'));
   }
   if (e.key === 'r') {
     cy_basis.fit();

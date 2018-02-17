@@ -2175,10 +2175,80 @@ Layout.prototype.runLayout = function () {
     this.tilingPostLayout();
   }
 
+  this.updateBoundingBox();
+
   this.isLayoutFinished = true;
 
   return isLayoutSuccessfull;
 };
+
+// Updates node positions to fit within bounding box.
+// * Original bounds ratio is respected.
+//   Alternative: just fit in new bounds. This will deform the original graph shape.
+// * Node sizes are not altered.
+//   Alternative: resize nodes proportionally to their new bounding box size.
+// * Repositioning %age is relative to node center. For nodes that are big
+//   relative to their original bounding box, you will lose a lot of space in the
+//   new bounds.
+//   Alternative: reposition relative to closest border.
+Layout.prototype.updateBoundingBox = function() {
+
+  if (!LayoutConstants.BOUNDING_BOX) return;
+
+  var graph = this.getGraphManager().getRoot();
+  const box = LayoutConstants.BOUNDING_BOX;
+
+  var nodes = graph.getNodes();
+  var s = nodes.length;
+
+  var bounds = LGraph.calculateBounds(nodes);
+  var x = bounds.getX();
+  var y = bounds.getY();
+  var w = bounds.getWidth();
+  var h = bounds.getHeight();
+
+  var boundRatio = w/h;
+  var boxRatio = box.w / box.h;
+
+  var boxW, boxH;
+  // box is flat relative to bounds
+  if (boxRatio >= boundRatio) {
+    boxH = box.h;
+    boxW = w * box.h/h;
+  // box is thin relative to bounds
+  } else {
+    boxW = box.w;
+    boxH = h * box.w/w;
+  }
+
+  var boxX, boxY;
+  // center new box
+  boxX = box.x1 + (box.w-boxW)/2;
+  boxY = box.y1 + (box.h-boxH)/2;
+
+  for (var i = 0; i< s; i++) {
+    var lNode = nodes[i];
+    // nW/2 & nH/2 fiddling repositions nodes relative to their center
+    var nW = lNode.getWidth();
+    var nH = lNode.getHeight();
+    var nX = lNode.getLeft() + nW/2;
+    var nY = lNode.getTop() + nH/2;
+
+    var pctX = (nX - x) / w;
+    var pctY = (nY - y) / h;
+
+    lNode.setRect({
+      x: (boxX + pctX * boxW) - nW/2,
+      y: (boxY + pctY * boxH) - nH/2
+    },
+    {
+      width: lNode.getWidth(),
+      height: lNode.getHeight()
+    });
+  }
+
+  this.graphManager.updateBounds();
+}
 
 /**
  * This method performs the operations required after layout.
@@ -4088,6 +4158,7 @@ var getUserOptions = function getUserOptions(options) {
 
   CoSEConstants.NODE_DIMENSIONS_INCLUDE_LABELS = FDLayoutConstants.NODE_DIMENSIONS_INCLUDE_LABELS = LayoutConstants.NODE_DIMENSIONS_INCLUDE_LABELS = options.nodeDimensionsIncludeLabels;
   CoSEConstants.DEFAULT_INCREMENTAL = FDLayoutConstants.DEFAULT_INCREMENTAL = LayoutConstants.DEFAULT_INCREMENTAL = !options.randomize;
+  LayoutConstants.BOUNDING_BOX = options.boundingBox;
   CoSEConstants.ANIMATE = FDLayoutConstants.ANIMATE = LayoutConstants.ANIMATE = options.animate;
   CoSEConstants.TILE = options.tile;
   CoSEConstants.TILING_PADDING_VERTICAL = typeof options.tilingPaddingVertical === 'function' ? options.tilingPaddingVertical.call() : options.tilingPaddingVertical;
@@ -4175,6 +4246,8 @@ _CoSELayout.prototype.run = function () {
       if (layout.tilingPostLayout) {
         layout.tilingPostLayout();
       }
+
+      layout.updateBoundingBox();
 
       layout.isLayoutFinished = true;
 
