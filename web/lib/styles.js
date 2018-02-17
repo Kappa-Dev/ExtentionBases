@@ -1,3 +1,29 @@
+const outer = {
+  background: {
+    idle: '#666',
+    active: '#2ba7ef',
+    hover: '#0654d3',
+  },
+  edge: {
+    conflict: {
+      line: {
+        idle: '#A0A0A0',
+        hover: '#505050',
+        active: '#808080',
+        activeLong: '#404040',
+      }
+    },
+    line: {
+      idle: '#1a8416',
+      active: '#0e540b',
+      hover: '#27db20'
+    },
+    arrow: {
+      idle: '#ccc',
+    }
+  }
+};
+
 module.exports = [ // the stylesheet for the graph
   {
     selector: 'node[inner]',
@@ -17,7 +43,6 @@ module.exports = [ // the stylesheet for the graph
   {
     selector: 'edge[inner]',
     style: {
-      //'opacity': 0.6,
       'source-label': 'data(taillabel)',
       'target-label': 'data(headlabel)',
       'curve-style': 'bezier',
@@ -28,7 +53,7 @@ module.exports = [ // the stylesheet for the graph
   {
     selector: 'node[outer]',
     style: {
-      'background-color': '#666',
+      'background-color': outer.background.idle,
       'background-opacity': 0,
       'border-width': '2px',
       'border-style': 'solid',
@@ -45,7 +70,7 @@ module.exports = [ // the stylesheet for the graph
   {
     selector: 'node[outer].activeCC, node[outer].activeCCLong',
     style: {
-      'background-color': '#2ba7ef',
+      'background-color': outer.background.active,
       'background-opacity': 0.1,
       'border-opacity': 0.1,
     }
@@ -59,16 +84,14 @@ module.exports = [ // the stylesheet for the graph
   {
     selector: 'node[outer].hoverLong',
     style: {
-      'background-color': '#0654d3',
+      'background-color': outer.background.hover,
       'background-opacity': 0.2,
     }
   },
   {
     selector: 'node[outer].hover',
     style: {
-      //'border-color': '#0654d3',
-      'background-color': '#0654d3',
-      //'border-width': '10px',
+      'background-color': outer.background.hover,
       'background-opacity': 0.3,
       'border-opacity': 1
     }
@@ -76,16 +99,12 @@ module.exports = [ // the stylesheet for the graph
   {
     selector: 'edge[outer]',
     style: {
-      //'source-label': 'data(sourceLabel)',
-      //'target-label': 'data(targetLabel)',
       'width': 2,
-      'line-color': '#1a8416',
+      'line-color': outer.edge.line.idle,
       'line-style': 'solid',
       'opacity': '0.7',
-      'target-arrow-color': '#ccc',
+      'target-arrow-color': outer.edge.arrow.idle,
       'target-arrow-shape': 'triangle',
-      //'source-endpoint': 'outside-to-node',
-      //'target-endpoint': 'outside-to-line',
       'curve-style': 'unbundled-bezier'
     }
   },
@@ -95,7 +114,7 @@ module.exports = [ // the stylesheet for the graph
     style: {
       'line-style': 'dashed',
       'width': 1,
-      'line-color': '#A0A0A0',
+      'line-color': outer.edge.conflict.line.idle,
       'visibility': 'hidden'
       //'curve-style': 'unbundled-bezier'
     }
@@ -112,7 +131,7 @@ module.exports = [ // the stylesheet for the graph
     style: {
       opacity: 0.9,
       width: 7,
-      color: '#27db20'
+      color: outer.edge.line.hover,
     }
   },
   {
@@ -120,7 +139,7 @@ module.exports = [ // the stylesheet for the graph
     style: {
       opacity: 0.9,
       width: 7,
-      color: '#505050'
+      color: outer.edge.conflict.line.hover,
     }
   },
   {
@@ -134,21 +153,21 @@ module.exports = [ // the stylesheet for the graph
     selector: 'edge[outer].activeCC',
     style: {
       opacity: 1,
-      color: '#0e540b',
+      color: outer.edge.line.active,
       width: 7,
     }
   },
   {
-    selector: 'edge[outer][conflict].activeCC, edge[outer][conflict].activeCCLong',
+    selector: 'edge[outer][conflict].activeCCLong',
     style: {
-      'line-color': '#808080',
+      'line-color': outer.edge.conflict.line.active,
       width: 7,
     }
   },
   {
     selector: 'edge[outer][conflict].activeCC',
     style: {
-      'line-color': '#404040',
+      'line-color': outer.edge.conflict.line.activeLong,
       width: 7,
     }
   },
