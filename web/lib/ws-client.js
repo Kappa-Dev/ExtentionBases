@@ -1,73 +1,80 @@
 let ws_client = ({url,cb}) => {
-  let ready = false;
   let connection = null;
-  let interval = null;
+  let timeout = null;
+  let connection_counter = 0;
+  let debug = false;
+
+  let _log = (str) => { if (debug) { console.log(str); } }
+
 
   let retry = () => {
-    ready = false;
-    if(!interval) {
-      interval = setInterval(connect,500);
+    if (!connection || connection.obsolete || connection.readyState !== WebSocket.OPEN) {
+      if (!timeout) {
+        _log("[retry: closed, no timeout]");
+        connect();
+        timeout = setTimeout(() => { timeout = null; retry(); },2000);
+      } else {
+        _log("[retry: closed, has timeout]");
+      }
+    } else {
+      _log("[retry: open]");
     }
   }
 
   let connect = () => {
+
     if (connection) {
-      connection.obsolete = true;
+      connection.close();
     }
 
-    connection = new WebSocket(url);
+    that = new WebSocket(url);
+    connection = that;
+    let current_counter = connection_counter++;
+    let log = str => _log(`[${current_counter}${that.obsolete ? ' obsolete' : ''}]: ${str}`)
 
-    let that = connection;
-
-    connection.onopen = () => {
-      console.log("Connection opened");
-      if (that.obsolete) { console.log("open: obsolete"); return; }
-      ready = true;
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-      console.log("New connection confirmed");
-      connection.send('Connected');
+    that.onopen = () => {
+      log("open start");
+      if (that.obsolete) return;
+      log("open: confirmed");
+      that.send('Connected');
     }
 
-    connection.onmessage = (e) => {
-      if (that.obsolete) { console.log("message: obsolete"); return; }
-
+    that.onmessage = (e) => {
+      log("message received");
+      if (that.obsolete) return;
 
       let m = null;
 
       try {
         m = JSON.parse(e.data);
       } catch(err) {
-        console.error("Cannot parse message: "+e.data);
+        log("Cannot parse message: "+e.data);
         return;
       }
 
       if (!m.type) {
-        console.error("No message type specified: "+e.data);
+        log("No message type specified: "+e.data);
       } else {
         cb(m.type,m.data);
       }
     }
 
-    connection.onclose = (e) => {
-      if (that.obsolete) { console.log("close: obsolete"); return; }
-      console.log("close");
+    that.onclose = (e) => {
+      log("close");
       that.obsolete = true;
       retry();
     }
 
-    connection.onerror = (e) => {
-      if (that.obsolete) { console.log("error: obsolete"); return; }
-      console.log("error");
+    that.onerror = (e) => {
+      log("error");
+      if (that.obsolete) return;
       that.obsolete = true;
       retry();
     }
   }
 
   let send = (msg) => {
-    if (ready) {
+    if (connection && !connection.obsolete) {
       connection.send(msg);
     }
   }
