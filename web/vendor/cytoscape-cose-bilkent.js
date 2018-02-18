@@ -2187,10 +2187,8 @@ Layout.prototype.runLayout = function () {
 //   Alternative: just fit in new bounds. This will deform the original graph shape.
 // * Node sizes are not altered.
 //   Alternative: resize nodes proportionally to their new bounding box size.
-// * Repositioning %age is relative to node center. For nodes that are big
-//   relative to their original bounding box, you will lose a lot of space in the
-//   new bounds.
-//   Alternative: reposition relative to closest border.
+// * Repositioning %age is relative to border closest to node.
+//   Alternative: reposition relative to node center.
 Layout.prototype.updateBoundingBox = function() {
 
   if (!LayoutConstants.BOUNDING_BOX) return;
@@ -2231,19 +2229,38 @@ Layout.prototype.updateBoundingBox = function() {
     // nW/2 & nH/2 fiddling repositions nodes relative to their center
     var nW = lNode.getWidth();
     var nH = lNode.getHeight();
-    var nX = lNode.getLeft() + nW/2;
-    var nY = lNode.getTop() + nH/2;
+    var nL = lNode.getLeft();
+    var nT = lNode.getTop();
+    var nR = lNode.getRight();
+    var nB = lNode.getBottom();
 
-    var pctX = (nX - x) / w;
-    var pctY = (nY - y) / h;
+    var nX,nY;
+
+    // left of node closer to left border than right of node close to right border
+    if ((nL-x) <= (x + w - nR)) {
+      var pctX = (nL - x) / w;
+      nX = (boxX + pctX * boxW);
+    } else {
+      var pctX = (x + w - nR) / w;
+      nX = boxX + (boxW - (pctX * boxW)) - nW;
+    }
+
+    // top of node closer to top border than bottom of node close to bottom border
+    if ((nT-y) <= (y + h - nB)) {
+      var pctY = (nT - y) / h;
+      nY = (boxY + pctY * boxH);
+    } else {
+      var pctY = (y + h - nB) / h;
+      nY = boxY + (boxH - (pctY * boxH)) - nH;
+    }
 
     lNode.setRect({
-      x: (boxX + pctX * boxW) - nW/2,
-      y: (boxY + pctY * boxH) - nH/2
+      x: nX,
+      y: nY
     },
     {
-      width: lNode.getWidth(),
-      height: lNode.getHeight()
+      width: nW,
+      height: nH
     });
   }
 
