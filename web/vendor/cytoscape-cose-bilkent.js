@@ -2193,65 +2193,67 @@ Layout.prototype.updateBoundingBox = function() {
 
   if (!LayoutConstants.BOUNDING_BOX) return;
 
-  var graph = this.getGraphManager().getRoot();
-  const box = LayoutConstants.BOUNDING_BOX;
+  var box = LayoutConstants.BOUNDING_BOX;
 
-  var nodes = graph.getNodes();
+  var nodes = this.getAllNodes();
   var s = nodes.length;
 
-  var bounds = LGraph.calculateBounds(nodes);
-  var x = bounds.getX();
-  var y = bounds.getY();
-  var w = bounds.getWidth();
-  var h = bounds.getHeight();
+  var _bounds = LGraph.calculateBounds(nodes);
+  var bounds = {
+    x: _bounds.getX(),
+    y: _bounds.getY(),
+    w: _bounds.getWidth(),
+    h: _bounds.getHeight()
+  }
 
-  var boundRatio = w/h;
+  var boundRatio = bounds.w / bounds.h;
   var boxRatio = box.w / box.h;
 
+  var newBox = {x:0, y: 0, w: 0,h: 0};
   var boxW, boxH;
   // box is flat relative to bounds
   if (boxRatio >= boundRatio) {
-    boxH = box.h;
-    boxW = w * box.h/h;
+    newBox.h = box.h;
+    newBox.w = bounds.w * box.h / bounds.h;
   // box is thin relative to bounds
   } else {
-    boxW = box.w;
-    boxH = h * box.w/w;
+    newBox.w = box.w;
+    newBox.h = bounds.h * box.w / bounds.w;
   }
 
-  var boxX, boxY;
   // center new box
-  boxX = box.x1 + (box.w-boxW)/2;
-  boxY = box.y1 + (box.h-boxH)/2;
+  newBox.x = box.x1 + (box.w-newBox.w)/2;
+  newBox.y = box.y1 + (box.h-newBox.h)/2;
 
-  for (var i = 0; i< s; i++) {
+  for (var i = 0; i < s; i++) {
     var lNode = nodes[i];
-    // nW/2 & nH/2 fiddling repositions nodes relative to their center
-    var nW = lNode.getWidth();
-    var nH = lNode.getHeight();
-    var nL = lNode.getLeft();
-    var nT = lNode.getTop();
-    var nR = lNode.getRight();
-    var nB = lNode.getBottom();
+    var node = {
+      w: lNode.getWidth(),
+      h: lNode.getHeight(),
+      l: lNode.getLeft(),
+      t: lNode.getTop(),
+      r: lNode.getRight(),
+      b: lNode.getBottom()
+    }
 
-    var nX,nY;
+    var nX,nY, pctX, pctY;
 
     // left of node closer to left border than right of node close to right border
-    if ((nL-x) <= (x + w - nR)) {
-      var pctX = (nL - x) / w;
-      nX = (boxX + pctX * boxW);
+    if ((node.l-bounds.x) <= (bounds.x + bounds.w - node.r)) {
+      pctX = (node.l - bounds.x) / bounds.w;
+      nX = (newBox.x + pctX * newBox.w);
     } else {
-      var pctX = (x + w - nR) / w;
-      nX = boxX + (boxW - (pctX * boxW)) - nW;
+      pctX = (bounds.x + bounds.w - node.r) / bounds.w;
+      nX = newBox.x + (newBox.w - (pctX * newBox.w)) - node.w;
     }
 
     // top of node closer to top border than bottom of node close to bottom border
-    if ((nT-y) <= (y + h - nB)) {
-      var pctY = (nT - y) / h;
-      nY = (boxY + pctY * boxH);
+    if ((node.t-bounds.y) <= (bounds.y + bounds.h - node.b)) {
+      pctY = (node.t - bounds.y) / bounds.h;
+      nY = (newBox.y + pctY * newBox.h);
     } else {
-      var pctY = (y + h - nB) / h;
-      nY = boxY + (boxH - (pctY * boxH)) - nH;
+      pctY = (bounds.y + bounds.h - node.b) / bounds.h;
+      nY = newBox.y + (newBox.h - (pctY * newBox.h)) - node.h;
     }
 
     lNode.setRect({
@@ -2259,8 +2261,8 @@ Layout.prototype.updateBoundingBox = function() {
       y: nY
     },
     {
-      width: nW,
-      height: nH
+      width: node.w,
+      height: node.h
     });
   }
 
