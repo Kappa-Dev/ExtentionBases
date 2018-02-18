@@ -1,6 +1,5 @@
 let cytoscape = require('./vendor/cytoscape');
 let graph = require('./lib/graph');
-let domtoimage = require('./vendor/dom-to-image');
 let colors = require('./lib/colors')();
 let styles = require('./lib/styles');
 
@@ -183,18 +182,12 @@ document.addEventListener('keypress', e => {
     cy_basis.fit();
   }
   if (e.key === 'p') {
-    let node = window.cy;
     let screenlink = document.getElementById('screenlink');
 
-    domtoimage.toPng(node)
-    .then(dataUrl => {
-      screenlink.classList.add('ready');
-      screenlink.href = dataUrl;
-      screenlink.click();
-    })
-  .catch(error => {
-    console.error('oops, something went wrong!', error);
-  });
+    let dataUrl = cy_basis.png({full:true,bg: "white"});
+    screenlink.classList.add('ready');
+    screenlink.href = dataUrl;
+    screenlink.click();
   }
 });
 
