@@ -28,6 +28,7 @@ module type Category =
 
 
     val share : arrows -> arrows -> (arrows * tile) list
+    val share_new : arrows -> arrows -> (arrows * tile) list
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
     val invert : arrows -> arrows
@@ -691,23 +692,104 @@ module Make (Node:Node.NodeType) =
           1
         with
           Undefined -> 0
-                     (*
-    let rec extend_sharings left right sharings = function
-        [] -> sharings
-        (f,g,next) :: tl ->
-         List.fold_left
-           (fun ext_fg u ->
-             let u_f = Hom.find u f in
-             let u_g = Hom.find u g in
-             List.fold_left
-               (fun ext_fg v_f ->
-                 List.fold_left
-                (fun ext_fg v_g ->
-                ) (Graph.bound_to u
-               ) ext_fg (Graph.bound_to u_f left)
-             
-           ) [] next
-                      *)
+
+
+    exception Impossible
+
+    (*fun_next may raise Not_found*)
+    let rec extend_to left f inf g right continuation fun_next fun_inf todo =
+      List.fold_left
+        (fun cont u ->
+          List.fold_left
+            (fun cont (f,inf,g,todo') ->
+              assert (Hom.mem u f && Hom.mem u g) ;
+              let u_f,u_g = Hom.find u f,Hom.find u g in
+              try
+                let candidates_f = fun_next u_f left in
+                let candidates_g =  fun_next u_g right in
+                List.fold_left
+                  (fun cont v_f ->
+                    List.fold_left
+                      (fun cont v_g ->
+                        let new_v =
+                          if Hom.comem v_f f then
+                            if Hom.comem v_g g then
+                              let new_v,new_v' = Hom.cofind v_f f, Hom.cofind v_g g in
+                              if new_v = new_v' then new_v
+                              else raise Hom.Not_injective
+                            else raise Hom.Not_injective
+                          else
+                            if Hom.comem v_g g then raise Hom.Not_injective
+                            else
+                              Node.rename ((Graph.max_id inf)+1) v_g
+                        in
+                        let inf' = fun_inf u new_v inf in
+                        try
+                          (Hom.add new_v v_f f,
+                           inf',
+                           Hom.add new_v v_g g,
+                           new_v::todo')::cont
+                        with
+                          Hom.Not_injective | Hom.Not_structure_preserving -> cont
+                      ) cont candidates_g
+                  ) cont candidates_f
+              with
+                Not_found -> raise Impossible
+            ) cont continuation
+        ) [] todo
+
+
+    let extend_meet fun_next fun_inf left right meet_list best =
+      List.fold_left
+        (fun (continuation,best) (f,inf,g,todo) ->
+          match todo with
+            [] -> (continuation,(f,inf,g)::best)
+          | _ ->
+             begin
+               try
+                 (extend_to left f inf g right continuation fun_next fun_inf todo,best)
+               with Impossible -> (continuation,best)
+             end
+        ) ([],best) meet_list
+
+    let share_new f g =
+      let fun_next_ids u g =
+        List.fold_left (fun cont v -> if v<>u then v::cont else cont) [] (Graph.nodes_of_id (Node.id u) g)
+      in
+      let fun_inf_ids u v g =
+        assert (Node.id u = Node.id v) ;
+        Graph.add_node v g
+      in
+      let fun_next_bnd u g =
+        Graph.bound_to u g
+      in
+      let fun_inf_bnd u v g =
+        Graph.add_edge u v (Graph.add_node v g)
+      in
+      let left,right,inf0 = trg f,trg g,src f in
+      let rec iter_extend best = function
+          [] -> best
+        | meet_list ->
+           let meet_list,best = (*extending meet list by adding all nodes whose id is already constrained*)
+             extend_meet fun_next_ids fun_inf_ids left right meet_list best
+           in
+           (*extending meet list by adding all nodes that are bound to a node of the domain of the span *)
+           let meet_list,best =
+             extend_meet fun_next_bnd fun_inf_bnd left right meet_list best
+           in
+           iter_extend best meet_list
+      in
+      let spans = iter_extend [] [(hom_of_arrows f,inf0,hom_of_arrows g,Graph.nodes inf0)] in
+      let sharings =
+        List.map (fun (f,inf,g) ->
+            let span = ({src = inf ; trg = left ; maps = [f] ; partial = false},
+                       {src = inf ; trg = right ; maps = [g]; partial = false})
+            in
+            let co_span = None (*TODO*) in
+            (identity inf0 inf ,{span = span ; cospan = co_span})
+          ) spans
+      in
+      sharings
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       print_endline "Entering sharing function" ;

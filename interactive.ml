@@ -49,15 +49,15 @@ module Make (Node:Node.NodeType) =
     let (=~=>) g h = Cat.flatten (Cat.extension_class (g => h))
 
     let simple_tests () =
-      let o8 = draw (Node.tn [([2],[3]);([3],[6]);([6],[5]);([4],[5]);([4],[2])]) Graph.empty in
-      let o2 = draw (Node.tn [([3],[2])]) Graph.empty in
-      let w =  draw (Node.tn [([5],[4]);([5],[6]);([6],[4]);([6],[3]);([3],[2]);([2],[4])]) Graph.empty in
-      let o2_to_o8 = o2 =~=> o8 in
-      let o2_to_w = o2 =~=> w in
+      let one = graph_of_library "one" in
+      let house = graph_of_library "house" in
+      let square = graph_of_library "square" in
+      let o2_to_o8 = one =~=> square in
+      let o2_to_w = one =~=> house in
       let sharings =
         List.fold_left (fun sharings o2_o8 ->
             List.fold_left (fun sharings o2_w ->
-                (Cat.share o2_o8 o2_w)::sharings
+                (Cat.share_new o2_o8 o2_w)::sharings
               ) sharings o2_to_w
           ) [] o2_to_o8
       in
