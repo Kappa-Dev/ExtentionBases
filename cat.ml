@@ -28,7 +28,9 @@ module type Category =
 
 
     val share : arrows -> arrows -> (arrows * tile) list
-    val share_new : arrows -> arrows -> (arrows * tile) list
+
+    val share_new : arrows -> arrows -> unit
+
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
     val invert : arrows -> arrows
@@ -262,10 +264,9 @@ module Make (Node:Node.NodeType) =
 		      Hom.Not_structure_preserving | Hom.Not_injective -> cont
 		  else
 		    cont
-
 		) []
 	    in
-	    hom_extended_with_candidates_u@hom_list
+	    hom_extended_with_candidates_u @ hom_list
 	  ) [] hom_list
       in
       let cc_roots = Graph.connected_components _G in
@@ -693,103 +694,73 @@ module Make (Node:Node.NodeType) =
         with
           Undefined -> 0
 
-
-    exception Impossible
-
-    (*fun_next may raise Not_found*)
-    let rec extend_to left f inf g right continuation fun_next fun_inf todo =
+    (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
+    let extend_hom fun_ext u left f right =
+      assert (Hom.mem u f) ;
+      let nodes_left = fun_ext u left in
+      let nodes_right = fun_ext (Hom.find u f) right in
+      Printf.printf "Associating {%s} to {%s}\n"
+        (String.concat "," (List.map Node.to_string nodes_left))
+        (String.concat "," (List.map Node.to_string nodes_right)) ;
       List.fold_left
-        (fun cont u ->
-          List.fold_left
-            (fun cont (f,inf,g,todo') ->
-              assert (Hom.mem u f && Hom.mem u g) ;
-              let u_f,u_g = Hom.find u f,Hom.find u g in
-              try
-                let candidates_f = fun_next u_f left in
-                let candidates_g =  fun_next u_g right in
-                List.fold_left
-                  (fun cont v_f ->
-                    List.fold_left
-                      (fun cont v_g ->
-                        let new_v =
-                          if Hom.comem v_f f then
-                            if Hom.comem v_g g then
-                              let new_v,new_v' = Hom.cofind v_f f, Hom.cofind v_g g in
-                              if new_v = new_v' then new_v
-                              else raise Hom.Not_injective
-                            else raise Hom.Not_injective
-                          else
-                            if Hom.comem v_g g then raise Hom.Not_injective
-                            else
-                              Node.rename ((Graph.max_id inf)+1) v_g
-                        in
-                        let inf' = fun_inf u new_v inf in
-                        try
-                          (Hom.add new_v v_f f,
-                           inf',
-                           Hom.add new_v v_g g,
-                           new_v::todo')::cont
-                        with
-                          Hom.Not_injective | Hom.Not_structure_preserving -> cont
-                      ) cont candidates_g
-                  ) cont candidates_f
-              with
-                Not_found -> raise Impossible
-            ) cont continuation
-        ) [] todo
+        (fun cont u_left ->
+          if Hom.mem u_left f then cont
+          else
+            let f_list =
+              List.fold_left
+                (fun f_list u_right ->
+                  List.fold_left
+                    (fun cont (f',todo) ->
+                      try
+                        (Hom.add u_left u_right f',NodeSet.add u_left todo)::cont
+                      with
+                        Hom.Not_injective | Hom.Not_structure_preserving -> cont
+                    ) [] f_list
+                ) [(f,NodeSet.empty)] nodes_right
+            in
+            f_list@cont
+        ) [] nodes_left
 
-
-    let extend_meet fun_next fun_inf left right meet_list best =
-      List.fold_left
-        (fun (continuation,best) (f,inf,g,todo) ->
-          match todo with
-            [] -> (continuation,(f,inf,g)::best)
-          | _ ->
-             begin
-               try
-                 (extend_to left f inf g right continuation fun_next fun_inf todo,best)
-               with Impossible -> (continuation,best)
-             end
-        ) ([],best) meet_list
+    let phl l = String.concat ";" (List.map (fun (h,todo) -> Hom.to_string ~full:true h) l)
 
     let share_new f g =
-      let fun_next_ids u g =
-        List.fold_left (fun cont v -> if v<>u then v::cont else cont) [] (Graph.nodes_of_id (Node.id u) g)
+      Printf.printf "Building extensions for <-%s-.-%s->\n" (string_of_arrows f) (string_of_arrows g) ;
+      let left,right = f.trg,g.trg in
+      let f_0 = hom_of_arrows (g @@ invert f) in
+      let todo_0 = Hom.domain f_0 in
+      let extend_node_properties =
+        fun u graph -> try Graph.nodes_of_id (Node.id u) graph with Not_found -> []
       in
-      let fun_inf_ids u v g =
-        assert (Node.id u = Node.id v) ;
-        Graph.add_node v g
+      let extend_node_links =
+        fun u graph -> try Graph.bound_to u graph with Not_found -> []
       in
-      let fun_next_bnd u g =
-        Graph.bound_to u g
-      in
-      let fun_inf_bnd u v g =
-        Graph.add_edge u v (Graph.add_node v g)
-      in
-      let left,right,inf0 = trg f,trg g,src f in
-      let rec iter_extend best = function
-          [] -> best
-        | meet_list ->
-           let meet_list,best = (*extending meet list by adding all nodes whose id is already constrained*)
-             extend_meet fun_next_ids fun_inf_ids left right meet_list best
+      let rec iter_extend prop finished = function
+          [] -> finished
+        | f_list ->
+           print_endline (phl f_list) ;
+           let fun_ext = if prop then extend_node_properties else extend_node_links in
+           let cont,finished =
+             List.fold_left
+               (fun (cont,finished) (f,todo) ->
+                 Printf.printf "Extending %s (todo: {%s})...\n"
+                   (Hom.to_string ~full:true f)
+                   (String.concat "," (List.map Node.to_string (NodeSet.elements todo))) ;
+                 if NodeSet.is_empty todo then (cont,f::finished)
+                 else
+                   let ext_list_todo =
+                     NodeSet.fold
+                       (fun u ext_list_f ->
+                         let ext_list_u = extend_hom fun_ext u left f right in
+                         ext_list_u@ext_list_f
+                       ) todo cont
+                   in
+                   (ext_list_todo,finished)
+               ) ([],finished) f_list
            in
-           (*extending meet list by adding all nodes that are bound to a node of the domain of the span *)
-           let meet_list,best =
-             extend_meet fun_next_bnd fun_inf_bnd left right meet_list best
-           in
-           iter_extend best meet_list
+           iter_extend (not prop) finished cont
       in
-      let spans = iter_extend [] [(hom_of_arrows f,inf0,hom_of_arrows g,Graph.nodes inf0)] in
-      let sharings =
-        List.map (fun (f,inf,g) ->
-            let span = ({src = inf ; trg = left ; maps = [f] ; partial = false},
-                       {src = inf ; trg = right ; maps = [g]; partial = false})
-            in
-            let co_span = None (*TODO*) in
-            (identity inf0 inf ,{span = span ; cospan = co_span})
-          ) spans
-      in
-      sharings
+      let ext_f_list = iter_extend true [] [(f_0,todo_0)] in
+      print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       print_endline "Entering sharing function" ;

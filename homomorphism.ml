@@ -9,6 +9,8 @@ module Make (Node:Node.NodeType) =
 
     type t = {tot : NodeBij.t ; sub : IntBij.t }
 
+    let domain hom = NodeBij.domain hom.tot
+
     let size hom = NodeBij.size hom.tot
 
     let is_equal hom hom' = NodeBij.is_equal (fun u v -> Node.compare u v = 0) hom.tot hom'.tot

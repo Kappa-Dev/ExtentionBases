@@ -437,7 +437,7 @@ module Make (Node:Node.NodeType) =
                        else
                          Lib.IntMap.fold
                            (fun j step_ij cont ->
-                             QueueList.add_fifo (i,step_ij,j) cont ; cont
+                             QueueList.add_lp (i,step_ij,j) cont
                            ) (find i ext_base).next queue
                      in
                      let visited' = Lib.IntSet.add i visited in
@@ -492,7 +492,7 @@ module Make (Node:Node.NodeType) =
                          else
                            Lib.IntMap.fold
                              (fun j step_ij cont ->
-                               QueueList.add_lifo (i,step_ij,j) cont ; cont
+                               QueueList.add_hp (i,step_ij,j) cont
                              ) (find i ext_base).next queue
                        in
                        (dry_run,(Lib.IntSet.add i visited), inf_path' ,queue', dec_step ext_base max_step)
@@ -530,7 +530,7 @@ module Make (Node:Node.NodeType) =
                            else
                              Lib.IntMap.fold
                                (fun j step_ij cont ->
-                                 QueueList.add_fifo (i,step_ij,j) cont ; cont
+                                 QueueList.add_lp (i,step_ij,j) cont
                                ) (find i ext_base).next queue
                          in
                          let dry_run' =
@@ -548,7 +548,7 @@ module Make (Node:Node.NodeType) =
                            else
                              Lib.IntMap.fold
                                (fun j step_ij cont ->
-                                 QueueList.add_fifo (i, step_ij, j) cont ; cont
+                                 QueueList.add_lp (i, step_ij, j) cont
                                ) (find i ext_base).next queue
                          in
                          let fresh_id = get_fresh ext_base in
@@ -587,7 +587,8 @@ module Make (Node:Node.NodeType) =
                                    inf_path
                              in
 		             let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
-                             rm_step_alpha inf i ext_base inf_path (*will remove steps only if they exists and they are direct*)
+                             (*will remove steps only if they exists and they are direct*)
+                             rm_step_alpha inf i ext_base inf_path
                            )::dry_run
                          in
 		         (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step)
@@ -603,8 +604,9 @@ module Make (Node:Node.NodeType) =
         let beta_0 = Lib.IntMap.add 0 [(0,id_0,id_0,ext_w)] Lib.IntMap.empty in
         let alpha_0 = Lib.IntMap.empty in
         let inf_path_0 = {beta = beta_0 ; alpha = alpha_0} in
-        let queue_0 = QueueList.create () in
-        QueueList.add_fifo (0,id_0,0) queue_0 ;
+        let queue_0 =
+          QueueList.add_hp (0,id_0,0) (QueueList.create ())
+        in
         let visited_0 = Lib.IntSet.empty in
         let dry_run_0 = [] in
         let inf_path,dry_run = progress ext_base dry_run_0 visited_0 inf_path_0 queue_0 max_step
@@ -702,7 +704,10 @@ module Make (Node:Node.NodeType) =
               let eb = empty inf in
               let l = get_fresh eb in
               let r = get_fresh eb in
-              List.fold_left (fun (ext_base,z,l,r) tiles -> iter_convert z l r tiles ext_base) (eb,0,l,r) tiles_l
+              List.fold_left
+                (fun (ext_base,z,l,r) tiles ->
+                  iter_convert z l r tiles ext_base
+                ) (eb,0,l,r) tiles_l
             in
             eb
 

@@ -48,16 +48,16 @@ module Make (Node:Node.NodeType) =
 
     let (=~=>) g h = Cat.flatten (Cat.extension_class (g => h))
 
-    let simple_tests () =
+    let simple_tests_old () =
       let one = graph_of_library "one" in
       let house = graph_of_library "house" in
-      let square = graph_of_library "square" in
+      let square = graph_of_library "house" in
       let o2_to_o8 = one =~=> square in
       let o2_to_w = one =~=> house in
       let sharings =
         List.fold_left (fun sharings o2_o8 ->
             List.fold_left (fun sharings o2_w ->
-                (Cat.share_new o2_o8 o2_w)::sharings
+                (Cat.share o2_o8 o2_w)::sharings
               ) sharings o2_to_w
           ) [] o2_to_o8
       in
@@ -67,6 +67,18 @@ module Make (Node:Node.NodeType) =
       Printf.fprintf d "%s\n%s" (EB.to_dot false Lib.Dict.empty ext_base) str ;
       close_out d
 
+
+    let simple_tests () =
+      let one = graph_of_library "one" in
+      let house = graph_of_library "house" in
+      let square = graph_of_library "house" in
+      let o2_to_o8 = one =~=> square in
+      let o2_to_w = one =~=> house in
+      List.iter (fun o2_o8 ->
+          List.iter (fun o2_w ->
+              Cat.share_new o2_o8 o2_w
+            ) o2_to_w
+        ) o2_to_o8
 
 
     type t = {model : Model.t ; show_positive : bool ; eb : (EB.t * EB.t) option ; rule : (string * string) option}
