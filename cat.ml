@@ -694,34 +694,48 @@ module Make (Node:Node.NodeType) =
         with
           Undefined -> 0
 
-    (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
-    let extend_hom fun_ext u left f right =
-      assert (Hom.mem u f) ;
-      let nodes_left = fun_ext u left in
-      let nodes_right = fun_ext (Hom.find u f) right in
-      Printf.printf "Associating {%s} to {%s}\n"
-        (String.concat "," (List.map Node.to_string nodes_left))
-        (String.concat "," (List.map Node.to_string nodes_right)) ;
-      List.fold_left
-        (fun cont u_left ->
-          if Hom.mem u_left f then cont
-          else
-            let f_list =
-              List.fold_left
-                (fun f_list u_right ->
-                  List.fold_left
-                    (fun cont (f',todo) ->
-                      try
-                        (Hom.add u_left u_right f',NodeSet.add u_left todo)::cont
-                      with
-                        Hom.Not_injective | Hom.Not_structure_preserving -> cont
-                    ) [] f_list
-                ) [(f,NodeSet.empty)] nodes_right
-            in
-            f_list@cont
-        ) [] nodes_left
+    let shl l = String.concat ";" (List.map (fun (h,todo) -> Hom.to_string ~full:true h) l)
 
-    let phl l = String.concat ";" (List.map (fun (h,todo) -> Hom.to_string ~full:true h) l)
+    (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
+    let rec extend_hom_list fun_next left right continuation finished f_todo_list =
+      let rec extend_hom_list_to_node u continuation = function
+          [] -> continuation
+        | (f',todo')::tl ->
+           assert (Hom.mem u f') ;
+           let nodes_left = fun_next u left in
+           let nodes_right = fun_next (Hom.find u f') right in
+           Printf.printf "Associating {%s} to {%s}\n"
+             (String.concat "," (List.map Node.to_string nodes_left))
+             (String.concat "," (List.map Node.to_string nodes_right)) ;
+           let continuation =
+             List.fold_left
+               (fun continuation u_l ->
+                 if Hom.mem u_l f' then continuation
+                 else
+                   List.fold_left
+                     (fun continuation v_r ->
+                       try
+                         (Hom.add u_l v_r f',NodeSet.add u_l todo')::continuation
+                       with
+                         Hom.Not_injective | Hom.Not_structure_preserving -> continuation
+                     ) continuation nodes_right
+               ) continuation nodes_left
+           in
+           extend_hom_list_to_node u continuation tl
+      in
+      match f_todo_list with
+        [] -> (continuation,finished)
+      | (f,todo)::tl ->
+         if NodeSet.is_empty todo then extend_hom_list fun_next left right continuation (f::finished) tl
+         else
+           let cont =
+             NodeSet.fold
+               (fun u cont ->
+                 extend_hom_list_to_node u [] cont
+               ) todo [(f,NodeSet.empty)]
+           in
+           extend_hom_list fun_next left right cont finished tl
+
 
     let share_new f g =
       Printf.printf "Building extensions for <-%s-.-%s->\n" (string_of_arrows f) (string_of_arrows g) ;
@@ -737,27 +751,11 @@ module Make (Node:Node.NodeType) =
       let rec iter_extend prop finished = function
           [] -> finished
         | f_list ->
-           print_endline (phl f_list) ;
-           let fun_ext = if prop then extend_node_properties else extend_node_links in
-           let cont,finished =
-             List.fold_left
-               (fun (cont,finished) (f,todo) ->
-                 Printf.printf "Extending %s (todo: {%s})...\n"
-                   (Hom.to_string ~full:true f)
-                   (String.concat "," (List.map Node.to_string (NodeSet.elements todo))) ;
-                 if NodeSet.is_empty todo then (cont,f::finished)
-                 else
-                   let ext_list_todo =
-                     NodeSet.fold
-                       (fun u ext_list_f ->
-                         let ext_list_u = extend_hom fun_ext u left f right in
-                         ext_list_u@ext_list_f
-                       ) todo cont
-                   in
-                   (ext_list_todo,finished)
-               ) ([],finished) f_list
+           print_endline (shl f_list) ;
+           let fun_next = if prop then extend_node_properties else extend_node_links in
+           let continuation,finished = extend_hom_list fun_next left right [] finished f_list
            in
-           iter_extend (not prop) finished cont
+           iter_extend (not prop) finished continuation
       in
       let ext_f_list = iter_extend true [] [(f_0,todo_0)] in
       print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
