@@ -28,7 +28,6 @@ module type Category =
 
 
     val share : arrows -> arrows -> (arrows * tile) list
-
     val share_new : arrows -> arrows -> unit
 
     val is_iso : arrows -> bool
@@ -694,34 +693,50 @@ module Make (Node:Node.NodeType) =
         with
           Undefined -> 0
 
-    let shl l = String.concat ";" (List.map (fun (h,todo) -> Hom.to_string ~full:true h) l)
+    let shl l = String.concat ";"
+                  (List.map
+                     (fun (h,todo) ->
+                       Printf.sprintf "%s{%s}"
+                         (Hom.to_string ~full:true h)
+                         (yellow (String.concat "," (List.map Node.to_string (NodeSet.elements todo))))
+                     ) l
+                  )
 
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list fun_next left right continuation finished f_todo_list =
-      let rec extend_hom_list_to_node u continuation = function
-          [] -> continuation
-        | (f',todo')::tl ->
-           assert (Hom.mem u f') ;
-           let nodes_left = fun_next u left in
-           let nodes_right = fun_next (Hom.find u f') right in
-           Printf.printf "Associating {%s} to {%s}\n"
-             (String.concat "," (List.map Node.to_string nodes_left))
-             (String.concat "," (List.map Node.to_string nodes_right)) ;
-           let continuation =
-             List.fold_left
-               (fun continuation u_l ->
-                 if Hom.mem u_l f' then continuation
-                 else
-                   List.fold_left
-                     (fun continuation v_r ->
-                       try
-                         (Hom.add u_l v_r f',NodeSet.add u_l todo')::continuation
-                       with
-                         Hom.Not_injective | Hom.Not_structure_preserving -> continuation
-                     ) continuation nodes_right
-               ) continuation nodes_left
-           in
-           extend_hom_list_to_node u continuation tl
+
+      let extend_hom_list_to_node u f flist =
+        assert (Hom.mem u f) ;
+        let nodes_left = fun_next u left f Hom.mem in
+        let nodes_right = fun_next (Hom.find u f) right f Hom.comem in
+        (*Printf.printf "Succ(%s): {%s} and {%s} to %s\nflist:%s\n"
+          (Node.to_string u)
+          (String.concat "," (List.map Node.to_string nodes_left))
+          (String.concat "," (List.map Node.to_string nodes_right))
+          (Hom.to_string ~full:true f)
+          (shl flist) ;*)
+        List.fold_left
+          (fun flist_v v ->
+            if Hom.mem v f then flist
+            else
+              List.fold_left
+                (fun flist_vv' v' ->
+                  List.fold_left
+                    (fun cont (f,todo) ->
+                      (*print_endline (Printf.sprintf "%s|->%s + %s"
+                                       (Node.to_string v)
+                                       (Node.to_string v')
+                                       (Hom.to_string ~full:true f)
+                        ) ;*)
+                      try
+                        (Hom.add v v' f,NodeSet.add v todo)::cont
+                      with
+                        Hom.Not_injective | Hom.Not_structure_preserving ->
+                                             (*print_endline "failed!" ;*)
+                                             (f,todo)::cont
+                    ) [] flist_vv'
+                ) flist_v nodes_right
+          ) flist nodes_left
       in
       match f_todo_list with
         [] -> (continuation,finished)
@@ -731,34 +746,46 @@ module Make (Node:Node.NodeType) =
            let cont =
              NodeSet.fold
                (fun u cont ->
-                 extend_hom_list_to_node u [] cont
+                 (*print_endline
+                   (Printf.sprintf "Extending flist of size %d to node %s"
+                      (List.length cont)
+                      (Node.to_string u)) ;*)
+                 extend_hom_list_to_node u f cont
                ) todo [(f,NodeSet.empty)]
            in
            extend_hom_list fun_next left right cont finished tl
 
 
     let share_new f g =
-      Printf.printf "Building extensions for <-%s-.-%s->\n" (string_of_arrows f) (string_of_arrows g) ;
+      (*Printf.printf "Building extensions for <-%s-.-%s->\n"
+          (string_of_arrows f)
+          (string_of_arrows g) ;*)
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
-      let extend_node_properties =
-        fun u graph -> try Graph.nodes_of_id (Node.id u) graph with Not_found -> []
+      let extend_node =
+        fun fun_ext u graph f mem ->
+        try List.filter (fun v -> not (mem v f)) (fun_ext u graph)
+        with Not_found -> []
       in
-      let extend_node_links =
-        fun u graph -> try Graph.bound_to u graph with Not_found -> []
+      let fun_next u graph f mem =
+        match extend_node Graph.nodes_of_id (Node.id u) graph f mem with
+          [] -> extend_node Graph.bound_to u graph f mem
+        | succs -> succs
       in
-      let rec iter_extend prop finished = function
+      let rec iter_extend finished = function
           [] -> finished
         | f_list ->
-           print_endline (shl f_list) ;
-           let fun_next = if prop then extend_node_properties else extend_node_links in
+           (*print_endline (shl f_list) ;*)
            let continuation,finished = extend_hom_list fun_next left right [] finished f_list
            in
-           iter_extend (not prop) finished continuation
+           iter_extend finished continuation
       in
-      let ext_f_list = iter_extend true [] [(f_0,todo_0)] in
-      print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
+      let ext_f_list = iter_extend [] [(f_0,todo_0)] in
+      begin
+        print_endline "Final embeddings:" ;
+        print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
+      end
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       print_endline "Entering sharing function" ;

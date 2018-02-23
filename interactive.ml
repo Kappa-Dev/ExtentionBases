@@ -50,10 +50,10 @@ module Make (Node:Node.NodeType) =
 
     let simple_tests_old () =
       let one = graph_of_library "one" in
-      let house = graph_of_library "house" in
-      let square = graph_of_library "house" in
-      let o2_to_o8 = one =~=> square in
-      let o2_to_w = one =~=> house in
+      let w1 = graph_of_library "house" in
+      let w2 = graph_of_library "triangle" in
+      let o2_to_o8 = one =~=> w1 in
+      let o2_to_w = one =~=> w2 in
       let sharings =
         List.fold_left (fun sharings o2_o8 ->
             List.fold_left (fun sharings o2_w ->
@@ -70,10 +70,10 @@ module Make (Node:Node.NodeType) =
 
     let simple_tests () =
       let one = graph_of_library "one" in
-      let house = graph_of_library "house" in
-      let square = graph_of_library "house" in
-      let o2_to_o8 = one =~=> square in
-      let o2_to_w = one =~=> house in
+      let w = graph_of_library "house" in
+      let w' = graph_of_library "square" in
+      let o2_to_o8 = one =~=> w in
+      let o2_to_w = one =~=> w' in
       List.iter (fun o2_o8 ->
           List.iter (fun o2_w ->
               Cat.share_new o2_o8 o2_w
