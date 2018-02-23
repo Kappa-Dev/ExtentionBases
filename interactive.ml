@@ -50,7 +50,7 @@ module Make (Node:Node.NodeType) =
 
     let simple_tests_old () =
       let one = graph_of_library "one" in
-      let w1 = graph_of_library "house" in
+      let w1 = graph_of_library "square" in
       let w2 = graph_of_library "triangle" in
       let o2_to_o8 = one =~=> w1 in
       let o2_to_w = one =~=> w2 in
@@ -69,11 +69,23 @@ module Make (Node:Node.NodeType) =
 
 
     let simple_tests () =
+      let tri = draw (Node.tn
+                        [([0;0;0],[1;0;0]);
+                         ([0;1;0],[2;0;0]) ;
+                         ([2;1;0],[1;1;0]);
+                  ]) (Graph.empty)
+      in
+      let fake_tri = draw (Node.tn
+                             [([0;0;0],[1;0;0]);
+                              ([0;1;0],[2;0;0]);
+                              ([4;1;0],[1;1;0]);
+                       ]) (Graph.empty)
+      in
       let one = graph_of_library "one" in
-      let w = graph_of_library "house" in
+      let w = graph_of_library "triangle" in
       let w' = graph_of_library "square" in
-      let o2_to_o8 = one =~=> w in
-      let o2_to_w = one =~=> w' in
+      let o2_to_o8 = one =~=> tri in
+      let o2_to_w = one =~=> fake_tri in
       List.iter (fun o2_o8 ->
           List.iter (fun o2_w ->
               Cat.share_new o2_o8 o2_w

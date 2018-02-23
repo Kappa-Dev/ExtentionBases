@@ -19,8 +19,8 @@ module Make (Node:Node.NodeType) =
       try
 	NodeBij.fold
 	  (fun u v b ->
-	   let v' = NodeBij.find u hom'.tot in
-	   (compare v v' = 0) && b
+	    let v' = NodeBij.find u hom'.tot in
+	    (compare v v' = 0) && b
 	  ) hom.tot true
       with
 	Not_found -> false

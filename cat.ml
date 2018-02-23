@@ -704,17 +704,18 @@ module Make (Node:Node.NodeType) =
 
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list fun_next left right continuation finished f_todo_list =
-
+      let add_hom h list = h::list in (*could do much better*)
       let extend_hom_list_to_node u f flist =
         assert (Hom.mem u f) ;
         let nodes_left = fun_next u left f Hom.mem in
         let nodes_right = fun_next (Hom.find u f) right f Hom.comem in
-        (*Printf.printf "Succ(%s): {%s} and {%s} to %s\nflist:%s\n"
+        Printf.printf "Succ(%s): {%s} and {%s} to %s\ncalling:%s\n"
           (Node.to_string u)
           (String.concat "," (List.map Node.to_string nodes_left))
           (String.concat "," (List.map Node.to_string nodes_right))
           (Hom.to_string ~full:true f)
-          (shl flist) ;*)
+          (shl flist) ;
+
         List.fold_left
           (fun flist_v v ->
             if Hom.mem v f then flist
@@ -723,16 +724,16 @@ module Make (Node:Node.NodeType) =
                 (fun flist_vv' v' ->
                   List.fold_left
                     (fun cont (f,todo) ->
-                      (*print_endline (Printf.sprintf "%s|->%s + %s"
+                      print_endline (Printf.sprintf "%s|->%s + %s"
                                        (Node.to_string v)
                                        (Node.to_string v')
                                        (Hom.to_string ~full:true f)
-                        ) ;*)
+                        ) ;
                       try
-                        (Hom.add v v' f,NodeSet.add v todo)::cont
+                        (Hom.add v v' f,NodeSet.add v todo)::(f,todo)::cont
                       with
                         Hom.Not_injective | Hom.Not_structure_preserving ->
-                                             (*print_endline "failed!" ;*)
+                                             print_endline "failed!" ;
                                              (f,todo)::cont
                     ) [] flist_vv'
                 ) flist_v nodes_right
@@ -741,25 +742,30 @@ module Make (Node:Node.NodeType) =
       match f_todo_list with
         [] -> (continuation,finished)
       | (f,todo)::tl ->
-         if NodeSet.is_empty todo then extend_hom_list fun_next left right continuation (f::finished) tl
+         if NodeSet.is_empty todo then
+           begin
+             print_endline (Printf.sprintf "Adding %s to completed embeddings" (Hom.to_string ~full:true f)) ;
+             extend_hom_list fun_next left right continuation (add_hom f finished) tl
+           end
          else
            let cont =
              NodeSet.fold
                (fun u cont ->
-                 (*print_endline
-                   (Printf.sprintf "Extending flist of size %d to node %s"
-                      (List.length cont)
-                      (Node.to_string u)) ;*)
-                 extend_hom_list_to_node u f cont
+                 Printf.printf "cont: %s\n" (shl cont) ;
+                 let cont =
+                   extend_hom_list_to_node u f cont
+                 in
+                 Printf.printf "returned: %s\n" (shl cont) ;
+                 cont
                ) todo [(f,NodeSet.empty)]
            in
-           extend_hom_list fun_next left right cont finished tl
+           extend_hom_list fun_next left right (cont@continuation) finished tl
 
 
     let share_new f g =
-      (*Printf.printf "Building extensions for <-%s-.-%s->\n"
+      Printf.printf "Building extensions for <-%s-.-%s->\n"
           (string_of_arrows f)
-          (string_of_arrows g) ;*)
+          (string_of_arrows g) ;
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
@@ -776,12 +782,19 @@ module Make (Node:Node.NodeType) =
       let rec iter_extend finished = function
           [] -> finished
         | f_list ->
-           (*print_endline (shl f_list) ;*)
+           print_endline "********" ;
+           print_endline (shl f_list) ;
+           print_endline (String.concat "," (List.map (Hom.to_string ~full:true) finished)) ;
+           print_endline "********" ;
            let continuation,finished = extend_hom_list fun_next left right [] finished f_list
            in
            iter_extend finished continuation
       in
       let ext_f_list = iter_extend [] [(f_0,todo_0)] in
+      (*List.fold_left
+        (fun (arrows_list,hom_list) hom ->
+          if List.exists (fun hom' -> Hom.is_equal hom' hom) hom_list
+        ) ([],[]) ext_f_list*)
       begin
         print_endline "Final embeddings:" ;
         print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
