@@ -791,10 +791,6 @@ module Make (Node:Node.NodeType) =
            iter_extend finished continuation
       in
       let ext_f_list = iter_extend [] [(f_0,todo_0)] in
-      (*List.fold_left
-        (fun (arrows_list,hom_list) hom ->
-          if List.exists (fun hom' -> Hom.is_equal hom' hom) hom_list
-        ) ([],[]) ext_f_list*)
       begin
         print_endline "Final embeddings:" ;
         print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
@@ -865,33 +861,5 @@ module Make (Node:Node.NodeType) =
           ) [] wit_list
       with Undefined -> []
 
-                          (*
-      let eq_tile obs_right tile tile' =
-        match tile.cospan,tile'.cospan with
-          None,_ -> raise Undefined
-        | _,None -> raise Undefined
-        | Some (left_to_sup,right_to_sup),Some (left_to_sup',right_to_sup') ->
-           if db () then
-             assert (Graph.is_equal left_to_sup.src left_to_sup'.src
-                     && Graph.is_equal right_to_sup.src right_to_sup'.src) ;
 
-           if obs_right then (left_to_sup  =~= left_to_sup') else (right_to_sup  =~= right_to_sup')
-        in
-        List.fold_left
-          (fun cont (f,tile) ->
-            if Graph.is_empty (inf_of_tile tile) then cont
-            else
-              match tile.cospan with
-                None -> cont
-              | Some _ ->
-                 if List.exists
-                      (fun tile' ->
-                        eq_tile true tile tile'
-                      ) cont then
-                   cont
-                 else
-                   tile::cont
-          ) [] (glue h obs)
-                           *)
-
-                          end:Category with type obj = Graph.Make(Node).t)
+end:Category with type obj = Graph.Make(Node).t)

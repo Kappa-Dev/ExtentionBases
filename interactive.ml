@@ -93,7 +93,11 @@ module Make (Node:Node.NodeType) =
         ) o2_to_o8
 
 
-    type t = {model : Model.t ; show_positive : bool ; eb : (EB.t * EB.t) option ; rule : (string * string) option}
+    type t = {model : Model.t ;
+              show_positive : bool ;
+              eb : (EB.t * EB.t) option ;
+              rule : (string * string) option
+             }
     let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None}
 
     let output env =

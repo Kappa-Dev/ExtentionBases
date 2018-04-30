@@ -614,7 +614,8 @@ module Make (Node:Node.NodeType) =
         let () = if db() then print_inf_path inf_path in
         (* 1. Adding witness point *)
         let w = get_fresh ext_base in
-        let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ; flush stdout in
+        let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ;
+                flush stdout in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
         (* 2. Executing dry run, i.e inserting midpoints *)
