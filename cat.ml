@@ -791,10 +791,29 @@ module Make (Node:Node.NodeType) =
            iter_extend finished continuation
       in
       let ext_f_list = iter_extend [] [(f_0,todo_0)] in
-      begin
-        print_endline "Final embeddings:" ;
-        print_endline (String.concat "\n" (List.map (Hom.to_string ~full:true) ext_f_list))
-      end
+      let size_map =
+        List.fold_left (fun smap hom ->
+            let n = Hom.size hom in
+            let l = try Lib.IntMap.find n smap with Not_found -> [] in
+            if List.exists (fun hom' -> Hom.is_equal hom hom') l then
+              smap
+            else
+              Lib.IntMap.add n (hom::l) smap
+          ) Lib.IntMap.empty ext_f_list
+      in
+      Lib.IntMap.iter (fun n l -> Printf.printf "%d %d\n" n (List.length l)) size_map ;
+      let higher_sharing_hom =
+        Lib.IntMap.fold
+          (fun n hom_list (max,hom_l) ->
+            match hom_list with
+              [_] -> (n,hom_list)
+            | _ -> (max,hom_l)
+          ) size_map (Lib.IntMap.min_binding size_map)
+      in
+      match higher_sharing_hom with
+        (n,[hom]) -> Printf.printf "Best sharing found: %d %s\n" n (Hom.to_string ~full:true hom)
+      | _ -> failwith "Invariant violation"
+
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       print_endline "Entering sharing function" ;
