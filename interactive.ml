@@ -69,23 +69,13 @@ module Make (Node:Node.NodeType) =
 
 
     let simple_tests () =
-      let tri = draw (Node.tn
-                        [([0;0;0],[1;0;0]);
-                         ([0;1;0],[2;0;0]) ;
-                         ([2;1;0],[1;1;0]);
-                  ]) (Graph.empty)
+      let dsquare = graph_of_library "dsquare"
       in
-      let fake_tri = draw (Node.tn
-                             [([0;0;0],[1;0;0]);
-                              ([0;1;0],[2;0;0]);
-                              ([4;1;0],[1;1;0]);
-                       ]) (Graph.empty)
+      let house = graph_of_library "house"
       in
       let one = graph_of_library "one" in
-      let w = graph_of_library "triangle" in
-      let w' = graph_of_library "square" in
-      let o2_to_o8 = one =~=> tri in
-      let o2_to_w = one =~=> fake_tri in
+      let o2_to_o8 = one =~=> dsquare in
+      let o2_to_w = one =~=> house in
       List.iter (fun o2_o8 ->
           List.iter (fun o2_w ->
               Cat.share_new o2_o8 o2_w

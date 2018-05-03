@@ -801,20 +801,26 @@ module Make (Node:Node.NodeType) =
               Lib.IntMap.add n (hom::l) smap
           ) Lib.IntMap.empty ext_f_list
       in
-      Lib.IntMap.iter (fun n l -> Printf.printf "%d %d\n" n (List.length l)) size_map ;
-      let higher_sharing_hom =
-        Lib.IntMap.fold
-          (fun n hom_list (max,hom_l) ->
-            match hom_list with
-              [_] -> (n,hom_list)
-            | _ -> (max,hom_l)
-          ) size_map (Lib.IntMap.min_binding size_map)
+      Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;
+      let rec find_best_sharing k best map =
+        let prev_l = try Lib.IntMap.find (k-1) map with Not_found -> []
+        in
+        let hom_l = try Lib.IntMap.find k map with Not_found -> []
+        in
+        match hom_l with
+          [h] ->
+           if List.for_all (fun h' -> Hom.is_sub h' h) prev_l
+           then find_best_sharing (k+1) k map
+           else
+             best
+        | [] -> best
+        | _ -> find_best_sharing (k+1) best map
       in
-      match higher_sharing_hom with
-        (n,[hom]) -> Printf.printf "Best sharing found: %d %s\n" n (Hom.to_string ~full:true hom)
-      | _ -> failwith "Invariant violation"
-
-
+      let k = find_best_sharing 2 2 size_map in
+      match Lib.IntMap.find k size_map with
+        [h] -> Printf.printf "Best sharing : %s\n" (Hom.to_string ~full:true h)
+      | _ -> failwith "invariant violation"
+           
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       print_endline "Entering sharing function" ;
       let compare_sharing (f,tile) (f',tile') =
