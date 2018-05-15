@@ -818,9 +818,11 @@ module Make (Node:Node.NodeType) =
       in
       let k = find_best_sharing 2 2 size_map in
       match Lib.IntMap.find k size_map with
-        [h] -> Printf.printf "Best sharing : %s\n" (Hom.to_string ~full:true h)
+        [h] ->
+         
       | _ -> failwith "invariant violation"
-           
+
+
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)
       print_endline "Entering sharing function" ;
       let compare_sharing (f,tile) (f',tile') =
