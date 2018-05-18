@@ -41,6 +41,7 @@ module type GraphType =
     val meet : t -> t -> t
     val sum : t -> t -> t
     val minus : t -> t -> t
+    val remove : node -> t -> t
     val image : hom -> t -> t
 
     exception Incoherent
@@ -208,6 +209,27 @@ module Make (Node:Node.NodeType) =
 		let diff = add_node v diff in
 		try add_edge u v diff with Incoherent -> failwith "Invariant violation"
 	     ) g empty
+
+(*Removes node u from g, and possible edges connecting v to u for some node v*)
+    let remove u g =
+      let bnd_u = bound_to u g in
+      let edges,size =
+        match bnd_u with
+          [] -> g.edges,g.size
+        | node_list ->
+           let edges =
+             List.fold_left
+               (fun edges v ->
+                 NodeMap.add v (List.filter (fun v' -> v'<>u) (bound_to v g)) edges
+               ) g.edges node_list
+           in
+           NodeMap.remove u edges, g.size - (List.length node_list)
+      in
+      {nodes = NodeSet.remove u g.nodes ;
+       edges = edges ;
+       size = size ;
+       idmap = Lib.IntMap.remove (Node.id u) g.idmap;
+       coherent = g.coherent}
 
     (*TODO: maintain max_id when adding a new node to the graph*)
     let max_id g =

@@ -28,7 +28,7 @@ module type Category =
 
 
     val share : arrows -> arrows -> (arrows * tile) list
-    val share_new : arrows -> arrows -> unit
+    val share_new : arrows -> arrows -> (arrows * arrows * arrows)
 
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
@@ -58,7 +58,6 @@ module Make (Node:Node.NodeType) =
 
     type obj = Graph.t
 
-
     module NodeSet = Set.Make (Node)
     open Lib.Util
 
@@ -76,6 +75,19 @@ module Make (Node:Node.NodeType) =
       Hom.fold (fun u v cont -> (Node.id u, Node.id v)::cont) ar []
 
     let is_identity f = List.for_all (fun h -> Hom.is_identity h) f.maps
+
+    let is_partial f =
+      match f.maps with
+        [] -> true
+      | h::_ ->
+         try
+           Graph.fold_nodes
+             (fun u _ ->
+               if not (Hom.mem u h) then raise Exit
+             ) f.src () ;
+           false
+         with Exit -> true
+
     let lower_bound tile = tile.span
     let upper_bound tile = tile.cospan
 
@@ -702,6 +714,21 @@ module Make (Node:Node.NodeType) =
                      ) l
                   )
 
+    let span_of_partial f_part =
+      let p_hom = hom_of_arrows f_part in
+      let dom =
+        Graph.fold_nodes (fun u d ->
+            if Hom.mem u p_hom then d
+            else
+              Graph.remove u d
+          ) f_part.src f_part.src
+      in
+      let inf_to_left = identity dom f_part.src in
+      let inf_to_right = {src = dom ; trg = f_part.trg ; maps = [p_hom] ; partial = false} in
+      assert (not (is_partial inf_to_right)) ;
+      (inf_to_left,inf_to_right)
+
+
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list fun_next left right continuation finished f_todo_list =
       let add_hom h list = h::list in (*could do much better*)
@@ -709,12 +736,12 @@ module Make (Node:Node.NodeType) =
         assert (Hom.mem u f) ;
         let nodes_left = fun_next u left f Hom.mem in
         let nodes_right = fun_next (Hom.find u f) right f Hom.comem in
-        Printf.printf "Succ(%s): {%s} and {%s} to %s\ncalling:%s\n"
+        (*Printf.printf "Succ(%s): {%s} and {%s} to %s\ncalling:%s\n"
           (Node.to_string u)
           (String.concat "," (List.map Node.to_string nodes_left))
           (String.concat "," (List.map Node.to_string nodes_right))
           (Hom.to_string ~full:true f)
-          (shl flist) ;
+          (shl flist) ;*)
 
         List.fold_left
           (fun flist_v v ->
@@ -724,16 +751,16 @@ module Make (Node:Node.NodeType) =
                 (fun flist_vv' v' ->
                   List.fold_left
                     (fun cont (f,todo) ->
-                      print_endline (Printf.sprintf "%s|->%s + %s"
+                      (*print_endline (Printf.sprintf "%s|->%s + %s"
                                        (Node.to_string v)
                                        (Node.to_string v')
                                        (Hom.to_string ~full:true f)
-                        ) ;
+                        ) ;*)
                       try
                         (Hom.add v v' f,NodeSet.add v todo)::(f,todo)::cont
                       with
                         Hom.Not_injective | Hom.Not_structure_preserving ->
-                                             print_endline "failed!" ;
+                                             (*print_endline "failed!" ;*)
                                              (f,todo)::cont
                     ) [] flist_vv'
                 ) flist_v nodes_right
@@ -744,28 +771,27 @@ module Make (Node:Node.NodeType) =
       | (f,todo)::tl ->
          if NodeSet.is_empty todo then
            begin
-             print_endline (Printf.sprintf "Adding %s to completed embeddings" (Hom.to_string ~full:true f)) ;
+             (*print_endline (Printf.sprintf "Adding %s to completed embeddings" (Hom.to_string ~full:true f)) ;*)
              extend_hom_list fun_next left right continuation (add_hom f finished) tl
            end
          else
            let cont =
              NodeSet.fold
                (fun u cont ->
-                 Printf.printf "cont: %s\n" (shl cont) ;
+                 (*Printf.printf "cont: %s\n" (shl cont) ;*)
                  let cont =
                    extend_hom_list_to_node u f cont
                  in
-                 Printf.printf "returned: %s\n" (shl cont) ;
+                 (*Printf.printf "returned: %s\n" (shl cont) ;*)
                  cont
                ) todo [(f,NodeSet.empty)]
            in
            extend_hom_list fun_next left right (cont@continuation) finished tl
 
-
     let share_new f g =
-      Printf.printf "Building extensions for <-%s-.-%s->\n"
+      (*Printf.printf "Building extensions for <-%s-.-%s->\n"
           (string_of_arrows f)
-          (string_of_arrows g) ;
+          (string_of_arrows g) ;*)
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
@@ -782,10 +808,11 @@ module Make (Node:Node.NodeType) =
       let rec iter_extend finished = function
           [] -> finished
         | f_list ->
-           print_endline "********" ;
+           (*print_endline "********" ;
            print_endline (shl f_list) ;
            print_endline (String.concat "," (List.map (Hom.to_string ~full:true) finished)) ;
            print_endline "********" ;
+            *)
            let continuation,finished = extend_hom_list fun_next left right [] finished f_list
            in
            iter_extend finished continuation
@@ -801,7 +828,7 @@ module Make (Node:Node.NodeType) =
               Lib.IntMap.add n (hom::l) smap
           ) Lib.IntMap.empty ext_f_list
       in
-      Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;
+      (*Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;*)
       let rec find_best_sharing k best map =
         let prev_l = try Lib.IntMap.find (k-1) map with Not_found -> []
         in
@@ -819,7 +846,8 @@ module Make (Node:Node.NodeType) =
       let k = find_best_sharing 2 2 size_map in
       match Lib.IntMap.find k size_map with
         [h] ->
-         
+         let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
+         (identity f.src f'.src,f',g')
       | _ -> failwith "invariant violation"
 
 
