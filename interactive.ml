@@ -51,7 +51,7 @@ module Make (Node:Node.NodeType) =
     let simple_tests_old () =
       let one = graph_of_library "one" in
       let w1 = graph_of_library "square" in
-      let w2 = graph_of_library "triangle" in
+      let w2 = graph_of_library "dsquare" in
       let o2_to_o8 = one =~=> w1 in
       let o2_to_w = one =~=> w2 in
       let sharings =
@@ -71,11 +71,11 @@ module Make (Node:Node.NodeType) =
     let simple_tests () =
       let dsquare = graph_of_library "dsquare"
       in
-      let house = graph_of_library "house"
+      let square = graph_of_library "square"
       in
       let one = graph_of_library "one" in
       let o2_to_o8 = one =~=> dsquare in
-      let o2_to_w = one =~=> house in
+      let o2_to_w = one =~=> square in
       List.iter (fun o2_o8 ->
           List.iter (fun o2_w ->
               let inf_to_mp,mp_to_base,mp_to_w = Cat.share_new o2_o8 o2_w in

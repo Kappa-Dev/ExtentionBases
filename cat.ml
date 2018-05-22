@@ -707,7 +707,7 @@ module Make (Node:Node.NodeType) =
 
     let shl l = String.concat ";"
                   (List.map
-                     (fun (h,todo) ->
+                     (fun (h,todo,visited) ->
                        Printf.sprintf "%s{%s}"
                          (Hom.to_string ~full:true h)
                          (yellow (String.concat "," (List.map Node.to_string (NodeSet.elements todo))))
@@ -730,13 +730,23 @@ module Make (Node:Node.NodeType) =
 
 
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
-    let rec extend_hom_list fun_next left right continuation finished f_todo_list =
+    let rec extend_hom_list left right continuation finished f_todo_list =
+
       let add_hom h list = h::list in (*could do much better*)
-      let extend_hom_list_to_node u f flist =
+      let extend_hom_list_to_node u f visited flist =
+
         assert (Hom.mem u f) ;
-        let nodes_left = fun_next u left f Hom.mem in
-        let nodes_right = fun_next (Hom.find u f) right f Hom.comem in
-        (*Printf.printf "Succ(%s): {%s} and {%s} to %s\ncalling:%s\n"
+        let nodes_left,nodes_right =
+          match
+            List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.nodes_of_id (Node.id u) left)
+          with
+            [] ->
+             List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.bound_to u left),
+             List.filter (fun v -> not (Hom.comem v f)) (Graph.bound_to (Hom.find u f) right)
+          | nodes ->
+             nodes, List.filter (fun v -> not (Hom.comem v f)) (Graph.nodes_of_id (Node.id (Hom.find u f)) right)
+        in
+        (*Printf.printf "Succ(%s): lft={%s} <-?-> rgt={%s} to %s\ncalling:%s\n"
           (Node.to_string u)
           (String.concat "," (List.map Node.to_string nodes_left))
           (String.concat "," (List.map Node.to_string nodes_right))
@@ -745,34 +755,32 @@ module Make (Node:Node.NodeType) =
 
         List.fold_left
           (fun flist_v v ->
-            if Hom.mem v f then flist
-            else
-              List.fold_left
-                (fun flist_vv' v' ->
-                  List.fold_left
-                    (fun cont (f,todo) ->
-                      (*print_endline (Printf.sprintf "%s|->%s + %s"
-                                       (Node.to_string v)
-                                       (Node.to_string v')
-                                       (Hom.to_string ~full:true f)
-                        ) ;*)
-                      try
-                        (Hom.add v v' f,NodeSet.add v todo)::(f,todo)::cont
-                      with
-                        Hom.Not_injective | Hom.Not_structure_preserving ->
-                                             (*print_endline "failed!" ;*)
-                                             (f,todo)::cont
-                    ) [] flist_vv'
-                ) flist_v nodes_right
+            List.fold_left
+              (fun flist_vv' v' ->
+                List.fold_left
+                  (fun cont (f,todo,visited) ->
+                    (*print_endline (Printf.sprintf "%s|->%s + %s"
+                                     (Node.to_string v)
+                                     (Node.to_string v')
+                                     (Hom.to_string ~full:true f)
+                      ) ;*)
+                    try
+                      (Hom.add v v' f,NodeSet.add v todo,visited)::((f,todo,NodeSet.add v visited)::cont)
+                    with
+                      Hom.Not_injective | Hom.Not_structure_preserving ->
+                                           (*print_endline "would be incoherent!" ;*)
+                                           (f,todo,NodeSet.add v visited)::cont
+                  ) [] flist_vv'
+              ) flist_v nodes_right
           ) flist nodes_left
       in
       match f_todo_list with
         [] -> (continuation,finished)
-      | (f,todo)::tl ->
+      | (f,todo,visited)::tl ->
          if NodeSet.is_empty todo then
            begin
              (*print_endline (Printf.sprintf "Adding %s to completed embeddings" (Hom.to_string ~full:true f)) ;*)
-             extend_hom_list fun_next left right continuation (add_hom f finished) tl
+             extend_hom_list left right continuation (add_hom f finished) tl
            end
          else
            let cont =
@@ -780,31 +788,23 @@ module Make (Node:Node.NodeType) =
                (fun u cont ->
                  (*Printf.printf "cont: %s\n" (shl cont) ;*)
                  let cont =
-                   extend_hom_list_to_node u f cont
+                   extend_hom_list_to_node u f visited cont
                  in
                  (*Printf.printf "returned: %s\n" (shl cont) ;*)
                  cont
-               ) todo [(f,NodeSet.empty)]
+               ) todo [(f,NodeSet.empty,NodeSet.empty)]
            in
-           extend_hom_list fun_next left right (cont@continuation) finished tl
+           extend_hom_list left right (cont@continuation) finished tl
 
     let share_new f g =
       (*Printf.printf "Building extensions for <-%s-.-%s->\n"
-          (string_of_arrows f)
-          (string_of_arrows g) ;*)
+        (string_of_arrows f)
+        (string_of_arrows g);
+      *)
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
-      let extend_node =
-        fun fun_ext u graph f mem ->
-        try List.filter (fun v -> not (mem v f)) (fun_ext u graph)
-        with Not_found -> []
-      in
-      let fun_next u graph f mem =
-        match extend_node Graph.nodes_of_id (Node.id u) graph f mem with
-          [] -> extend_node Graph.bound_to u graph f mem
-        | succs -> succs
-      in
+
       let rec iter_extend finished = function
           [] -> finished
         | f_list ->
@@ -813,13 +813,14 @@ module Make (Node:Node.NodeType) =
            print_endline (String.concat "," (List.map (Hom.to_string ~full:true) finished)) ;
            print_endline "********" ;
             *)
-           let continuation,finished = extend_hom_list fun_next left right [] finished f_list
+           let continuation,finished = extend_hom_list left right [] finished f_list
            in
            iter_extend finished continuation
       in
-      let ext_f_list = iter_extend [] [(f_0,todo_0)] in
+      let ext_f_list = iter_extend [] [(f_0,todo_0,NodeSet.empty)] in
       let size_map =
         List.fold_left (fun smap hom ->
+            Printf.printf "%s\n" (Hom.to_string ~full:true hom) ;
             let n = Hom.size hom in
             let l = try Lib.IntMap.find n smap with Not_found -> [] in
             if List.exists (fun hom' -> Hom.is_equal hom hom') l then
@@ -843,6 +844,14 @@ module Make (Node:Node.NodeType) =
         | [] -> best
         | _ -> find_best_sharing (k+1) best map
       in
+      (*let () =
+        Printf.printf "Sharing %s \n" (string_of_span (f,g));
+        Lib.IntMap.iter
+          (fun n hom_l ->
+            Printf.printf "%d : {%s}\n" n (String.concat "," (List.map (Hom.to_string ~full:true) hom_l))
+          ) size_map
+      in
+       *)
       let k = find_best_sharing 2 2 size_map in
       match Lib.IntMap.find k size_map with
         [h] ->

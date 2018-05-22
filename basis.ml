@@ -311,9 +311,11 @@ module Make (Node:Node.NodeType) =
           try
             let oldp,root_to_oldp,oldp_to_i,oldp_to_w = Lib.IntMap.find i inf_path.beta
             in
-            let to_oldp,to_newp = try List.hd (oldp_to_i |/ newp_to_i) with _ -> failwith "could not compute pullback"
-            in
-            add_alias newp oldp (to_oldp @@ (Cat.invert to_newp)) inf_path.alpha,inf_path.beta
+            if newp = oldp then inf_path.alpha,inf_path.beta
+            else
+              let to_oldp,to_newp = try List.hd (oldp_to_i |/ newp_to_i) with _ -> failwith "could not compute pullback"
+              in
+              add_alias newp oldp (to_oldp @@ (Cat.invert to_newp)) inf_path.alpha,inf_path.beta
           with Not_found -> inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
         in
         let inf_path' = {beta = beta' ; alpha = alpha'} in
@@ -526,7 +528,7 @@ module Make (Node:Node.NodeType) =
         let inf_list =
           Lib.IntSet.fold
           (fun i inf_list ->
-            try (Lib.IntMap.find i inf_path.beta)::inf_list with Not_found -> failwith "Unkown predecessor"
+            try (Lib.IntMap.find i inf_path.beta)::inf_list with Not_found -> inf_list
           ) ext_base.max_elements []
         in
         let compare_infs (i,_,_,_) (j,_,_,_) =
