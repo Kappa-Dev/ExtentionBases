@@ -856,7 +856,8 @@ module Make (Node:Node.NodeType) =
       match Lib.IntMap.find k size_map with
         [h] ->
          let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
-         (identity f.src f'.src,f',g')
+         let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
+         (sh,f',g')
       | _ -> failwith "invariant violation"
 
 

@@ -74,12 +74,12 @@ module Make (Node:Node.NodeType) =
       let square = graph_of_library "square"
       in
       let one = graph_of_library "one" in
-      let o2_to_o8 = one =~=> dsquare in
-      let o2_to_w = one =~=> square in
+      let o2_to_o8 = one =~=> square in
+      let o2_to_w = one =~=> dsquare in
       List.iter (fun o2_o8 ->
           List.iter (fun o2_w ->
               let inf_to_mp,mp_to_base,mp_to_w = Cat.share_new o2_o8 o2_w in
-              Printf.printf "%s \n %s \n" (Cat.string_of_arrows inf_to_mp) (Cat.string_of_span (mp_to_base,mp_to_w))
+              Printf.printf "%s \n %s \n %s \n" (Cat.string_of_span (o2_o8,o2_w)) (Cat.string_of_arrows inf_to_mp) (Cat.string_of_span (mp_to_base,mp_to_w))
             ) o2_to_w
         ) o2_to_o8
 
