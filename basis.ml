@@ -203,11 +203,6 @@ module Make (Node:Node.NodeType) =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ; flush stdout ;
       let inf_to_sh,sh_to_base,sh_to_w = Cat.share_new inf_to_i inf_to_w in
-      let _ =
-        Printf.printf
-          "Sharing is %s\n"
-          (Cat.string_of_span (sh_to_base,sh_to_w))
-      in
       let iso_to_w = Cat.is_iso sh_to_w in
       let iso_to_base = Cat.is_iso sh_to_base in
       if iso_to_w then

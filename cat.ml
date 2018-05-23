@@ -796,6 +796,8 @@ module Make (Node:Node.NodeType) =
            in
            extend_hom_list left right (cont@continuation) finished tl
 
+    exception Throw of Hom.t option
+
     let share_new f g =
       (*Printf.printf "Building extensions for <-%s-.-%s->\n"
         (string_of_arrows f)
@@ -820,7 +822,6 @@ module Make (Node:Node.NodeType) =
       let ext_f_list = iter_extend [] [(f_0,todo_0,NodeSet.empty)] in
       let size_map =
         List.fold_left (fun smap hom ->
-            Printf.printf "%s\n" (Hom.to_string ~full:true hom) ;
             let n = Hom.size hom in
             let l = try Lib.IntMap.find n smap with Not_found -> [] in
             if List.exists (fun hom' -> Hom.is_equal hom hom') l then
@@ -829,21 +830,27 @@ module Make (Node:Node.NodeType) =
               Lib.IntMap.add n (hom::l) smap
           ) Lib.IntMap.empty ext_f_list
       in
+      assert (not (Lib.IntMap.is_empty size_map)) ;
       (*Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;*)
-      let rec find_best_sharing k best map =
-        let prev_l = try Lib.IntMap.find (k-1) map with Not_found -> []
+      let rec find_best_sharing map =
+        let opt,_ =
+          try
+            Lib.IntMap.fold
+              (fun k hom_l (opt,prev_hom_l) ->
+                if List.for_all (fun h -> List.exists (fun h' -> Hom.is_sub h h') hom_l) prev_hom_l
+                then
+                  match hom_l with
+                    [h] -> (Some h,[h])
+                  | _ -> (opt,hom_l)
+                else
+                  raise (Throw opt)
+              ) map (None,[])
+          with
+            Throw opt -> (opt,[])
         in
-        let hom_l = try Lib.IntMap.find k map with Not_found -> []
-        in
-        match hom_l with
-          [h] ->
-           if List.for_all (fun h' -> Hom.is_sub h' h) prev_l
-           then find_best_sharing (k+1) k map
-           else
-             best
-        | [] -> best
-        | _ -> find_best_sharing (k+1) best map
+        opt
       in
+
       (*let () =
         Printf.printf "Sharing %s \n" (string_of_span (f,g));
         Lib.IntMap.iter
@@ -852,13 +859,13 @@ module Make (Node:Node.NodeType) =
           ) size_map
       in
        *)
-      let k = find_best_sharing 2 2 size_map in
-      match Lib.IntMap.find k size_map with
-        [h] ->
+      let h_opt = find_best_sharing size_map in
+      match h_opt with
+        Some h ->
          let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
          let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
          (sh,f',g')
-      | _ -> failwith "invariant violation"
+      | None -> failwith "invariant violation"
 
 
     let share f g = (*one should add here all midpoints (partially ordered), what about kappa??*)

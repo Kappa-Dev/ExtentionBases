@@ -1,3 +1,2 @@
 load big
-debug
 build (empty,pat_1)
