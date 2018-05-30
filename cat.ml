@@ -765,7 +765,8 @@ module Make (Node:Node.NodeType) =
                                      (Hom.to_string ~full:true f)
                       ) ;*)
                     try
-                      (Hom.add v v' f,NodeSet.add v todo,visited)::((f,todo,NodeSet.add v visited)::cont)
+                      (Hom.add v v' f,NodeSet.add v todo,visited)::cont
+                      (*Hom.add v v' f,NodeSet.add v todo,visited)::((f,todo,NodeSet.add v visited)::cont*)
                     with
                       Hom.Not_injective | Hom.Not_structure_preserving ->
                                            (*print_endline "would be incoherent!" ;*)

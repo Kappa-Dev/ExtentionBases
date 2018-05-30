@@ -377,7 +377,13 @@ module Make (Node:Node.NodeType) =
                              ^(string_of_int i)
                              ^" through "^
                                (Cat.string_of_arrows ~full:true i_to_w)^"\n") ;
-             assert (alias i inf_path = i) ;
+             assert (
+                 if not (alias i inf_path = i) then
+                   (Printf.printf "Something wrong point %d is aliased to %d\n" i (alias i inf_path) ;
+                    false)
+                 else
+                   true
+               ) ;
              let g_i = Cat.src i_to_w in
              let inf_path' =
                update_inf i
