@@ -210,6 +210,21 @@ module Make (Node:Node.NodeType) =
 		try add_edge u v diff with Incoherent -> failwith "Invariant violation"
 	     ) g empty
 
+    
+    let bound_to_port ag_id port_id g =
+      let nodes = nodes_of_id ag_id g in
+      let rec find_port = function
+          [] -> []
+        | u::tl ->
+           if Node.get_structure u 0 = port_id then bound_to u g
+           else
+             find_port tl
+      in
+      find_port nodes
+
+    let fold_ports f ag_id cont g =
+      List.fold_left (fun cont u -> f u cont) cont (nodes_of_id ag_id g)
+
 (*Removes node u from g, and possible edges connecting v to u for some node v*)
     let remove u g =
       let bnd_u = bound_to u g in

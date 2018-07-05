@@ -729,6 +729,48 @@ module Make (Node:Node.NodeType) =
       (inf_to_left,inf_to_right)
 
 
+
+    let extend_part_rigid f_part =
+      let split u = (Node.id u, Node.get_structure u 0) in
+      let merge i x = Node.create [i;x] in
+      let hom_p = hom_of_arrows f_part in
+      let src = f_part.src in
+      let trg = f_part.trg in
+      let rec extend_ids hom_p todo =
+        if Lib.IntSet.is_empty todo then hom_p
+        else
+          let id = Lib.IntSet.choose todo in
+          let todo' = Lib.IntSet.remove id todo in
+          assert (Hom.mem_sub id hom_p) ;
+          let todo'',hom_p =
+            List.fold_left
+              (fun (todo,hom_p) u ->
+                let (i,x) = split u in
+                let i' = Hom.find_sub i hom_p in
+                let u' = merge i' x in
+                if not (Graph.has_node u' trg) then (todo,hom_p)
+                else
+                  let hom_p = Hom.add u u' hom_p in
+                  let v = match Graph.bound_to u src with [v] -> v | _ -> failwith "Not rigid"
+                  in
+                  try
+                    (let (j,y) = split v in
+                     match Graph.bound_to u' trg with
+                       [] -> (todo,hom_p)
+                     | [v'] ->
+                        let (j',z) = split v' in
+                        if z = y then (Lib.IntSet.add (Node.id v) todo, Hom.add v v' hom_p)
+                        else
+                          (todo,hom_p)
+                     | _ -> failwith "Not a rigid graph")
+                  with Hom.Not_injective -> (todo,Hom.rem
+                     | Hom.Not_structure_preserving -> (todo,hom_p)
+              ) (todo',hom_p) (Graph.nodes_of_id id src)
+          in
+          extend_ids hom_p todo''
+      in
+      extend_ids hom_p (Hom.fold_sub (fun i _ todo -> Lib.IntSet.add i todo) hom_p Lib.IntSet.empty)
+
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list left right continuation finished f_todo_list =
 

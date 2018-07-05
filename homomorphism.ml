@@ -89,6 +89,7 @@ module Make (Node:Node.NodeType) =
       try Some (IntBij.find (Node.id u) hom.sub) with Not_found -> None
 
     let fold f hom = NodeBij.fold (fun u v cont -> f u v cont) hom.tot
+    let fold_sub f hom = IntBij.fold (fun i j cont -> f i j cont) hom.sub
 
     let to_string ?(full=false) ?(sub=false) hom =
       if full then
