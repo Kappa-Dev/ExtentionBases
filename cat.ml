@@ -728,8 +728,7 @@ module Make (Node:Node.NodeType) =
       assert (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 
-
-
+(*
     let extend_part_rigid f_part =
       let split u = (Node.id u, Node.get_structure u 0) in
       let merge i x = Node.create [i;x] in
@@ -770,6 +769,7 @@ module Make (Node:Node.NodeType) =
           extend_ids hom_p todo''
       in
       extend_ids hom_p (Hom.fold_sub (fun i _ todo -> Lib.IntSet.add i todo) hom_p Lib.IntSet.empty)
+ *)
 
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list left right continuation finished f_todo_list =

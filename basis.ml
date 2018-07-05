@@ -322,7 +322,13 @@ module Make (Node:Node.NodeType) =
       in
       if QueueList.is_empty queue then (inf_path,dry_run)
       else
-        let k,step_ki,i = QueueList.pop queue in
+        let k,step_ki,i =
+          let k,step_ki,i = QueueList.pop queue in
+          try
+            let i',to_i' = Lib.IntMap.find i inf_path.alpha in
+            (k, to_i' @@ step_ki, i')
+          with Not_found -> (k,step_ki,i)
+        in
         let inf,root_to_inf,inf_to_k,inf_to_w =
           try get_best_inf k inf_path
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
