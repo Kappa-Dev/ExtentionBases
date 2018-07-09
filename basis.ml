@@ -231,8 +231,9 @@ module Make (Node:Node.NodeType) =
     let print_inf_path ip =
       Lib.IntMap.iter
         (fun i (j,f,g,h) ->
-          Printf.printf "Beta(%d):=[%s]\n" i
-            ((string_of_int j) ^":"^ (Cat.string_of_arrows ~full:true h))
+          (*Printf.printf "Beta(%d):=[%s]\n" i
+            ((string_of_int j) ^":"^ (Cat.string_of_arrows ~full:true h))*)
+          Printf.printf "Beta(%d):=[%d]\n" i j
         ) ip.beta ;
       Lib.IntMap.iter
         (fun i (j,f) ->
@@ -310,7 +311,10 @@ module Make (Node:Node.NodeType) =
             else
               let to_oldp,to_newp = try List.hd (oldp_to_i |/ newp_to_i) with _ -> failwith "could not compute pullback"
               in
-              add_alias newp oldp (to_oldp @@ (Cat.invert to_newp)) inf_path.alpha,inf_path.beta
+              if newp > oldp then
+                add_alias newp oldp (to_oldp @@ (Cat.invert to_newp)) inf_path.alpha,inf_path.beta
+              else
+                add_alias oldp newp (to_newp @@ (Cat.invert to_oldp)) inf_path.alpha,inf_path.beta
           with Not_found -> inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
         in
         let inf_path' = {beta = beta' ; alpha = alpha'} in
@@ -404,7 +408,10 @@ module Make (Node:Node.NodeType) =
                  Lib.IntMap.fold
                    (fun j step_ij cont ->
                      QueueList.add_hp (i,step_ij,j) cont
-                   ) (find i ext_base).next queue
+                   ) (try find i ext_base with
+                        Not_found ->
+                        failwith (Printf.sprintf "point %d is not in the base!\n" i)
+                   ).next queue
              in
              (dry_run,(Lib.IntSet.add i visited), inf_path' ,queue', dec_step ext_base max_step)
 
@@ -559,7 +566,7 @@ module Make (Node:Node.NodeType) =
               if inf=w then ext_base
               else
                 add_step_alpha inf w inf_to_w ext_base inf_path
-            ) ext_base inf_list
+            ) ext_base (List.rev inf_list)
         in
         add_step 0 w ext_w ext_base
       with
