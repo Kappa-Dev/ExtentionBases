@@ -322,17 +322,27 @@ module Make (Node:Node.NodeType) =
         inf_path'
       in
 
-      let get_best_inf i ip = Lib.IntMap.find i ip.beta
+      let get_best_inf i ip =
+        let inf,root_to_inf,inf_to_k,inf_to_w = Lib.IntMap.find i ip.beta in
+        try
+          let inf',to_inf' = Lib.IntMap.find inf ip.alpha in
+          let from_inf' = Cat.invert to_inf' in
+          (inf', to_inf' @@ root_to_inf, inf_to_k @@ from_inf', inf_to_w @@ from_inf')
+        with
+          Not_found -> (inf,root_to_inf,inf_to_k,inf_to_w)
       in
+
       if QueueList.is_empty queue then (inf_path,dry_run)
       else
         let k,step_ki,i =
           let k,step_ki,i = QueueList.pop queue in
+          assert (alias k inf_path = k) ;
           try
             let i',to_i' = Lib.IntMap.find i inf_path.alpha in
             (k, to_i' @@ step_ki, i')
           with Not_found -> (k,step_ki,i)
         in
+
         let inf,root_to_inf,inf_to_k,inf_to_w =
           try get_best_inf k inf_path
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
@@ -484,9 +494,20 @@ module Make (Node:Node.NodeType) =
                                else
                                  let mp = point (Cat.trg sh_info.to_midpoint) in
                                  let ext_base =
-                                   add fresh_id
+                                   add
+                                     fresh_id
                                      mp
-                                     (sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path))
+                                     (try sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path)
+                                      with Cat.Undefined ->
+                                        let str = Printf.sprintf "to_inf %d and inf_to_mp %d do not compose: \n %s <> %s "
+                                                    inf
+                                                    fresh_id
+                                                    (Cat.string_of_arrows ~full:true (find_extension_alpha inf ext_base inf_path))
+                                                    (Cat.string_of_arrows ~full:true sh_info.to_midpoint)
+
+                                        in
+                                        failwith str
+                                     )
                                      ext_base
                                  in
                                  add_step_alpha fresh_id i sh_info.to_base ext_base inf_path
