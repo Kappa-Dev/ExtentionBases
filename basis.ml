@@ -322,6 +322,8 @@ module Make (Node:Node.NodeType) =
         inf_path'
       in
 
+      let has_best_inf i ip = Lib.IntMap.mem i ip.beta in
+
       let get_best_inf i ip =
         let inf,root_to_inf,inf_to_k,inf_to_w = Lib.IntMap.find i ip.beta in
         try
@@ -342,7 +344,14 @@ module Make (Node:Node.NodeType) =
             (k, to_i' @@ step_ki, i')
           with Not_found -> (k,step_ki,i)
         in
-
+        
+        if i<>0 && has_best_inf i inf_path then
+          (
+            if db() then Printf.printf "Point %d already compared with witness, skipping \n" i ;
+            (inf_path,dry_run)
+          )
+        else
+          
         let inf,root_to_inf,inf_to_k,inf_to_w =
           try get_best_inf k inf_path
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))

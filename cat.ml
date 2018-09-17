@@ -319,17 +319,21 @@ module Make (Node:Node.NodeType) =
 	{src = src ; trg = trg ; maps = maps ; partial = f.partial || f'.partial}
 
     let compose f f' =
+      assert (flat f && flat f') ;
+      let hom = List.hd f.maps in
+      let hom' = List.hd f'.maps in
       try
-        assert (flat f && flat f') ;
-        let hom = List.hd f.maps in
-        let hom' = List.hd f'.maps in
         {src = f'.src ;
          trg = f.trg ;
          maps = [Hom.compose hom hom'];
          partial = f.partial || f'.partial
         }
       with
-        Hom.Not_injective | Hom.Not_structure_preserving -> raise Undefined
+        Hom.Not_injective | Hom.Not_structure_preserving ->
+                             Printf.printf "Cannot compose %s and %s\n"
+                               (Hom.to_string ~full:true hom)
+                               (Hom.to_string ~full:true hom') ;
+                             raise Undefined
 
 
     let eq_class matching f auto =
