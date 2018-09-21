@@ -134,7 +134,7 @@ module Make (Node:Node.NodeType) =
       in
       let col = if nocolor then fun x -> x else red
       in
-      str0^(col (String.concat "+" (List.map Hom.to_string f.maps)))^str1
+      str0^(col (String.concat "+" (List.map (Hom.to_string ~full:full) f.maps)))^str1
 
     let dot_of_arrows f =
       let cluster0,ref_cluster0,fresh = Graph.to_dot_cluster f.src 0 0 in
@@ -331,8 +331,8 @@ module Make (Node:Node.NodeType) =
       with
         Hom.Not_injective | Hom.Not_structure_preserving ->
                              Printf.printf "Cannot compose %s and %s\n"
-                               (Hom.to_string ~full:true hom)
-                               (Hom.to_string ~full:true hom') ;
+                               (string_of_arrows ~full:true f)
+                               (string_of_arrows ~full:true f') ;
                              raise Undefined
 
 
@@ -627,13 +627,13 @@ module Make (Node:Node.NodeType) =
               let inf_to_left =
                 {src = inf ;
                  trg = left_to_sup.src ;
-                 maps = [Hom.invert f] ;
+                 maps = [Hom.restrict (Hom.invert f) (Graph.nodes inf)] ;
                  partial = false}
               in
               let inf_to_right =
                 {src = inf ;
                  trg = right_to_sup.src ;
-                 maps = [Hom.invert g] ;
+                 maps = [Hom.restrict (Hom.invert g) (Graph.nodes inf)] ;
                  partial = false}
               in
               (inf_to_left,inf_to_right)::pb

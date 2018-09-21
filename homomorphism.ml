@@ -75,6 +75,17 @@ module Make (Node:Node.NodeType) =
     let cofind2_sub (u,v) hom = (cofind_sub u hom, cofind_sub v hom)
 
 
+    let mem u hom = NodeBij.mem u hom.tot
+    let mem_sub i hom = IntBij.mem i hom.sub
+    let comem u hom = NodeBij.comem u hom.tot
+    let comem_sub i hom = IntBij.comem i hom.sub
+
+
+
+    let restrict hom nodes =
+      List.fold_left (fun hom' u -> try let v = find u hom in add u v hom' with Not_found -> hom') empty nodes
+
+
     let (-->) l1 l2 =
       let n1 = List.length l1 in
       let n2 = List.length l2 in
@@ -100,17 +111,15 @@ module Make (Node:Node.NodeType) =
     (*[compose h h'] = (h o h') *)
     let compose hom hom' =
       try
-	fold (fun u v hom'' -> add u (find v hom) hom'') hom' empty
+	fold (fun u v hom'' ->
+            add u
+              (try find v hom with Not_found -> Printf.printf "%s has no image by 2nd hom\n" (Node.to_string v) ; raise Not_found)
+              hom''
+          ) hom' empty
       with
 	Not_found -> raise Not_injective
 
     let sum hom hom' = fold (fun u v hom_sum -> add u v hom_sum) hom hom'
-
-    let mem u hom = NodeBij.mem u hom.tot
-    let mem_sub i hom = IntBij.mem i hom.sub
-
-    let comem u hom = NodeBij.comem u hom.tot
-    let comem_sub i hom = IntBij.comem i hom.sub
 
     let to_dot_label hom =
       IntBij.to_dot_label hom.sub
