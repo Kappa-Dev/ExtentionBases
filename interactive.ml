@@ -48,25 +48,6 @@ module Make (Node:Node.NodeType) =
 
     let (=~=>) g h = Cat.flatten (Cat.extension_class (g => h))
 
-    let simple_tests_old () =
-      let one = graph_of_library "one" in
-      let w1 = graph_of_library "square" in
-      let w2 = graph_of_library "dsquare" in
-      let o2_to_o8 = one =~=> w1 in
-      let o2_to_w = one =~=> w2 in
-      let sharings =
-        List.fold_left (fun sharings o2_o8 ->
-            List.fold_left (fun sharings o2_w ->
-                (Cat.share o2_o8 o2_w)::sharings
-              ) sharings o2_to_w
-          ) [] o2_to_o8
-      in
-      let ext_base = EB.of_sharings sharings in
-      let d = open_out "web_eb.dot" in
-      let str = EB.to_dot_content ext_base in
-      Printf.fprintf d "%s\n%s" (EB.to_dot false Lib.Dict.empty ext_base) str ;
-      close_out d
-
 
     let simple_tests () =
       let dsquare = graph_of_library "dsquare"

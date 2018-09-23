@@ -33,6 +33,7 @@ module type GraphType =
     val size_node : t -> int
     val is_empty : t -> bool
     val is_equal : t -> t -> bool
+    val wf : t -> bool
     val is_connex : t -> bool
     val compatible : node -> t -> bool
 
@@ -78,6 +79,8 @@ module Make (Node:Node.NodeType) =
                  coherent = true}
 
     let is_empty g = g.size = 0
+
+
 
     let equal_support g h =
       try
@@ -210,7 +213,7 @@ module Make (Node:Node.NodeType) =
 		try add_edge u v diff with Incoherent -> failwith "Invariant violation"
 	     ) g empty
 
-    
+
     let bound_to_port ag_id port_id g =
       let nodes = nodes_of_id ag_id g in
       let rec find_port = function
@@ -422,6 +425,17 @@ module Make (Node:Node.NodeType) =
       match nodes with
         [] -> true
       | u'::tl -> Node.gluable u u'
+
+    let wf g =
+      try
+        fold_nodes
+          (fun u _ ->
+            match bound_to u g with
+              [] -> raise Exit
+            | _ -> ()
+          ) g () ; true
+        with Exit -> false
+
 
   end:GraphType with type node = Node.t and type hom = Homomorphism.Make(Node).t)
 

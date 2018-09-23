@@ -305,7 +305,7 @@ module Make (Node:Node.NodeType) =
             in
             if newp = oldp then inf_path.alpha,inf_path.beta
             else
-              let to_oldp,to_newp = try List.hd (oldp_to_i |/ newp_to_i) with _ -> failwith "could not compute pullback"
+              let to_oldp,to_newp = List.hd (oldp_to_i |/ newp_to_i)
               in
               assert (if db() then Cat.is_iso to_oldp && Cat.is_iso to_newp else true) ;
               

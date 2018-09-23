@@ -5,7 +5,6 @@ module Make (Node:Node.NodeType) =
     module Hom = Homomorphism.Make (Node)
 
     let (|>) = Cat.(|>)
-    let (/|) = Cat.(/|)
 
     type t = {rules : (Graph.t * Graph.t) Lib.IntMap.t ; obs : Graph.t Lib.IntMap.t ; dict : Lib.Dict.t}
     type effect = {neg : Cat.arrows option ; pos : Cat.arrows option}
