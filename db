@@ -1,2 +1,2 @@
 load big
-build 20 (empty,pat_1)
+build (empty,pat_1)

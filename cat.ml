@@ -36,14 +36,14 @@ module type Category =
     val flatten : arrows -> arrows list
     val extension_class : arrows -> arrows
     val matching_class : arrows -> arrows
-    val equalize : arrows -> arrows -> arrows option
-    val compare : arrows -> arrows -> int
+    (*val equalize : arrows -> arrows -> arrows option*)
+    (*val compare : arrows -> arrows -> int*)
 
     (**Operators*)
     val (@@) : arrows -> arrows -> arrows
     (*val (/|) : arrows -> arrows -> (arrows * tile) list*)
     val (|/) : arrows -> arrows -> (arrows * arrows) list
-    val (===) : arrows -> arrows -> bool
+    (*val (===) : arrows -> arrows -> bool*)
     val (-->) : obj -> arrows -> obj list
     val (=~=) : arrows -> arrows -> bool
 
@@ -642,7 +642,7 @@ module Make (Node:Node.NodeType) =
     let (=~=) f f' = match equalize f f' with Some _ -> true | None -> false
 
     (*[compare f f'] = -1 if exists h: h.f = f', +1 if f = h.f' and 0 otherwise (incomp or iso)*)
-    let compare f f' =
+    (*let compare f f' =
       let opt = try Some (complete f f') with Undefined -> None
       in
       let inf,iso =
@@ -657,7 +657,7 @@ module Make (Node:Node.NodeType) =
           1
         with
           Undefined -> 0
-
+     *)
     let shl l = String.concat ";"
                   (List.map
                      (fun (h,todo,visited) ->
@@ -670,10 +670,10 @@ module Make (Node:Node.NodeType) =
     let span_of_partial f_part =
       let p_hom = hom_of_arrows f_part in
       let dom =
-        Graph.fold_nodes (fun u d ->
-            if Hom.mem u p_hom then d
+        Graph.fold_edges (fun u v d ->
+            if Hom.mem u p_hom && Hom.mem v p_hom then d
             else
-              Graph.remove u d
+              Graph.remove u (Graph.remove v d)
           ) f_part.src f_part.src
       in
       let inf_to_left = identity dom f_part.src in
@@ -815,7 +815,10 @@ module Make (Node:Node.NodeType) =
       match h_opt with
         Some h ->
          let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
+         assert (if db() then Graph.wf left && Graph.wf right else true) ;
          let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
+         assert (if db() then Graph.wf f.src  else true);
+         assert (if db() then Graph.wf f'.src else true);
          (sh,f',g')
       | None -> failwith "invariant violation"
 
@@ -827,6 +830,6 @@ module Make (Node:Node.NodeType) =
             {span = (identity h h, h_to_o) ; cospan = Some (h_to_o,identity obs obs)}::tiles
           ) [] wit_list
       with Undefined -> []
- 
+
 
 end:Category with type obj = Graph.Make(Node).t)

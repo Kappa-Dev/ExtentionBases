@@ -310,13 +310,9 @@ module Make (Node:Node.NodeType) =
               assert (if db() then Cat.is_iso to_oldp && Cat.is_iso to_newp else true) ;
               
               if newp > oldp then
-                (
-                  Printf.printf "to_oldp = %s \n to_newp- = %s\n"
-                    (Cat.string_of_arrows ~full:true to_oldp) (Cat.string_of_arrows ~full:true (Cat.invert to_newp)) ;
-                  let new_to_old = to_oldp @@ (Cat.invert to_newp) in
-                  add_alias newp oldp new_to_old inf_path.alpha,inf_path.beta
-                )
-              
+                let new_to_old = to_oldp @@ (Cat.invert to_newp) in
+                add_alias newp oldp new_to_old inf_path.alpha,inf_path.beta
+                
               else
                 add_alias oldp newp (to_newp @@ (Cat.invert to_oldp)) inf_path.alpha,inf_path.beta
           with Not_found -> inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
@@ -382,12 +378,12 @@ module Make (Node:Node.NodeType) =
           (*NB no todo list to update here*)
           | Below w_to_i -> (* w --w_to_i--> i *)
              if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
-             let inf_path' = inf_path
-               (*update_inf
+             let inf_path' =
+               update_inf
                  i
                  (inf,root_to_inf,inf_to_i,inf_to_w)
                  inf_path
-                 ext_base*)
+                 ext_base
              in
              let dry_run' =
 	       ((fun w ext_base inf_path ->
@@ -493,8 +489,6 @@ module Make (Node:Node.NodeType) =
                      ) (find i ext_base).next queue
                in
                let fresh_id = get_fresh ext_base in
-               Printf.printf "inf_to_mp = %s \n root_to_inf = %s\n"
-                 (Cat.string_of_arrows sh_info.to_midpoint) (Cat.string_of_arrows root_to_inf) ;
                let inf_path' =
                  update_inf i
                    (fresh_id,sh_info.to_midpoint @@ root_to_inf,sh_info.to_base,sh_info.to_w)
