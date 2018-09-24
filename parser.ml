@@ -9,6 +9,7 @@ type command =
   | Add_named of (int list * int list) list * string
   | List
   | Debug
+  | Safe
   | Build of string*string*(int option)
   | Load of string
   | Output of bool
@@ -77,6 +78,8 @@ let add_named =
 let list = string "list" *> return List
 
 let debug = string "debug" *> return Debug
+let safe = string "safe" *> return Safe
+
 
 let build =
   string "build" *> ws1 *> number_or_nothing >>= fun n -> ws *> tuple name (fun (x,y)-> Build (x,y,n))
@@ -88,7 +91,7 @@ let reset = string "reset" *> ws *> return Reset
 let line = choice
              (List.map global [mode legal_modes;
                                add;
-                               debug ;
+                               debug ; safe ;
                                add_named;
                                list;
                                build ;

@@ -105,7 +105,7 @@ module Make (Node:Node.NodeType) =
       i
 
     let replace i p ext_base =
-      assert (Lib.IntMap.mem i ext_base.points) ;
+      myassert (safe()) (Lib.IntMap.mem i ext_base.points) ;
       {ext_base with points = Lib.IntMap.add i p ext_base.points}
 
     let mem i ext_base = Lib.IntMap.mem i ext_base.points
@@ -198,7 +198,7 @@ module Make (Node:Node.NodeType) =
       if iso_to_w then
         if iso_to_base then
           let () = if db() then
-                     assert (
+                     myassert (safe()) (
                          inf_to_i =~= inf_to_w
                        )
           in
@@ -236,7 +236,7 @@ module Make (Node:Node.NodeType) =
     let add_step_alpha i j a_ij ext_base inf_path =
       let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
       let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij)) in
-      assert (if db() then Cat.is_iso to_i' else true) ;
+      myassert (safe()) (Cat.is_iso to_i') ;
       let f = a_ij @@ (Cat.invert to_i') in
       let g = to_j' @@ f in
       add_step i' j' g ext_base
@@ -307,7 +307,7 @@ module Make (Node:Node.NodeType) =
             else
               let to_oldp,to_newp = List.hd (oldp_to_i |/ newp_to_i)
               in
-              assert (if db() then Cat.is_iso to_oldp && Cat.is_iso to_newp else true) ;
+              myassert (safe()) (Cat.is_iso to_oldp && Cat.is_iso to_newp) ;
               
               if newp > oldp then
                 let new_to_old = to_oldp @@ (Cat.invert to_newp) in
@@ -338,7 +338,7 @@ module Make (Node:Node.NodeType) =
       else
         let k,step_ki,i =
           let k,step_ki,i = QueueList.pop queue in
-          assert (alias k inf_path = k) ;
+          myassert (safe()) (alias k inf_path = k) ;
           try
             let i',to_i' = Lib.IntMap.find i inf_path.alpha in
             (k, to_i' @@ step_ki, i')
@@ -406,7 +406,7 @@ module Make (Node:Node.NodeType) =
                              ^(string_of_int i)
                              ^" through "^
                                (Cat.string_of_arrows ~full:true i_to_w)^"\n") ;
-             assert (
+             myassert (safe()) (
                  if not (alias i inf_path = i) then
                    (Printf.printf "Something wrong point %d is aliased to %d\n" i (alias i inf_path) ;
                     false)
@@ -560,8 +560,14 @@ module Make (Node:Node.NodeType) =
         let () = if db() then print_inf_path inf_path in
         (* 1. Adding witness point *)
         let w = get_fresh ext_base in
-        let _ = if db() then print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ;
-                flush stdout in
+        let _ =
+          if db() then
+            begin
+              print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ;
+              print_string (Printf.sprintf "Cut is {%s}\n" (String.concat "," (List.map string_of_int (Lib.IntSet.elements cut)))) ;
+              flush stdout
+            end
+        in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
         (* 2. Executing dry run, i.e inserting midpoints *)

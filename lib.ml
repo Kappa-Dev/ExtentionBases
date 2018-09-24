@@ -26,7 +26,15 @@ module Util =
     let histfile = "./session_history"
     let log s = print_endline s
     let db_mode = ref false
+    let safe_mode = ref false
     let db () = !db_mode
+    let safe () = !safe_mode
+    let safe_mode () =
+      if not !safe_mode then
+        (print_string "Entering safe mode\n" ; safe_mode := true)
+      else
+        (print_string "Exiting safe mode\n" ; safe_mode := false)
+
     let flush_string = fun x -> print_string x ; flush stdout
     let debug_mode () =
       if not !db_mode then
@@ -36,6 +44,7 @@ module Util =
 
     let proj_left = (fun (x,_) -> x)
     let proj_right = (fun (_,y) -> y)
+    let myassert = fun b test -> assert (if b then test else true)
 
     let rec ask_until s f = match LNoise.linenoise s with
       | None ->
@@ -49,7 +58,7 @@ module Util =
         | Some value -> value
 
 
-    let each_line file callback initial  = 
+    let each_line file callback initial  =
       let channel = open_in file
       and line = ref ""
       and lineno = ref 0

@@ -182,7 +182,7 @@ module Make (Node:Node.NodeType) =
 
 
     let string_of_cospan (f,f') =
-      assert (is_cospan (f,f')) ;
+      myassert (safe()) (is_cospan (f,f')) ;
       let str = Printf.sprintf " %s " (Graph.to_string f.trg) in
       let str' = Printf.sprintf " %s " (Graph.to_string f.src) in
       let str'' = Printf.sprintf " %s " (Graph.to_string f'.src) in
@@ -309,7 +309,7 @@ module Make (Node:Node.NodeType) =
       {src = _G ; trg = _H ; maps = [Hom.identity (Graph.nodes _G)] ; partial = false}
 
     let compose f f' =
-      assert (flat f && flat f') ;
+      myassert (safe()) (flat f && flat f') ;
       let hom = List.hd f.maps in
       let hom' = List.hd f'.maps in
       try
@@ -320,7 +320,8 @@ module Make (Node:Node.NodeType) =
         }
       with
         Hom.Not_injective | Hom.Not_structure_preserving ->
-                             assert (if db() then (Printf.printf "Testing WF\n" ; (*Graph.wf f.src && Graph.wf f.trg &&*) wf f && wf f') else true) ;
+                             myassert (safe())
+                               (Graph.wf f.src && Graph.wf f.trg && wf f && wf f') ;
                              Printf.printf "Cannot compose %s and %s\n"
                                (string_of_arrows ~full:true f)
                                (string_of_arrows ~full:true f') ;
@@ -331,7 +332,7 @@ module Make (Node:Node.NodeType) =
       let close_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-	      assert (Hom.mem u hom') ;
+	      myassert (safe()) (Hom.mem u hom') ;
 	      let v' = Hom.find u hom' in
 	      Hom.add v v' phi
 	    ) hom Hom.empty
@@ -341,7 +342,7 @@ module Make (Node:Node.NodeType) =
       let close_co_span hom hom' =
 	try
 	  Hom.fold (fun u v phi ->
-	      assert (Hom.comem v hom') ;
+	      myassert (safe()) (Hom.comem v hom') ;
 	      let u' = Hom.cofind v hom' in
 	      Hom.add u u' phi
 	    ) hom Hom.empty
@@ -370,7 +371,7 @@ module Make (Node:Node.NodeType) =
 	     ) f.maps
 	  )
       in
-      assert (reduced_maps <> []) ;
+      myassert (safe()) (reduced_maps <> []) ;
       {f with maps = reduced_maps}
 
     let extension_class f =
@@ -393,7 +394,7 @@ module Make (Node:Node.NodeType) =
     let (@@) = compose
 
     let is_iso f =
-      assert (flat f) ;
+      myassert (safe()) (flat f) ;
       let trg = List.hd (f.src --> f) in
       Graph.is_equal trg f.trg
 
@@ -603,7 +604,7 @@ module Make (Node:Node.NodeType) =
       iter_extend [(ls,sup0,il,inf,ir)] (Hom.fold (fun u _ cont -> u::cont) ls [])
 
     let hom_of_arrows f =
-      assert (if db() then wf f else true) ;
+      myassert (safe()) (wf f) ;
       match f.maps with
         [hom] -> hom
       | _ -> failwith "Invariant violation, not a flat embedding"
@@ -628,13 +629,12 @@ module Make (Node:Node.NodeType) =
                  maps = [Hom.restrict (Hom.invert g) (Graph.nodes inf)] ;
                  partial = false}
               in
-              if db() then
-                begin
-                  assert (Graph.wf inf_to_left.src) ;
-                  assert (Graph.wf inf_to_left.trg) ;
-                  assert (Graph.wf inf_to_right.src) ;
-                  assert (Graph.wf inf_to_right.trg) ;
-                end ;
+              begin
+                myassert (safe()) (Graph.wf inf_to_left.src) ;
+                myassert (safe()) (Graph.wf inf_to_left.trg) ;
+                myassert (safe()) (Graph.wf inf_to_right.src) ;
+                myassert (safe()) (Graph.wf inf_to_right.trg) ;
+              end ;
               (inf_to_left,inf_to_right)::pb
             ) pb right_to_sup.maps
         ) [] left_to_sup.maps
@@ -678,7 +678,7 @@ module Make (Node:Node.NodeType) =
       in
       let inf_to_left = identity dom f_part.src in
       let inf_to_right = {src = dom ; trg = f_part.trg ; maps = [p_hom] ; partial = false} in
-      assert (not (is_partial inf_to_right)) ;
+      myassert (safe()) (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
@@ -687,7 +687,7 @@ module Make (Node:Node.NodeType) =
       let add_hom h list = h::list in (*could do much better*)
       let extend_hom_list_to_node u f visited flist =
 
-        assert (Hom.mem u f) ;
+        myassert (safe()) (Hom.mem u f) ;
         let nodes_left,nodes_right =
           match
             List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.nodes_of_id (Node.id u) left)
@@ -783,7 +783,7 @@ module Make (Node:Node.NodeType) =
               Lib.IntMap.add n (hom::l) smap
           ) Lib.IntMap.empty ext_f_list
       in
-      assert (not (Lib.IntMap.is_empty size_map)) ;
+      myassert (safe()) (not (Lib.IntMap.is_empty size_map)) ;
       (*Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;*)
       let rec find_best_sharing map =
         let opt,_ =
@@ -815,10 +815,10 @@ module Make (Node:Node.NodeType) =
       match h_opt with
         Some h ->
          let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
-         assert (if db() then Graph.wf left && Graph.wf right else true) ;
+         myassert (safe()) (Graph.wf left && Graph.wf right) ;
          let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
-         assert (if db() then Graph.wf f.src  else true);
-         assert (if db() then Graph.wf f'.src else true);
+         myassert (safe()) (Graph.wf f.src);
+         myassert (safe()) (Graph.wf f'.src);
          (sh,f',g')
       | None -> failwith "invariant violation"
 

@@ -161,6 +161,11 @@ module Make (Node:Node.NodeType) =
            debug_mode () ;
            env
          end
+      | Parser.Safe ->
+         begin
+           safe_mode () ;
+           env
+         end
       | Parser.List ->
          log ("Observables:\n") ;
          log (String.concat "\n" (proj_left (Model.list env.model))) ;
