@@ -120,10 +120,14 @@ module Make (Node:Node.NodeType) =
            | Some basis -> basis
          in
          print_endline "Computing sharing..." ;
-         let pos_ext_base =
+         print_endline "----------------------------------------" ;
+         let n = List.length pw in
+         let prog = n/40 in
+         let _,pos_ext_base =
            try
              List.fold_left
-               (fun ext_base (id_obs,tile) ->
+               (fun (cpt,ext_base) (id_obs,tile) ->
+                 if cpt mod prog = 0 then Printf.printf "#" ; flush stdout ;
                  match Cat.upper_bound tile with
                    None -> failwith "no witness"
                  | Some (to_w,from_o) ->
@@ -131,9 +135,9 @@ module Make (Node:Node.NodeType) =
                       Printf.printf "Inserting witness of observable '%s': %s\n"
                         (Lib.Dict.to_name id_obs env.model.Model.dict)
                         (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                    EB.insert ~max_step:max_step to_w from_o id_obs ext_base
-               ) eb_pos pw
-           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
+                    (cpt+1,EB.insert ~max_step:max_step to_w from_o id_obs ext_base)
+               ) (1,eb_pos) pw
+           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
          in
          let neg_ext_base =
            try
