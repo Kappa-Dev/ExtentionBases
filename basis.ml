@@ -15,6 +15,7 @@ module Make (Node:Node.NodeType) =
 
     type point = {value : Graph.t ;
                   next : Cat.arrows Lib.IntMap.t ;
+                  prev : Lib.IntSet.t ;
                   obs : (Cat.arrows * int) list ;
                   conflict : Lib.IntSet.t ;
                  }
@@ -33,6 +34,7 @@ module Make (Node:Node.NodeType) =
     let point g =
       {value = g ;
        next = Lib.IntMap.empty ;
+       prev = Lib.IntSet.empty ;
        obs = [] ;
        conflict = Lib.IntSet.empty ;
       }
@@ -105,7 +107,7 @@ module Make (Node:Node.NodeType) =
       i
 
     let replace i p ext_base =
-      myassert (safe()) (Lib.IntMap.mem i ext_base.points) ;
+      if safe() then assert (Lib.IntMap.mem i ext_base.points) ;
       {ext_base with points = Lib.IntMap.add i p ext_base.points}
 
     let mem i ext_base = Lib.IntMap.mem i ext_base.points
@@ -120,7 +122,65 @@ module Make (Node:Node.NodeType) =
       else
         Lib.IntMap.find i ext_base.extensions
 
-    exception Found of Cat.arrows list
+    (**[is_in_sup i j eb] evaluates to true if [j] is in the sup of [i] in extension base [eb]*)
+    let is_in_sup i j ext_base =
+      assert (mem i ext_base && mem j ext_base) ;
+      let pj = find j ext_base
+      in
+      let size_of p = (Graph.size_edge p.value, Graph.size_node p.value) in
+      let (<<) (u,v) (u',v') = u <= u' && v<= v' in
+      let sj = size_of pj in
+      let rec iter_search todo visited =
+        match todo with
+          [] -> false
+        | k::todo' ->
+           if Lib.IntSet.mem k visited then
+             iter_search todo' visited
+           else
+             let pk = find k ext_base in
+             if (size_of pk) << sj then
+               if k = j || Lib.IntMap.mem j pk.next then true
+               else
+                 iter_search
+                   (Lib.IntMap.fold (fun j' _ todo' -> j'::todo') pk.next todo')
+                   (Lib.IntSet.add k visited)
+             else  (*j cannot be above k*)
+               iter_search todo' (Lib.IntSet.add k visited)
+      in
+      iter_search [i] Lib.IntSet.empty
+
+    (*returns the set of pairs (u,v) that would violate Hasse property if i |-->j is added*)
+    let hasse_violation i j ext_base =
+      assert (mem i ext_base && mem j ext_base) ;
+      let pi = find i ext_base in
+      let size_of p = (Graph.size_edge p.value, Graph.size_node p.value) in
+      let (<<) (u,v) (u',v') = u <= u' && v<= v' in
+      let si = size_of pi in
+      let rec iter_search todo visited violations =
+        match todo with
+          [] -> violations
+        | k::todo' ->
+           if Lib.IntSet.mem k visited then
+             iter_search todo' visited violations
+           else
+             let pk = find k ext_base in
+             let violations' =
+               Lib.IntSet.fold
+                 (fun k' violations ->
+                   let pk' = find k' ext_base in
+                   if size_of pk' << si then
+                     if is_in_sup k' i ext_base then Lib.Int2Set.add (k',k) violations
+                     else violations
+                   else
+                     violations
+                 ) pk.prev violations
+             in
+             iter_search
+               (Lib.IntMap.fold (fun j' _ todo' -> j'::todo') pk.next todo')
+               (Lib.IntSet.add k visited)
+               violations'
+      in
+      iter_search [j] Lib.IntSet.empty Lib.Int2Set.empty
 
 
     let add_conflict i j ext_base =
@@ -145,12 +205,18 @@ module Make (Node:Node.NodeType) =
           find i ext_base
         with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
       in
+      let pj =
+        try
+          find j ext_base
+        with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" j,ext_base))
+      in
       let _ = if db() then
                 if Lib.IntMap.mem j pi.next then
                   print_string
                     (red (Printf.sprintf "\t Removing step %d |-x-> %d\n" i j))
       in
-      replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base
+      replace j {pj with prev = Lib.IntSet.remove i pj.prev}
+        (replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base)
 
     let add_step i j emb_ij ext_base =
       let () =
@@ -160,18 +226,40 @@ module Make (Node:Node.NodeType) =
         try find i ext_base
         with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
       in
-      
-      (*test here if pi\in down [pj] *)
-      
-      let () = if db() then Printf.printf
-                                "\t Add Step %d |-> %d = %s-%s->%s\n" i j
-                                (Graph.to_string (Cat.src emb_ij))
-                                (Cat.string_of_arrows emb_ij)
-                                (Graph.to_string (Cat.trg emb_ij))
-        in
-        replace i
-          {pi with next = Lib.IntMap.add j emb_ij pi.next}
-          {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements}
+      let pj =
+        try find j ext_base
+        with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" j,ext_base))
+      in
+      (*optim*)
+      if Lib.IntMap.mem j pi.next || is_in_sup i j ext_base then
+        begin
+          if db() then Printf.printf "Point %d is in the future of %d, not adding step.\n" j i ;
+          ext_base
+        end
+      else
+      let rm_edges = hasse_violation i j ext_base in
+      if db() then
+        begin
+          Printf.printf
+            "\t Add Step %d |-> %d = %s-%s->%s\n" i j
+            (Graph.to_string (Cat.src emb_ij))
+            (Cat.string_of_arrows emb_ij)
+            (Graph.to_string (Cat.trg emb_ij)) ;
+          if not (Lib.Int2Set.is_empty rm_edges) then
+            Printf.printf "this step would generate violations {%s}!\n"
+              (String.concat "," (List.map (fun (x,y) -> Printf.sprintf "(%d,%d)" x y) (Lib.Int2Set.elements rm_edges)))
+        end ;
+      let ext_base =
+        Lib.Int2Set.fold
+          (fun (x,y) ext_base ->
+            remove_step x y ext_base
+          ) rm_edges ext_base
+      in
+      replace j
+        {pj with prev = Lib.IntSet.add i pj.prev}
+        (replace i
+           {pi with next = Lib.IntMap.add j emb_ij pi.next}
+           {ext_base with max_elements = Lib.IntSet.remove i ext_base.max_elements})
 
     type sharing_info = {to_w : Cat.arrows ;
                          to_base : Cat.arrows ;
@@ -197,10 +285,7 @@ module Make (Node:Node.NodeType) =
       let iso_to_base = Cat.is_iso sh_to_base in
       if iso_to_w then
         if iso_to_base then
-          let () = if db() then
-                     myassert (safe()) (
-                         inf_to_i =~= inf_to_w
-                       )
+          let () = if safe() then assert (inf_to_i =~= inf_to_w)
           in
           Iso (sh_to_base @@ (Cat.invert sh_to_w))
         else
@@ -236,7 +321,7 @@ module Make (Node:Node.NodeType) =
     let add_step_alpha i j a_ij ext_base inf_path =
       let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
       let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij)) in
-      myassert (safe()) (Cat.is_iso to_i') ;
+      if safe() then assert (Cat.is_iso to_i') ;
       let f = a_ij @@ (Cat.invert to_i') in
       let g = to_j' @@ f in
       add_step i' j' g ext_base
@@ -307,7 +392,7 @@ module Make (Node:Node.NodeType) =
             else
               let to_oldp,to_newp = List.hd (oldp_to_i |/ newp_to_i)
               in
-              myassert (safe()) (Cat.is_iso to_oldp && Cat.is_iso to_newp) ;
+              if safe() then assert (Cat.is_iso to_oldp && Cat.is_iso to_newp) ;
               
               if newp > oldp then
                 let new_to_old = to_oldp @@ (Cat.invert to_newp) in
@@ -338,7 +423,7 @@ module Make (Node:Node.NodeType) =
       else
         let k,step_ki,i =
           let k,step_ki,i = QueueList.pop queue in
-          myassert (safe()) (alias k inf_path = k) ;
+          if safe() then assert (alias k inf_path = k) ;
           try
             let i',to_i' = Lib.IntMap.find i inf_path.alpha in
             (k, to_i' @@ step_ki, i')
@@ -388,7 +473,7 @@ module Make (Node:Node.NodeType) =
              let dry_run' =
 	       ((fun w ext_base inf_path ->
                  (*no check and no aliasing necessary here*)
-                 rm_step_alpha inf i (add_step_alpha w i w_to_i ext_base inf_path) inf_path
+                 add_step_alpha w i w_to_i ext_base inf_path
                )::dry_run)
              in
              let visited' = Lib.IntSet.add i visited in
@@ -406,7 +491,7 @@ module Make (Node:Node.NodeType) =
                              ^(string_of_int i)
                              ^" through "^
                                (Cat.string_of_arrows ~full:true i_to_w)^"\n") ;
-             myassert (safe()) (
+             if safe() then assert (
                  if not (alias i inf_path = i) then
                    (Printf.printf "Something wrong point %d is aliased to %d\n" i (alias i inf_path) ;
                     false)
@@ -534,9 +619,7 @@ module Make (Node:Node.NodeType) =
                        ext_base
                        inf_path
                    in
-		   let ext_base = if sh_info.has_sup then ext_base else add_conflict i w ext_base in
-                   (*will remove steps only if they exists and they are direct*)
-                   rm_step_alpha inf i ext_base inf_path
+		   if sh_info.has_sup then ext_base else add_conflict i w ext_base
                  )::dry_run
                in
 	       (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step, subst fresh_id inf cut)
