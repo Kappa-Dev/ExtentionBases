@@ -277,27 +277,33 @@ module Make (Node:Node.NodeType) =
       | Above _ -> "Above"
       | Incomp _ -> "Incomp"
 
-    let compare inf_to_i inf_to_w =
+    let compare inf_to_i inf_to_w min_share =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ; flush stdout ;
       let inf_to_sh,sh_to_base,sh_to_w = Cat.share_new inf_to_i inf_to_w in
       let iso_to_w = Cat.is_iso sh_to_w in
       let iso_to_base = Cat.is_iso sh_to_base in
-      if iso_to_w then
-        if iso_to_base then
-          let () = if safe() then assert (inf_to_i =~= inf_to_w)
-          in
-          Iso (sh_to_base @@ (Cat.invert sh_to_w))
-        else
-          Below (sh_to_base @@ (Cat.invert sh_to_w))
+      if (Cat.size inf_to_sh) < min_share then
+        Incomp {to_w = sh_to_w ;
+                to_base = sh_to_base ;
+                to_midpoint = inf_to_sh ;
+                has_sup = true} (*To be Implemented*)
       else
-        if iso_to_base then
-          Above (sh_to_w @@ (Cat.invert sh_to_base))
+        if iso_to_w then
+          if iso_to_base then
+            let () = if safe() then assert (inf_to_i =~= inf_to_w)
+            in
+            Iso (sh_to_base @@ (Cat.invert sh_to_w))
+          else
+            Below (sh_to_base @@ (Cat.invert sh_to_w))
         else
-          Incomp {to_w = sh_to_w ;
-                  to_base = sh_to_base ;
-                  to_midpoint = inf_to_sh ;
-                  has_sup = true} (*To be Implemented*)
+          if iso_to_base then
+            Above (sh_to_w @@ (Cat.invert sh_to_base))
+          else
+            Incomp {to_w = sh_to_w ;
+                    to_base = sh_to_base ;
+                    to_midpoint = inf_to_sh ;
+                    has_sup = true} (*To be Implemented*)
 
     exception Found_iso of Cat.arrows * int
 
@@ -454,7 +460,7 @@ module Make (Node:Node.NodeType) =
           in
           let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
           flush stdout ;
-          match compare inf_to_i inf_to_w with
+          match compare inf_to_i inf_to_w 4 with
 
           (************************** Case inf_to_w factors inf_to_i ********************************)
           (*1. best_inf,aliases = (root_to_inf,inf_to_i,inf,inf_to w) +!> best_inf (i) *)

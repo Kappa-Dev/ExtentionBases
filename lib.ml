@@ -25,6 +25,16 @@ module Dict =
 module Util =
   struct
     let histfile = "./session_history"
+
+    let digits x =
+      let r = ref x in
+      let d = ref 0 in
+      while (!r <> 0) do
+        r := !r/10 ;
+        d := !d+1
+      done ;
+      !d
+
     let log s = print_endline s
     let db_mode = ref false
     let safe_mode = ref false

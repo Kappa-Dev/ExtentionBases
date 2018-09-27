@@ -26,6 +26,8 @@ module type Category =
     val trg : arrows -> obj
     val fold_arrow : arrows -> (int * int) list
 
+    val size : arrows -> int
+
 
    (* val share : arrows -> arrows -> (arrows * tile) list*)
     val share_new : arrows -> arrows -> (arrows * arrows * arrows)
@@ -65,6 +67,8 @@ module Make (Node:Node.NodeType) =
 
     type arrows = {src : obj ; trg : obj ; maps : Hom.t list ; partial : bool}
     let unit = {src = Graph.empty ; trg = Graph.empty ; maps = [] ; partial = false}
+
+    let size f = (Graph.size_edge f.trg) - (Graph.size_edge f.src)
 
     type tile = {span : arrows * arrows ; cospan : (arrows * arrows) option}
 

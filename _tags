@@ -1,1 +1,1 @@
-true: package(linenoise), package(angstrom)
+true: package(linenoise), package(angstrom), package(ANSITerminal)

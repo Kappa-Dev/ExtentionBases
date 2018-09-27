@@ -1,4 +1,5 @@
 exception Change_shape of string
+module Term = ANSITerminal
 
 module type InteractiveType =
   sig
@@ -119,15 +120,15 @@ module Make (Node:Node.NodeType) =
               (EB.empty (get_seed pw) , EB.empty (get_seed nw))
            | Some basis -> basis
          in
-         print_endline "Computing sharing..." ;
-         print_endline "----------------------------------------" ;
+         Term.printf [Term.Bold; Term.blue] "Building positive extension base...\n" ;
          let n = List.length pw in
-         let prog = n/40 in
          let _,pos_ext_base =
            try
              List.fold_left
                (fun (cpt,ext_base) (id_obs,tile) ->
-                 if cpt mod prog = 0 then Printf.printf "#" ; flush stdout ;
+                 Term.printf [Term.yellow] "%d/%d" cpt n; flush stdout ;
+                 ANSITerminal.move_bol () ;
+
                  match Cat.upper_bound tile with
                    None -> failwith "no witness"
                  | Some (to_w,from_o) ->
@@ -139,6 +140,7 @@ module Make (Node:Node.NodeType) =
                ) (1,eb_pos) pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
          in
+         print_newline () ;
          let neg_ext_base =
            try
            List.fold_left
