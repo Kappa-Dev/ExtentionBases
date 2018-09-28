@@ -1,5 +1,8 @@
 BIN = test
 
+annot:
+	OCAML_LANDMARKS=auto ocamlbuild -use-ocamlfind $(BIN).native
+
 test:
 	ocamlbuild -use-ocamlfind $(BIN).native
 

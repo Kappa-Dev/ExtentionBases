@@ -277,33 +277,27 @@ module Make (Node:Node.NodeType) =
       | Above _ -> "Above"
       | Incomp _ -> "Incomp"
 
-    let compare inf_to_i inf_to_w min_share =
+    let compare inf_to_i inf_to_w =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ; flush stdout ;
       let inf_to_sh,sh_to_base,sh_to_w = Cat.share_new inf_to_i inf_to_w in
       let iso_to_w = Cat.is_iso sh_to_w in
       let iso_to_base = Cat.is_iso sh_to_base in
-      if (Cat.size inf_to_sh) < min_share then
-        Incomp {to_w = sh_to_w ;
-                to_base = sh_to_base ;
-                to_midpoint = inf_to_sh ;
-                has_sup = true} (*To be Implemented*)
-      else
-        if iso_to_w then
-          if iso_to_base then
-            let () = if safe() then assert (inf_to_i =~= inf_to_w)
-            in
-            Iso (sh_to_base @@ (Cat.invert sh_to_w))
-          else
-            Below (sh_to_base @@ (Cat.invert sh_to_w))
+      if iso_to_w then
+        if iso_to_base then
+          let () = if safe() then assert (inf_to_i =~= inf_to_w)
+          in
+          Iso (sh_to_base @@ (Cat.invert sh_to_w))
         else
-          if iso_to_base then
-            Above (sh_to_w @@ (Cat.invert sh_to_base))
-          else
-            Incomp {to_w = sh_to_w ;
-                    to_base = sh_to_base ;
-                    to_midpoint = inf_to_sh ;
-                    has_sup = true} (*To be Implemented*)
+          Below (sh_to_base @@ (Cat.invert sh_to_w))
+      else
+        if not iso_to_base then
+          Incomp {to_w = sh_to_w ;
+                  to_base = sh_to_base ;
+                  to_midpoint = inf_to_sh ;
+                  has_sup = true} (*To be Implemented*)
+        else
+          Above (sh_to_w @@ (Cat.invert sh_to_base))
 
     exception Found_iso of Cat.arrows * int
 
@@ -399,11 +393,9 @@ module Make (Node:Node.NodeType) =
               let to_oldp,to_newp = List.hd (oldp_to_i |/ newp_to_i)
               in
               if safe() then assert (Cat.is_iso to_oldp && Cat.is_iso to_newp) ;
-              
               if newp > oldp then
                 let new_to_old = to_oldp @@ (Cat.invert to_newp) in
                 add_alias newp oldp new_to_old inf_path.alpha,inf_path.beta
-                
               else
                 add_alias oldp newp (to_newp @@ (Cat.invert to_oldp)) inf_path.alpha,inf_path.beta
           with Not_found -> inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
@@ -460,7 +452,7 @@ module Make (Node:Node.NodeType) =
           in
           let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
           flush stdout ;
-          match compare inf_to_i inf_to_w 4 with
+          match compare inf_to_i inf_to_w with
 
           (************************** Case inf_to_w factors inf_to_i ********************************)
           (*1. best_inf,aliases = (root_to_inf,inf_to_i,inf,inf_to w) +!> best_inf (i) *)

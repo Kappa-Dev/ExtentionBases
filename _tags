@@ -1,1 +1,2 @@
-true: package(linenoise), package(angstrom), package(ANSITerminal)
+true: package(linenoise), package(angstrom), package(ANSITerminal), package(landmarks), package(landmarks.ppx)
+
