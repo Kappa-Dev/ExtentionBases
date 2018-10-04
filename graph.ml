@@ -243,10 +243,11 @@ module Make (Node:Node.NodeType) =
            in
            NodeMap.remove u edges, g.size - (List.length node_list)
       in
+      let nodes = List.filter (fun v -> v<>u) (nodes_of_id (Node.id u) g) in
       {nodes = NodeSet.remove u g.nodes ;
        edges = edges ;
        size = size ;
-       idmap = Lib.IntMap.remove (Node.id u) g.idmap;
+       idmap = if nodes = [] then Lib.IntMap.remove (Node.id u) g.idmap else Lib.IntMap.add (Node.id u) nodes g.idmap;
        coherent = g.coherent}
 
     (*TODO: maintain max_id when adding a new node to the graph*)

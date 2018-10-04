@@ -57,7 +57,7 @@ module Make (Node:Node.NodeType) =
   (struct
     module Hom = Homomorphism.Make (Node)
     module Graph = Graph.Make (Node)
-
+    module Term = ANSITerminal
     type obj = Graph.t
 
     module NodeSet = Set.Make (Node)
@@ -648,23 +648,6 @@ module Make (Node:Node.NodeType) =
 
     let (=~=) f f' = match equalize f f' with Some _ -> true | None -> false
 
-    (*[compare f f'] = -1 if exists h: h.f = f', +1 if f = h.f' and 0 otherwise (incomp or iso)*)
-    (*let compare f f' =
-      let opt = try Some (complete f f') with Undefined -> None
-      in
-      let inf,iso =
-        match opt with
-          Some g -> if not (is_iso g) then true,false else false,true
-        | None -> false,false
-      in
-      if inf then -1 else if iso then 0
-      else
-        try
-          let _ = complete f' f in
-          1
-        with
-          Undefined -> 0
-     *)
     let shl l = String.concat ";"
                   (List.map
                      (fun (h,todo,visited) ->
@@ -676,6 +659,13 @@ module Make (Node:Node.NodeType) =
 
     let span_of_partial f_part =
       let p_hom = hom_of_arrows f_part in
+      let () =
+        if db() then
+          (Term.printf [Term.red] "Completing %s --%s--\\ %s\n"
+             (Graph.to_string f_part.src)
+             (Hom.to_string ~full:true p_hom)
+             (Graph.to_string f_part.trg) ; flush stdout)
+      in
       let dom =
         Graph.fold_nodes (fun u d ->
             if Hom.mem u p_hom &&
@@ -694,10 +684,8 @@ module Make (Node:Node.NodeType) =
 
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list left right continuation finished f_todo_list =
-
       let add_hom h list = h::list in (*could do much better*)
       let extend_hom_list_to_node u f visited flist =
-
         if safe() then assert (Hom.mem u f) ;
         let nodes_left,nodes_right =
           match
@@ -714,8 +702,8 @@ module Make (Node:Node.NodeType) =
           (String.concat "," (List.map Node.to_string nodes_left))
           (String.concat "," (List.map Node.to_string nodes_right))
           (Hom.to_string ~full:true f)
-          (shl flist) ;*)
-
+          (shl flist) ;
+         *)
         List.fold_left
           (fun flist_v v ->
             List.fold_left
@@ -770,7 +758,20 @@ module Make (Node:Node.NodeType) =
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
-
+      (*
+      let () = Printf.printf "(Left) %s || %s (Right)\n" (Graph.to_string left) (Graph.to_string right) in
+      let () =
+        let str =
+          String.concat "\n"
+            (Graph.fold_ids (fun i cont ->
+                 let str = Printf.sprintf "%d:%s" i (String.concat "," (List.map Node.to_string (Graph.nodes_of_id i left)))
+                 in
+                 str::cont) left []
+            )
+        in
+        print_string str ; print_newline()
+      in
+       *)
       let rec iter_extend finished = function
           [] -> finished
         | f_list ->

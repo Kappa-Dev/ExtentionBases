@@ -234,9 +234,7 @@ module Make (Node:Node.NodeType) =
           let pi = find i eb in
           let pj = find j eb in
           assert (not (Lib.IntMap.mem j pi.next || Lib.IntSet.mem j pj.prev)) ;
-          Term.printf [Term.red] "%d |--> %d has been removed!\n" i j;
         end ;
-      dump eb ;
       eb
 
     let add_step i j emb_ij ext_base =
@@ -290,12 +288,6 @@ module Make (Node:Node.NodeType) =
     | Below of Cat.arrows
     | Above of Cat.arrows
     | Incomp of sharing_info
-
-    let string_of_comparison = function
-        Iso _ -> "Iso"
-      | Below _ -> "Below"
-      | Above _ -> "Above"
-      | Incomp _ -> "Incomp"
 
     let compare inf_to_i inf_to_w =
       if db() then
@@ -488,6 +480,7 @@ module Make (Node:Node.NodeType) =
              let dry_run' =
 	       ((fun w ext_base inf_path ->
                  (*no check and no aliasing necessary here*)
+                 let ext_base = add_step_alpha inf w inf_to_w ext_base inf_path in
                  add_step_alpha w i w_to_i ext_base inf_path
                )::dry_run)
              in
