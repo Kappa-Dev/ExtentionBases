@@ -401,8 +401,7 @@ module Make (Node:Node.NodeType) =
       if safe() then assert (flat f) ;
       let trg = List.hd (f.src --> f) in
       Graph.is_equal trg f.trg
- *)
-
+*)
     let is_iso f =
       not f.partial && (Graph.size_edge f.trg) = (Graph.size_edge f.src)
 
@@ -678,14 +677,18 @@ module Make (Node:Node.NodeType) =
     let span_of_partial f_part =
       let p_hom = hom_of_arrows f_part in
       let dom =
-        Graph.fold_edges (fun u v d ->
-            if Hom.mem u p_hom && Hom.mem v p_hom then d
+        Graph.fold_nodes (fun u d ->
+            if Hom.mem u p_hom &&
+                 List.exists (fun v -> Hom.mem v p_hom) (Graph.bound_to u d)
+            then d
             else
-              Graph.remove u (Graph.remove v d)
+              Graph.remove u d
           ) f_part.src f_part.src
       in
       let inf_to_left = identity dom f_part.src in
-      let inf_to_right = {src = dom ; trg = f_part.trg ; maps = [p_hom] ; partial = false} in
+      let inf_to_right =
+        {src = dom ; trg = f_part.trg ; maps = [p_hom] ; partial = false}
+      in
       if safe() then assert (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 

@@ -133,9 +133,12 @@ module Make (Node:Node.NodeType) =
                    None -> failwith "no witness"
                  | Some (to_w,from_o) ->
                     if db() then
-                      Printf.printf "Inserting witness of observable '%s': %s\n"
-                        (Lib.Dict.to_name id_obs env.model.Model.dict)
-                        (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
+                      begin
+                        Term.printf [Term.red] "------------------------\n" ;
+                        Printf.printf "Inserting witness of observable '%s': %s\n"
+                          (Lib.Dict.to_name id_obs env.model.Model.dict)
+                          (Cat.string_of_cospan (to_w,from_o)) ; flush stdout
+                      end;
                     (cpt+1,EB.insert ~max_step:max_step to_w from_o id_obs ext_base)
                ) (1,eb_pos) pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
@@ -231,8 +234,12 @@ module Make (Node:Node.NodeType) =
     let interactive debug =
       let rec session env =
         let _ = Unix.waitpid [Unix.WNOHANG] in
-        let prompt () = if db() then "db> " else "> " in
-        (match (LNoise.linenoise (prompt debug)) with
+        let prompt () =
+          let db_str = if db() then "db" else "" in
+          let safe_str = if safe() then "!" else "" in
+          Printf.sprintf "%s%s> " db_str safe_str
+        in
+        (match (LNoise.linenoise (prompt ())) with
          | None ->
             log "Attempting to save session history";
             ignore (LNoise.history_save histfile);

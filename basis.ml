@@ -2,6 +2,7 @@ module Make (Node:Node.NodeType) =
   struct
     module Graph = Graph.Make (Node)
     module Cat = Cat.Make (Node)
+    module Term = ANSITerminal
 
     let (-->) = Cat.(-->)
     let (@@) = Cat.(@@)
@@ -46,6 +47,15 @@ module Make (Node:Node.NodeType) =
        max_elements = Lib.IntSet.singleton 0 ;
        fresh = 1
       }
+
+    let dump eb =
+      Lib.IntMap.iter
+      (fun i p ->
+        let next = Lib.IntMap.fold (fun j _ cont -> (Printf.sprintf "%d" j)::cont) p.next []
+        in
+        Term.printf [] "%d |--> [%s]\n" i (String.concat "," next);
+      ) eb.points
+
 
     let to_dot show_conflict dict ext_base =
       let l =
@@ -215,8 +225,19 @@ module Make (Node:Node.NodeType) =
                   print_string
                     (red (Printf.sprintf "\t Removing step %d |-x-> %d\n" i j))
       in
-      replace j {pj with prev = Lib.IntSet.remove i pj.prev}
-        (replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base)
+      let eb =
+        replace j {pj with prev = Lib.IntSet.remove i pj.prev}
+          (replace i {pi with next = Lib.IntMap.remove j pi.next} ext_base)
+      in
+      if safe () then
+        begin
+          let pi = find i eb in
+          let pj = find j eb in
+          assert (not (Lib.IntMap.mem j pi.next || Lib.IntSet.mem j pj.prev)) ;
+          Term.printf [Term.red] "%d |--> %d has been removed!\n" i j;
+        end ;
+      dump eb ;
+      eb
 
     let add_step i j emb_ij ext_base =
       let () =
@@ -225,10 +246,6 @@ module Make (Node:Node.NodeType) =
       let pi =
         try find i ext_base
         with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" i,ext_base))
-      in
-      let pj =
-        try find j ext_base
-        with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d is not in the base" j,ext_base))
       in
       (*optim*)
       if Lib.IntMap.mem j pi.next || is_in_sup i j ext_base then
@@ -255,6 +272,9 @@ module Make (Node:Node.NodeType) =
             remove_step x y ext_base
           ) rm_edges ext_base
       in
+      (*NB pi might have changed in the ext_base because of previous step*)
+      let pi,pj = find i ext_base, find j ext_base in
+      if safe() then assert (not (Lib.Int2Set.mem (i,j) rm_edges)) ;
       replace j
         {pj with prev = Lib.IntSet.add i pj.prev}
         (replace i
@@ -325,9 +345,6 @@ module Make (Node:Node.NodeType) =
       let f = a_ij @@ (Cat.invert to_i') in
       let g = to_j' @@ f in
       add_step i' j' g ext_base
-
-    let rm_step_alpha i j ext_base inf_path =
-      remove_step (alias i inf_path) (alias j inf_path) ext_base
 
     let find_extension_alpha i ext_base inf_path =
       find_extension (alias i inf_path) ext_base
@@ -624,6 +641,7 @@ module Make (Node:Node.NodeType) =
         in
         progress ext_base dry_run' visited' inf_path' queue' max_step' cut'
 
+
     let insert ~max_step ext_w obs_emb obs_id ext_base =
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
@@ -651,10 +669,18 @@ module Make (Node:Node.NodeType) =
         in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
         let ext_base = add_obs w obs_emb obs_id ext_base in
+
         (* 2. Executing dry run, i.e inserting midpoints *)
         let ext_base =
-          List.fold_left (fun ext_base act -> act w ext_base inf_path) ext_base (List.rev dry_run)
+          List.fold_left
+            (fun ext_base act ->
+              let eb = act w ext_base inf_path in
+              eb
+            ) ext_base (List.rev dry_run)
         in
+        if db() then
+          (Term.printf [Term.Blink ; Term.magenta] "Dry run executed!\n" ;
+           dump ext_base) ;
         (* 3. Connecting witness w to its best predecessors in the base*)
         let inf_list =
           Lib.IntSet.fold
@@ -662,24 +688,22 @@ module Make (Node:Node.NodeType) =
               try (Lib.IntMap.find i inf_path.beta)::inf_list with Not_found -> inf_list
           ) ext_base.max_elements []
         in
- 
+
         let () =
           if db() then
             Printf.printf "best infs for witness %d are {%s}\n"
               w
-              (String.concat "," (List.map (fun (i,_,_,_) -> string_of_int i) inf_list)) ;
-          if db () then
-            Printf.printf "cut is {%s}\n" (String.concat "," (Lib.IntSet.fold (fun i cont -> (string_of_int i) :: cont) cut []))
+              (String.concat "," (List.map (fun (i,_,_,_) -> string_of_int i) inf_list))
         in
-        (*let ext_base =*)
+        let ext_base =
           List.fold_left
             (fun ext_base (inf,_,_,inf_to_w) ->
               if inf=w || not (Lib.IntSet.mem inf cut) then (if db() then Printf.printf "%d not in cut skipping\n" inf ; ext_base)
               else
                 add_step_alpha inf w inf_to_w ext_base inf_path
             ) ext_base (List.rev inf_list)
-        (*in
-        add_step 0 w ext_w ext_base*)
+        in
+        ext_base
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 

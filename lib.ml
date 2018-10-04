@@ -42,16 +42,16 @@ module Util =
     let safe () = !safe_mode
     let safe_mode () =
       if not !safe_mode then
-        (print_string "Entering safe mode\n" ; safe_mode := true)
+        (print_string "Entering safe mode\n" ; flush stdout ; safe_mode := true)
       else
-        (print_string "Exiting safe mode\n" ; safe_mode := false)
+        (print_string "Exiting safe mode\n" ; flush stdout ; safe_mode := false)
 
     let flush_string = fun x -> print_string x ; flush stdout
     let debug_mode () =
       if not !db_mode then
-        (print_string "Entering debug mode\n" ; db_mode := true ; Printexc.record_backtrace true)
+        (print_string "Entering debug mode\n" ; flush stdout ; db_mode := true ; Printexc.record_backtrace true)
       else
-        (print_string "Exiting debug mode\n" ; db_mode := false ; Printexc.record_backtrace false)
+        (print_string "Exiting debug mode\n" ; flush stdout ; db_mode := false ; Printexc.record_backtrace false)
 
     let proj_left = (fun (x,_) -> x)
     let proj_right = (fun (_,y) -> y)
