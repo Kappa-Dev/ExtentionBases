@@ -84,10 +84,12 @@ let init = (cyd_basis,cyd_graphs) => {
     elements:cyd_basis.elements.concat(..._.map(cyd_graphs, ({elements}) => elements)),
     autoungrabify: true,
     autounselectify: true,
-    maxZoom: 1.8,
-    minZoom: 0.1,
+    maxZoom: 5,
+    minZoom: 0.01,
     style: styles ,
   });
+
+
 
   // Layout templates
   let dagre_data = { name: 'dagre',
@@ -110,6 +112,8 @@ let init = (cyd_basis,cyd_graphs) => {
   outers.layout(dagre_data).run();
   conflicts.layout(conflict_data).run();
 
+
+
   let paddingPc = 0.05;
   _.each(inners, (inner,id) => {
     const outer = cy_basis.getElementById(id);
@@ -118,7 +122,7 @@ let init = (cyd_basis,cyd_graphs) => {
     const h = outer.height();
     inner.layout({
       name: 'cose-bilkent',
-      animate: false,
+      animate: 'false', // end?
       boundingBox: {
         x1: pos.x - w/2 + paddingPc*w,
         y1: pos.y - h/2 + paddingPc*h,
@@ -127,6 +131,50 @@ let init = (cyd_basis,cyd_graphs) => {
       }
     }).run()
   });
+
+  let edgeLength = e => {
+    //console.log("edge", e.data().source, e.data().target);
+    //console.log(e.sourceEndpoint(),e.targetEndpoint());
+    let sPos = e.sourceEndpoint();
+    let tPos = e.targetEndpoint();
+    return Math.sqrt(Math.pow(sPos.x - tPos.x,2) + Math.pow(sPos.y - tPos.y,2));
+  }
+  let linearCutoff = (start, end, from, to, i) => {
+    if (i <= from) return start;
+    if (i >= to) return end;
+    return start + (((i-from)/(to-from))*(end-start));
+  }
+
+  // Adapt inner nodes size to inner graph size
+  _.each(inners, (inner,id) => {
+    //console.log("ID ", id);
+    let init = 30;
+    let initFont = 12;
+    let initEdgeFont = 12;
+    let initOffset = 10;
+    let initMainFont = 14;
+    let nodes = inner.filter(e => !e.data().source);
+    let edges = inner.filter(e => e.data().source);
+    let base = 3;
+    let num = nodes.size() < 10 ? 0 : nodes.size() - 10;
+    num = nodes.size();
+    let factor = Math.log10(num+base)/Math.log10(base);
+    let factorFont = linearCutoff(1,5,1,20,num);
+    //console.log(nodes.size(),factorFont);
+    _.each(nodes, (n,k) => {
+      n.style('width',init/factor);
+      n.style('height',init/factor);
+      n.style('font-size',(initMainFont/factorFont)+'px');
+    });
+    _.each(edges, (e,k) => {
+      let length = edgeLength(e);
+      let factor = linearCutoff(1.5,1,1,80,length);
+      e.style('font-size',(initEdgeFont/factor)+'px');
+      e.style('source-text-offset', (initOffset/factor)+'px');
+      e.style('target-text-offset', (initOffset/factor)+'px');
+    });
+  });
+
 
   // show conflicts or not
   if (getConflict() === null || getConflict() === "true") {

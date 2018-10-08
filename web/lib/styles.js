@@ -26,12 +26,20 @@ const outer = {
 
 module.exports = [ // the stylesheet for the graph
   {
+    selector: 'node:active',
+    style: {
+      //'overlay-padding': 0
+      //'overlay-opacity': 0
+    }
+  },
+  {
     selector: 'node[inner]',
     style: {
       'label': 'data(label)',
       'text-halign': 'center',
       'text-valign': 'center',
-      'events': 'no'
+      'events': 'no',
+      'font-size': '10px'
     }
   },
   {
