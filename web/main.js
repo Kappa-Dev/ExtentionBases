@@ -112,6 +112,22 @@ let init = (cyd_basis,cyd_graphs) => {
   outers.layout(dagre_data).run();
   conflicts.layout(conflict_data).run();
 
+  // Adapt inner_nodes size to inner graph size
+  _.each(inners, (inner,id) => {
+    //console.log("ID ", id);
+    let init = 30;
+    let nodes = inner.filter(e => !e.data().source);
+    let base = 3;
+    let num = nodes.size() < 10 ? 0 : nodes.size() - 10;
+    num = nodes.size();
+    let factor = Math.log10(num+base)/Math.log10(base);
+    //console.log(nodes.size(),factorFont);
+    _.each(nodes, (n,k) => {
+      n.style('width',init/factor);
+      n.style('height',init/factor);
+    });
+  });
+
 
 
   let paddingPc = 0.05;
@@ -122,7 +138,7 @@ let init = (cyd_basis,cyd_graphs) => {
     const h = outer.height();
     inner.layout({
       name: 'cose-bilkent',
-      animate: 'false', // end?
+      animate: 'end', // end?
       boundingBox: {
         x1: pos.x - w/2 + paddingPc*w,
         y1: pos.y - h/2 + paddingPc*h,
@@ -132,6 +148,8 @@ let init = (cyd_basis,cyd_graphs) => {
     }).run()
   });
 
+  //window.inners = inners;
+
   let edgeLength = e => {
     //console.log("edge", e.data().source, e.data().target);
     //console.log(e.sourceEndpoint(),e.targetEndpoint());
@@ -139,41 +157,44 @@ let init = (cyd_basis,cyd_graphs) => {
     let tPos = e.targetEndpoint();
     return Math.sqrt(Math.pow(sPos.x - tPos.x,2) + Math.pow(sPos.y - tPos.y,2));
   }
+
+  //window.edgeLength = edgeLength;
+
   let linearCutoff = (start, end, from, to, i) => {
     if (i <= from) return start;
     if (i >= to) return end;
     return start + (((i-from)/(to-from))*(end-start));
   }
 
-  // Adapt inner nodes size to inner graph size
-  _.each(inners, (inner,id) => {
-    //console.log("ID ", id);
-    let init = 30;
+  // Adapt inner nodes fonts and edges size to inner graph size
+  let adjust = () => {
     let initFont = 12;
-    let initEdgeFont = 12;
-    let initOffset = 10;
+    let initEdgeFont = 4;
+    let initOffset = 5;
     let initMainFont = 14;
-    let nodes = inner.filter(e => !e.data().source);
-    let edges = inner.filter(e => e.data().source);
-    let base = 3;
-    let num = nodes.size() < 10 ? 0 : nodes.size() - 10;
-    num = nodes.size();
-    let factor = Math.log10(num+base)/Math.log10(base);
-    let factorFont = linearCutoff(1,5,1,20,num);
-    //console.log(nodes.size(),factorFont);
-    _.each(nodes, (n,k) => {
-      n.style('width',init/factor);
-      n.style('height',init/factor);
-      n.style('font-size',(initMainFont/factorFont)+'px');
+    _.each(inners, (inner,id) => {
+      //console.log("ID ", id);
+      let nodes = inner.filter(e => !e.data().source);
+      let edges = inner.filter(e => e.data().source);
+      let num = nodes.size() < 10 ? 0 : nodes.size() - 10;
+      num = nodes.size();
+      let factorFont = linearCutoff(1,5,1,20,num);
+      //console.log(nodes.size(),factorFont);
+      _.each(nodes, (n,k) => {
+        n.style('font-size',(initMainFont/factorFont)+'px');
+      });
+      _.each(edges, (e,k) => {
+        let length = edgeLength(e);
+        let factor = linearCutoff(2,1,1,20,length);
+        //console.log("length: ",length,", factor: ", factor);
+        e.style('font-size',(initEdgeFont/factor)+'px');
+        //e.style('font-size','5px');
+        e.style('source-text-offset', (initOffset/(factor*1.5))+'px');
+        e.style('target-text-offset', (initOffset/(factor*1.5))+'px');
+      });
     });
-    _.each(edges, (e,k) => {
-      let length = edgeLength(e);
-      let factor = linearCutoff(1.5,1,1,80,length);
-      e.style('font-size',(initEdgeFont/factor)+'px');
-      e.style('source-text-offset', (initOffset/factor)+'px');
-      e.style('target-text-offset', (initOffset/factor)+'px');
-    });
-  });
+  }
+  adjust();
 
 
   // show conflicts or not
