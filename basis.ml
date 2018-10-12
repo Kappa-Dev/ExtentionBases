@@ -345,7 +345,33 @@ module Make (Node:Node.NodeType) =
       add_conflict (alias i inf_path) (alias j inf_path) ext_base
 
     let rec progress ext_base dry_run visited inf_path queue max_step cut =
+
       (************* DEBUGING INFO ***************)
+      let () =
+        if safe () then
+          let _ =
+            QueueList.fold (fun (k,_,i) lhs ->
+                let i' = alias i inf_path in
+                assert (if  (Lib.IntSet.mem i' lhs) then
+                          let () =
+                            Printf.printf
+                              "Queue is not well formed for %d (%d) : \n {%s}\n" i i'
+                              (String.concat
+                                 ","
+                                 (QueueList.fold
+                                    (fun (i,_,j) cont ->
+                                      ("("^(string_of_int i)^"|->"^(string_of_int j)^")")::cont
+                                    ) queue [])
+                              )
+                          in
+                          (flush stdout ; false)
+                        else true
+                  ) ;
+                Lib.IntSet.add k lhs
+              ) queue Lib.IntSet.empty
+          in
+          ()
+      in
       let _ = if db() then
                 begin
                   Printf.printf
@@ -366,6 +392,7 @@ module Make (Node:Node.NodeType) =
                 end
       in
       (************* DEBUGING INFO ***************)
+
       let subst i j set =
         Lib.IntSet.add i (Lib.IntSet.remove j set)
       in
@@ -377,6 +404,7 @@ module Make (Node:Node.NodeType) =
              Some (i-1)
       in
       let add_alias i i' to_i' alpha =
+        if safe () then assert (not (mem i ext_base)) ;
         let i',to_i' =
           try
             let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
@@ -406,7 +434,7 @@ module Make (Node:Node.NodeType) =
                 let new_to_old = to_oldp @@ (Cat.invert to_newp) in
                 add_alias newp oldp new_to_old inf_path.alpha,inf_path.beta
               else
-                add_alias oldp newp (to_newp @@ (Cat.invert to_oldp)) inf_path.alpha,inf_path.beta
+                add_alias oldp newp (to_newp @@ (Cat.invert to_oldp)) inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
           with Not_found -> inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
         in
         let inf_path' = {beta = beta' ; alpha = alpha'} in
@@ -430,24 +458,23 @@ module Make (Node:Node.NodeType) =
       else
         let k,step_ki,i =
           let k,step_ki,i = QueueList.pop queue in
+
           if safe() then assert (alias k inf_path = k) ;
           try
             let i',to_i' = Lib.IntMap.find i inf_path.alpha in
             (k, to_i' @@ step_ki, i')
           with Not_found -> (k,step_ki,i)
         in
-        (*
-        if i<>0 && has_best_inf i inf_path then
-          (
-            if db() then Printf.printf "Point %d already compared with witness, skipping \n" i ;
-            (inf_path,dry_run)
-          )
-        else
-         *)
+
+        let is_complete =
+          let pi = find i ext_base in
+          Lib.IntSet.fold (fun j b -> if j<>k then Lib.IntSet.mem (j,i) visited && b else b) pi.prev true
+        in
         let inf,root_to_inf,inf_to_k,inf_to_w =
           try get_best_inf k inf_path
           with Not_found -> raise (Invariant_failure (Printf.sprintf "Point %d has no defined best_inf" k, ext_base))
         in
+        if safe() then assert (alias inf inf_path = inf) ;
 
         let dry_run',visited',inf_path',queue',max_step',cut'=
           let inf_to_i = try step_ki @@ inf_to_k
@@ -459,7 +486,8 @@ module Make (Node:Node.NodeType) =
                                           ^(Cat.string_of_arrows ~full:true step_ki)) ;
                            raise Cat.Undefined
           in
-          let _ = if db() then Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
+          let _ = if db() then
+                    Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i in
           flush stdout ;
           match compare inf_to_i inf_to_w with
 
@@ -513,19 +541,34 @@ module Make (Node:Node.NodeType) =
                  inf_path
                  ext_base
              in
+             let queue',visited' =
+               if not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
+                 queue,visited
+               else
+                 let queue' =
+                   Lib.IntMap.fold
+                     (fun j step_ij cont ->
+                       QueueList.add_lp (i, step_ij, j) cont
+                     ) pi.next queue
+                 in
+                 queue', Lib.IntSet.add i visited
+             in
+             (* OPTIM TO BE CHECKED
              let queue' =
                if Lib.IntSet.mem i visited then
                  queue
                else
                  Lib.IntMap.fold
                    (fun j step_ij cont ->
+                     if db() then Term.printf [] "Pushing %d |-> %d at the top of the queue \n" i j ;
                      QueueList.add_hp (i,step_ij,j) cont
                    ) (try find i ext_base with
                         Not_found ->
                         failwith (Printf.sprintf "point %d is not in the base!\n" i)
                    ).next queue
              in
-             (dry_run,(Lib.IntSet.add i visited), inf_path' ,queue', dec_step ext_base max_step, subst i inf cut)
+              *)
+             (dry_run, visited' , inf_path' ,queue', dec_step ext_base max_step, subst i inf cut)
 
           (************************** Case inf_to_w =~= inf_to_i *************************)
           (*NB drop dry_run*)
@@ -535,6 +578,19 @@ module Make (Node:Node.NodeType) =
 
           (************** Case both inf_to_w and inf_to_i have a common factor ***********)
           | Incomp sh_info ->
+             let queue',visited' =
+               if not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
+                 queue,visited
+               else
+                 let queue' =
+                   Lib.IntMap.fold
+                     (fun j step_ij cont ->
+                       QueueList.add_lp (i, step_ij, j) cont
+                     ) (find i ext_base).next queue
+                 in
+                 queue', Lib.IntSet.add i visited
+             in
+
              if db() then print_string
 			    (green (Printf.sprintf
                                       "I found a midpoint %s (%d)!\n"
@@ -549,19 +605,11 @@ module Make (Node:Node.NodeType) =
              (*2. add i |-> succ i to next_layer if i not visited*)
              (*3. if sharing span has no sup add i ..#.. w to dry_run*)
              (*4. mark i as visited *)
+
              if Cat.is_iso sh_info.to_midpoint then
                let () = if db() then print_string (green "...that is not worth adding\n") in
                let inf_path' =
                  update_inf i (inf,root_to_inf,inf_to_i,inf_to_w) inf_path ext_base
-               in
-	       let queue' =
-                 if Lib.IntSet.mem i visited then
-                   queue
-                 else
-                   Lib.IntMap.fold
-                     (fun j step_ij cont ->
-                       QueueList.add_lp (i,step_ij,j) cont
-                     ) (find i ext_base).next queue
                in
                let dry_run' =
                  if not sh_info.has_sup then
@@ -569,18 +617,9 @@ module Make (Node:Node.NodeType) =
                  else
                    dry_run
 	       in
-               (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step, cut)
+               (dry_run',visited',inf_path',queue',dec_step ext_base max_step, cut)
              else
                (*Not a trivial midpoint*)
-               let queue' =
-                 if Lib.IntSet.mem i visited then
-                   queue
-                 else
-                   Lib.IntMap.fold
-                     (fun j step_ij cont ->
-                       QueueList.add_lp (i, step_ij, j) cont
-                     ) (find i ext_base).next queue
-               in
                let fresh_id = get_fresh ext_base in
                let inf_path' =
                  update_inf i
@@ -601,9 +640,9 @@ module Make (Node:Node.NodeType) =
                            mp
                            (try sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path)
                             with Cat.Undefined ->
-                              let str = Printf.sprintf "to_inf %d and inf_to_mp %d do not compose: \n %s <> %s "
-                                          inf
-                                          fresh_id
+                              let str = Printf.sprintf "to_inf %d (%d) and inf_to_mp %d (%d) do not compose: \n %s <> %s "
+                                          inf (alias inf inf_path)
+                                          fresh_id (alias fresh_id inf_path)
                                           (Cat.string_of_arrows ~full:true (find_extension_alpha inf ext_base inf_path))
                                           (Cat.string_of_arrows ~full:true sh_info.to_midpoint)
 
@@ -630,7 +669,7 @@ module Make (Node:Node.NodeType) =
 		   if sh_info.has_sup then ext_base else add_conflict i w ext_base
                  )::dry_run
                in
-	       (dry_run',(Lib.IntSet.add i visited),inf_path',queue',dec_step ext_base max_step, subst fresh_id inf cut)
+	       (dry_run',visited',inf_path',queue',dec_step ext_base max_step, subst fresh_id inf cut)
         in
         progress ext_base dry_run' visited' inf_path' queue' max_step' cut'
 

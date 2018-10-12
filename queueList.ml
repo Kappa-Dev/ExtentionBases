@@ -1,30 +1,28 @@
-type 'a t = {mutable hp: 'a list ; mutable lp : 'a list}
+type 'a t = {mutable hp: 'a Queue.t ; lp : 'a Queue.t}
 exception Empty
 
 let create () =
-  {hp = [] ; lp = []}
+  {hp = Queue.create () ; lp = Queue.create ()}
 
-let add_hp e ql = ql.hp <- e::ql.hp ; ql
-let add_lp e ql = ql.lp <- e::ql.lp ; ql
+let add_hp e ql = Queue.add e ql.hp ; ql
+let add_lp e ql = Queue.add e ql.lp ; ql
 
 let pop ql =
-  match ql.hp with
-    e::tl -> ql.hp <- tl ; e
-  | [] ->
-     begin
-       match ql.lp with
-         [] -> raise Empty
-       | e::tl -> ql.lp <- tl ; e
-     end
+  try Queue.pop ql.hp with
+    Queue.Empty ->
+    try
+      Queue.pop ql.lp
+    with
+      Queue.Empty -> raise Empty
 
 let fold f ql cont =
   let cont =
-    List.fold_left
+    Queue.fold
       (fun cont e ->
         f e cont
       ) cont ql.hp
   in
-  List.fold_left
+  Queue.fold
     (fun cont e ->
       f e cont
     ) cont ql.lp
@@ -33,4 +31,4 @@ let elements ql =
   List.rev (fold (fun e l -> e::l) ql [])
 
 let is_empty ql =
-   ql.hp = [] && ql.lp = []
+   Queue.is_empty ql.hp && Queue.is_empty ql.lp
