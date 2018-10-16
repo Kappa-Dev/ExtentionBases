@@ -372,7 +372,7 @@ module Make (Node:Node.NodeType) =
           in
           ()
       in
-      let _ = if db() then
+      let () = if db() then
                 begin
                   Printf.printf
                     "Queue: {%s}\n"
@@ -391,6 +391,18 @@ module Make (Node:Node.NodeType) =
                   flush stdout
                 end
       in
+      let () =
+        if safe () then
+          begin
+            (*beta : (int*arrows*arrows*arrows) Lib.IntMap.t ; alpha: (int*arrows) Lib.IntMap.t*)
+            Term.printf [Term.yellow] "Checking aliasing consistency...\n" ;
+            Lib.IntMap.iter
+              (fun _ (i,_,_,_) ->
+                if alias i inf_path = i then (assert true)
+                else (assert false)
+              ) inf_path.beta
+          end
+      in
       (************* DEBUGING INFO ***************)
 
       let subst i j set =
@@ -404,7 +416,11 @@ module Make (Node:Node.NodeType) =
              Some (i-1)
       in
       let add_alias i i' to_i' alpha =
-        if safe () then assert (not (mem i ext_base)) ;
+        if safe () then
+          begin
+            assert (alias i inf_path = i) ;
+            assert (not (mem i ext_base))
+          end ;
         let i',to_i' =
           try
             let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
@@ -429,7 +445,12 @@ module Make (Node:Node.NodeType) =
             else
               let to_oldp,to_newp = List.hd (oldp_to_i |/ newp_to_i)
               in
-              if safe() then assert (Cat.is_iso to_oldp && Cat.is_iso to_newp) ;
+              if safe() then
+                begin
+                  Term.printf [Term.yellow] "Checking that both midpoints (%d,%d) are isomorphic...\n" oldp newp ; flush stdout ;
+                  assert (Cat.is_iso to_oldp && Cat.is_iso to_newp) ;
+                  Term.printf [Term.yellow] "OK\n" ; flush stdout
+                end;
               if newp > oldp then
                 let new_to_old = to_oldp @@ (Cat.invert to_newp) in
                 add_alias newp oldp new_to_old inf_path.alpha,inf_path.beta
@@ -467,7 +488,12 @@ module Make (Node:Node.NodeType) =
         in
         let pi = find i ext_base in
         let is_complete =
-          Lib.IntSet.fold (fun j b -> if j<>k then Lib.Int2Set.mem (j,i) compared && b else b) pi.prev true
+          Lib.IntSet.fold
+            (fun j b ->
+              let j' = alias j inf_path in
+              if j' = j && j<>k then Lib.Int2Set.mem (j,i) compared && b
+              else b
+            ) pi.prev true
         in
         let inf,root_to_inf,inf_to_k,inf_to_w =
           try get_best_inf k inf_path
@@ -497,13 +523,13 @@ module Make (Node:Node.NodeType) =
           (*NB no todo list to update here*)
           | Below w_to_i -> (* w --w_to_i--> i *)
              if db() then print_string (blue ("below "^(string_of_int i)^"\n"));
-             let inf_path' =
+             (*let inf_path' =
                update_inf
                  i
                  (inf,root_to_inf,inf_to_i,inf_to_w)
                  inf_path
                  ext_base
-             in
+             in*)
              let dry_run' =
 	       ((fun w ext_base inf_path ->
                  (*no check and no aliasing necessary here*)
@@ -512,7 +538,7 @@ module Make (Node:Node.NodeType) =
                )::dry_run)
              in
              let compared' = Lib.Int2Set.add (k,i) compared in
-             (dry_run',compared',inf_path',queue,dec_step ext_base max_step, cut)
+             (dry_run',compared',inf_path,queue,dec_step ext_base max_step, cut)
 
           (************************** Case inf_to_i factors inf_to_w *******************)
           (*1. best_inf,_ = (root_to_i,id_i,i,i_to_w) +!> best_inf (i) *)
@@ -540,7 +566,7 @@ module Make (Node:Node.NodeType) =
                  inf_path
                  ext_base
              in
-             (*let queue' =
+             let queue' =
                if not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
                  queue
                else
@@ -548,11 +574,11 @@ module Make (Node:Node.NodeType) =
                    (fun j step_ij cont ->
                      QueueList.add_lp (i, step_ij, j) cont
                    ) pi.next queue
-             in*)
+             in
              let compared' = Lib.Int2Set.add (k,i) compared
              in
              (* OPTIM TO BE CHECKED *)
-             let queue' =
+             (*let queue' =
                if not is_complete then
                  queue
                else
@@ -565,6 +591,7 @@ module Make (Node:Node.NodeType) =
                         failwith (Printf.sprintf "point %d is not in the base!\n" i)
                    ).next queue
              in
+              *)
              (dry_run, compared' , inf_path' ,queue', dec_step ext_base max_step, subst i inf cut)
 
           (************************** Case inf_to_w =~= inf_to_i *************************)
@@ -624,39 +651,37 @@ module Make (Node:Node.NodeType) =
                in
                let dry_run' =
                  (fun w ext_base inf_path ->
-                   let skip_midpoint = (alias fresh_id inf_path) <> fresh_id in
+                   let mp = point (Cat.trg sh_info.to_midpoint) in
+                   let mp_id,iso = try Lib.IntMap.find fresh_id inf_path.alpha with Not_found -> (fresh_id,Cat.identity mp.value) in
+                   let to_mp_aliased = iso @@ sh_info.to_midpoint in
+                   let ######## TODO #########
                    let ext_base =
-                     if skip_midpoint then ext_base
+                     if mem mp_id ext_base then ext_base
                      else
-                       let mp = point (Cat.trg sh_info.to_midpoint) in
-                       let ext_base =
-                         add
-                           fresh_id
-                           mp
-                           (try sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path)
-                            with Cat.Undefined ->
-                              let str = Printf.sprintf "to_inf %d (%d) and inf_to_mp %d (%d) do not compose: \n %s <> %s "
-                                          inf (alias inf inf_path)
-                                          fresh_id (alias fresh_id inf_path)
-                                          (Cat.string_of_arrows ~full:true (find_extension_alpha inf ext_base inf_path))
-                                          (Cat.string_of_arrows ~full:true sh_info.to_midpoint)
-
-                              in
-                              failwith str
-                           )
-                           ext_base
-                       in
-                       add_step_alpha fresh_id i sh_info.to_base ext_base inf_path
+                       add
+                         mp_id
+                         mp
+                         (try sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path)
+                          with Cat.Undefined ->
+                            let str = Printf.sprintf "to_inf %d (%d) and inf_to_mp %d (%d) do not compose: \n %s <> %s "
+                                        inf (alias inf inf_path)
+                                        fresh_id (alias fresh_id inf_path)
+                                        (Cat.string_of_arrows ~full:true (find_extension_alpha inf ext_base inf_path))
+                                        (Cat.string_of_arrows ~full:true sh_info.to_midpoint)
+                            in
+                            failwith str
+                         )
+                         ext_base
+                   in
+                   let ext_base =
+                     add_step_alpha mp_id i sh_info.to_base ext_base inf_path
                    in
                    (*adding step from inf to midpoint or its alias
                      (in this case verify that inf is not already below the alias*)
                    let ext_base =
-                     (*if skip_midpoint && (is_below_alpha inf fresh_id ext_base inf_path)
-                       then ext_base
-                       else*)
                      add_step_alpha
                        inf
-                       fresh_id
+                       mp_id
                        sh_info.to_midpoint
                        ext_base
                        inf_path
