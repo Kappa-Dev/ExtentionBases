@@ -16,6 +16,7 @@ type command =
   | Shell of string * string array
   | Exit
   | Reset
+  | Blank
 
 let ws = skip_while (function ' ' -> true | _ -> false)
 let ws1 = take_while1 (function ' ' -> true | _ -> false)
@@ -70,6 +71,8 @@ let nodes = list_parser int_list_tuple
 
 let add = string "add" *> ws *> name >>| fun name_result -> Add name_result
 
+let blank = ws *> return Blank
+
 let add_named =
   string "add" *> ws *> nodes >>= fun nodes_result ->
   ws *> string "as" *> ws *> name >>| fun name_result ->
@@ -99,6 +102,8 @@ let line = choice
                                output legal_output ;
                                exit_p ;
                                shell ;
-                               reset])
+                               reset ;
+                               blank ;
+             ])
 
 let parse = parse_string line

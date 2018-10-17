@@ -8,6 +8,7 @@ module type InteractiveType =
     val simple_tests : unit -> unit
     val interactive : unit -> unit
     val process_command : t -> Parser.command -> t
+    val bench : string -> unit
   end
 
 module Make (Node:Node.NodeType) =
@@ -211,6 +212,7 @@ module Make (Node:Node.NodeType) =
          env
       | Parser.Exit -> log "exiting" ; exit 0
       | Parser.Reset -> empty
+      | Parser.Blank -> env
       | Parser.Shell (inst,args) ->
          let pid = Unix.fork () in
          if pid = 0 then Unix.execvp inst args
@@ -230,6 +232,20 @@ module Make (Node:Node.NodeType) =
               None
          in
          each_line file run_line env
+
+    let bench file =
+      let ic = open_in file in
+      let rec exec env =
+        let line = input_line ic in
+        match Parser.parse line with
+          Result.Ok command ->
+          exec (process_command env command)
+        | Result.Error s -> print_endline s ; close_in ic ; exit (-1)
+      in
+      try
+        exec empty
+      with
+        End_of_file -> close_in ic ; exit 0
 
     let interactive debug =
       let rec session env =

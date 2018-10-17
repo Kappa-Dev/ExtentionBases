@@ -3,7 +3,7 @@ module Make (Content:Lib.OrderedType) =
     module CMap = Map.Make(Content)
     module CSet = Set.Make(Content)
 
-    type t = I of CSet.t | B of (Content.t CMap.t) * (Content.t CMap.t)
+    type t = I of CSet.t | B of ((Content.t CMap.t) * (Content.t CMap.t))
 
     let domain = function
         I s -> s
@@ -22,6 +22,16 @@ module Make (Content:Lib.OrderedType) =
       | B (m,m') -> B (m',m)
 
     let identity clist = I (List.fold_left (fun set c -> CSet.add c set) CSet.empty clist)
+
+    let compose bij bij' =
+      match (bij,bij') with
+        (I _ , _) -> bij'
+      | (_ , I _) -> bij
+      | (B (m,_), B (m',_)) ->
+         B (CMap.fold (fun i j (map,comap) ->
+                let j' = CMap.find j m in
+                (CMap.add i j' map, CMap.add j' i comap)
+              ) m' (CMap.empty,CMap.empty))
 
     let is_equal f bij bij' =
       match (bij,bij') with

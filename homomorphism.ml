@@ -53,11 +53,15 @@ module Make (Node:Node.NodeType) =
       try
 	let hom' = add_sub u_i v_i hom
 	in
-	assert (
-	    match (try Some (NodeBij.find u hom.tot) with Not_found -> None) with
-	      None -> true
-	    | Some v' -> (Node.compare v v') = 0
-	  ) ;
+        let () =
+          if Lib.Util.safe () then
+	    assert (
+	        match (try Some (NodeBij.find u hom.tot) with Not_found -> None) with
+	          None -> true
+	        | Some v' -> (Node.compare v v') = 0
+	      )
+          else ()
+        in
 	{hom' with tot = NodeBij.add u v hom.tot}
       with
 	NodeBij.Not_bijective _ | IntBij.Not_bijective _ -> raise Not_injective
@@ -109,13 +113,16 @@ module Make (Node:Node.NodeType) =
       IntBij.to_string hom.sub
 
     (*[compose h h'] = (h o h') *)
-    let compose hom hom' =
+    let compose ?(check=true) hom hom' =
       try
-	fold (fun u v hom'' ->
-            add u
-              (try find v hom with Not_found -> Printf.printf "%s has no image by 2nd hom\n" (Node.to_string v) ; raise Not_found)
-              hom''
-          ) hom' empty
+        if check then
+	  fold (fun u v hom'' ->
+              add u
+                (try find v hom with Not_found -> Printf.printf "%s has no image by 2nd hom\n" (Node.to_string v) ; raise Not_found)
+                hom''
+            ) hom' empty
+        else
+          {tot = NodeBij.compose hom.tot hom'.tot ; sub = IntBij.compose hom.sub hom'.sub}
       with
 	Not_found -> raise Not_injective
 

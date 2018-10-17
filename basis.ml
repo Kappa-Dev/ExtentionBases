@@ -5,7 +5,7 @@ module Make (Node:Node.NodeType) =
     module Term = ANSITerminal
 
     let (-->) = Cat.(-->)
-    let (@@) = Cat.(@@)
+    let (@@) = Cat.compose ~check:true
     let (|/) = Cat.(|/)
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
@@ -571,26 +571,11 @@ module Make (Node:Node.NodeType) =
                else
                  Lib.IntMap.fold
                    (fun j step_ij cont ->
-                     QueueList.add_lp (i, step_ij, j) cont
+                     QueueList.add_hp (i, step_ij, j) cont (*trying to find iso first*)
                    ) pi.next queue
              in
              let compared' = Lib.Int2Set.add (k,i) compared
              in
-             (* OPTIM TO BE CHECKED *)
-             (*let queue' =
-               if not is_complete then
-                 queue
-               else
-                 Lib.IntMap.fold
-                   (fun j step_ij cont ->
-                     if db() then Term.printf [] "Pushing %d |-> %d at the top of the queue \n" i j ;
-                     QueueList.add_hp (i,step_ij,j) cont
-                   ) (try find i ext_base with
-                        Not_found ->
-                        failwith (Printf.sprintf "point %d is not in the base!\n" i)
-                   ).next queue
-             in
-              *)
              (dry_run, compared' , inf_path' ,queue', dec_step ext_base max_step, subst i inf cut)
 
           (************************** Case inf_to_w =~= inf_to_i *************************)

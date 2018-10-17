@@ -42,7 +42,7 @@ module type Category =
     (*val compare : arrows -> arrows -> int*)
 
     (**Operators*)
-    val (@@) : arrows -> arrows -> arrows
+    val compose : ?check:bool -> arrows -> arrows -> arrows
     (*val (/|) : arrows -> arrows -> (arrows * tile) list*)
     val (|/) : arrows -> arrows -> (arrows * arrows) list
     (*val (===) : arrows -> arrows -> bool*)
@@ -312,14 +312,14 @@ module Make (Node:Node.NodeType) =
     let identity _G _H =
       {src = _G ; trg = _H ; maps = [Hom.identity (Graph.nodes _G)] ; partial = false}
 
-    let compose f f' =
+    let compose ?(check=true) f f' =
       if safe() then assert (flat f && flat f') ;
       let hom = List.hd f.maps in
       let hom' = List.hd f'.maps in
       try
         {src = f'.src ;
          trg = f.trg ;
-         maps = [Hom.compose hom hom'];
+         maps = [Hom.compose ~check:check hom hom'];
          partial = f.partial || f'.partial
         }
       with

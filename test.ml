@@ -50,15 +50,8 @@ let test shape debug mode =
 let () =
   ignore (LNoise.history_load histfile);
   if Array.length Sys.argv > 1 then
-    (if Sys.argv.(1) = "auto" then
-       test Kappa false SimpleT
-     else if Sys.argv.(1) = "interactive" then
-       interactive None
-     else if Sys.argv.(1) = "load" then
-       (if Array.length Sys.argv > 3 then
-          load (shape_matcher Sys.argv.(2)) Sys.argv.(3)
-        else log "You must specify a shape(kappa|simple|degree) and a file")
-    )
+    let file = Sys.argv.(1) in
+    Kappa.bench file
   else
     let shape = ask_shape () in
     let debug = ask_until "Debug mode y/n (n)? > "
