@@ -532,7 +532,6 @@ module Make (Node:Node.NodeType) =
              in*)
              let dry_run' =
 	       ((fun w ext_base inf_path ->
-                 (*no check and no aliasing necessary here*)
                  let ext_base = add_step_alpha inf w inf_to_w ext_base inf_path in
                  add_step_alpha w i w_to_i ext_base inf_path
                )::dry_run)
@@ -651,40 +650,31 @@ module Make (Node:Node.NodeType) =
                in
                let dry_run' =
                  (fun w ext_base inf_path ->
-                   let mp = point (Cat.trg sh_info.to_midpoint) in
-                   let mp_id,iso = try Lib.IntMap.find fresh_id inf_path.alpha with Not_found -> (fresh_id,Cat.identity mp.value) in
-                   let to_mp_aliased = iso @@ sh_info.to_midpoint in
-                   let ######## TODO #########
+                   let mp_id,iso_mp =  (* fresh_id ---iso_mp--> mp_id *)
+                     try Lib.IntMap.find fresh_id inf_path.alpha
+                     with Not_found -> (fresh_id,Cat.identity (Cat.trg sh_info.to_midpoint)  (Cat.trg sh_info.to_midpoint))
+                   in
+                   let mp = point (Cat.trg iso_mp) in
+                   let inf_id,iso_inf = (* inf ---iso_inf--> inf_id *)
+                     try Lib.IntMap.find inf inf_path.alpha
+                     with Not_found ->
+                       (inf, Cat.identity (Cat.src sh_info.to_midpoint)  (Cat.src sh_info.to_midpoint))
+                   in
+                   let inf_to_mp = iso_mp @@ (sh_info.to_midpoint @@ (Cat.invert iso_inf)) in (*inf_to_mp: inf_id |--> mp_id*)
+                   let mp_to_base = sh_info.to_base @@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
+                   let ext_to_mp = inf_to_mp @@ (find_extension inf_id ext_base) in (*ext_to_mp: root |--> mp_id *)
+
+                   (*adding root --*--> mp_id in the extension base *)
                    let ext_base =
                      if mem mp_id ext_base then ext_base
                      else
-                       add
-                         mp_id
-                         mp
-                         (try sh_info.to_midpoint @@ (find_extension_alpha inf ext_base inf_path)
-                          with Cat.Undefined ->
-                            let str = Printf.sprintf "to_inf %d (%d) and inf_to_mp %d (%d) do not compose: \n %s <> %s "
-                                        inf (alias inf inf_path)
-                                        fresh_id (alias fresh_id inf_path)
-                                        (Cat.string_of_arrows ~full:true (find_extension_alpha inf ext_base inf_path))
-                                        (Cat.string_of_arrows ~full:true sh_info.to_midpoint)
-                            in
-                            failwith str
-                         )
-                         ext_base
+                       add mp_id mp ext_to_mp ext_base
                    in
-                   let ext_base =
-                     add_step_alpha mp_id i sh_info.to_base ext_base inf_path
+                   let ext_base = add_step mp_id i mp_to_base ext_base
                    in
                    (*adding step from inf to midpoint or its alias
                      (in this case verify that inf is not already below the alias*)
-                   let ext_base =
-                     add_step_alpha
-                       inf
-                       mp_id
-                       sh_info.to_midpoint
-                       ext_base
-                       inf_path
+                   let ext_base = add_step inf_id mp_id inf_to_mp ext_base
                    in
 		   if sh_info.has_sup then ext_base else add_conflict i w ext_base
                  )::dry_run
