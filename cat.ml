@@ -43,6 +43,7 @@ module type Category =
 
     (**Operators*)
     val compose : ?check:bool -> arrows -> arrows -> arrows
+    val aliasing : arrows -> arrows -> arrows
     (*val (/|) : arrows -> arrows -> (arrows * tile) list*)
     val (|/) : arrows -> arrows -> (arrows * arrows) list
     (*val (===) : arrows -> arrows -> bool*)
@@ -395,13 +396,8 @@ module Make (Node:Node.NodeType) =
 	  {src = src ; trg = trg ; maps = [hom]; partial = false}::emb_list
 	) [] f.maps
 
-    let (@@) = compose
+    let (@@) = compose ~check:true
 
-(*    let is_iso f =
-      if safe() then assert (flat f) ;
-      let trg = List.hd (f.src --> f) in
-      Graph.is_equal trg f.trg
-*)
     let is_iso f =
       not f.partial && (Graph.size_edge f.trg) = (Graph.size_edge f.src)
 
@@ -411,10 +407,8 @@ module Make (Node:Node.NodeType) =
                 maps = List.map Hom.invert f.maps ;
                 partial = false}
       in
-      try
-        let _ = co_domains f' in
-        f'
-      with Not_found -> {f' with partial = true}
+      {f' with partial = Graph.size_node f'.src > Graph.size_node f'.trg}
+
 
     let arrows_of_tile tile =
       match tile.cospan with
@@ -615,6 +609,13 @@ module Make (Node:Node.NodeType) =
       match f.maps with
         [hom] -> hom
       | _ -> failwith "Invariant violation, not a flat embedding"
+
+    let aliasing f g =
+      if safe() then assert (is_cospan (f,g)) ;
+      let hom = hom_of_arrows f in
+      let hom' = hom_of_arrows g in
+      let iso = Hom.compose (Hom.invert hom') hom in
+      {src = f.src ; trg = g.src ; maps = [iso] ; partial = false}
 
     let (|/) left_to_sup right_to_sup =
       List.fold_left

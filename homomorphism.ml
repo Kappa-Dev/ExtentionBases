@@ -1,5 +1,6 @@
 module Make (Node:Node.NodeType) =
   struct
+    module Term = ANSITerminal
     module NodeBij = Bijection.Make (Node)
     module IntBij =
       Bijection.Make (struct type t = int let compare = compare let to_string = string_of_int end)
@@ -114,17 +115,21 @@ module Make (Node:Node.NodeType) =
 
     (*[compose h h'] = (h o h') *)
     let compose ?(check=true) hom hom' =
-      try
-        if check then
+      let comp_bij () =
+        try
 	  fold (fun u v hom'' ->
               add u
                 (try find v hom with Not_found -> Printf.printf "%s has no image by 2nd hom\n" (Node.to_string v) ; raise Not_found)
                 hom''
             ) hom' empty
+        with
+	  Not_found -> raise Not_injective
+      in
+      if check then comp_bij ()
+      else
+        if is_identity hom then hom'
         else
-          {tot = NodeBij.compose hom.tot hom'.tot ; sub = IntBij.compose hom.sub hom'.sub}
-      with
-	Not_found -> raise Not_injective
+            comp_bij ()
 
     let sum hom hom' = fold (fun u v hom_sum -> add u v hom_sum) hom hom'
 

@@ -23,16 +23,6 @@ module Make (Content:Lib.OrderedType) =
 
     let identity clist = I (List.fold_left (fun set c -> CSet.add c set) CSet.empty clist)
 
-    let compose bij bij' =
-      match (bij,bij') with
-        (I _ , _) -> bij'
-      | (_ , I _) -> bij
-      | (B (m,_), B (m',_)) ->
-         B (CMap.fold (fun i j (map,comap) ->
-                let j' = CMap.find j m in
-                (CMap.add i j' map, CMap.add j' i comap)
-              ) m' (CMap.empty,CMap.empty))
-
     let is_equal f bij bij' =
       match (bij,bij') with
 	(I s, I s') -> CSet.equal s s'
@@ -54,6 +44,7 @@ module Make (Content:Lib.OrderedType) =
     let fold f = function
       	I dom -> CSet.fold (fun i cont -> f i i cont) dom
       | B (map,_) -> CMap.fold (fun i j cont -> f i j cont) map
+
 
     let mem i = function
 	I dom -> CSet.mem i dom

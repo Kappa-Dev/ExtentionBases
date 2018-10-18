@@ -1,1 +1,2 @@
-OCAML_LANDMARKS=format=json,output=prof.json,allocation ./test.native
+OCAML_LANDMARKS=format=json,output=prof.json,allocation ./test.native bench
+
