@@ -93,7 +93,7 @@ module.exports = [ // the stylesheet for the graph
     selector: 'node[outer].hoverLong',
     style: {
       'background-color': outer.background.hover,
-      'background-opacity': 0.2,
+      'background-opacity': 0.4,
     }
   },
   {

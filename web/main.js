@@ -224,7 +224,26 @@ let init = (cyd_basis,cyd_graphs) => {
     return c.union(graph.filteredPredecessors(node, '[^conflict]'));
   }
 
-  let actives = cy_basis.collection();
+  let actives = cy_basis.filter('*'); // full collection
+
+  window.getHoverLongs = () => { return cy_basis.filter('node.hoverLong')} ;
+
+  window.updateActives = () => {
+    let hoverLongs = getHoverLongs();
+    cy_basis.batch( () => {
+      actives.removeClass('activeCCLong');
+      if (hoverLongs.empty()) {
+        actives = cy_basis.collection(); // empty collection
+      } else {
+        actives = cy_basis.filter('*');
+        hoverLongs.forEach( e => {
+          actives = actives.intersection(activationZone(e))
+        });
+      }
+      actives.addClass('activeCCLong');
+    });
+  };
+
 
   cy_basis.filter('node[outer]').on('mouseover', evt => {
     evt.target.addClass('hover');
@@ -237,23 +256,17 @@ let init = (cyd_basis,cyd_graphs) => {
   });
 
   cy_basis.filter('node[outer]').on('tap', evt => {
-    actives.removeClass('activeCCLong');
-    actives.removeClass('hoverLong');
-    actives = activationZone(evt.target);
-    actives.addClass('activeCCLong');
-    evt.target.addClass('hoverLong');
+    evt.target.toggleClass('hoverLong');
+    updateActives();
   });
 
-  cy_basis.on('tap', evt => {
-    if (evt.target == cy_basis) {
-      actives.removeClass('activeCCLong');
-      actives.removeClass('hoverLong');
-      actives = cy_basis.collection();
-    }
-  });
 };
 
 document.addEventListener('keypress', e => {
+  if (e.key === 'x') {
+    getHoverLongs().removeClass('hoverLong');
+    updateActives();
+  }
   if (e.key === 'c') {
     toggleConflict(cy_basis.filter('[conflict]'));
   }
