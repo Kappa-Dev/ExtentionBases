@@ -15,13 +15,19 @@ let clear = () => {
   }
 }
 
-
 let getConflict = () => localStorage.getItem('show_conflict')
 let setConflict = (col,b) => {
   col.toggleClass('visible',b);
   localStorage.setItem('show_conflict',b);
 }
 let toggleConflict = col => setConflict(col, getConflict() === "false")
+
+let getHideMaps = () => localStorage.getItem('hide_maps')
+let setHideMaps = (col,b) => {
+  col.toggleClass('defaultHide',b),
+  localStorage.setItem('hide_maps',b);
+}
+let toggleHideMaps = col => setHideMaps(col, getHideMaps() === "false")
 
 // websocket callback
 let websocket_callback = (type,content) => {
@@ -202,6 +208,10 @@ let init = (cyd_basis,cyd_graphs) => {
     setConflict(conflicts,true);
   }
 
+  if (getHideMaps() === null || getHideMaps() === "false") {
+    setHideMaps(cy_basis.filter('[outer][^conflict]'),false);
+  }
+
   // Interactivity
   cy_basis.filter('edge[outer]').on('mouseover', evt => evt.target.addClass('hover'));
 
@@ -249,6 +259,9 @@ document.addEventListener('keypress', e => {
   }
   if (e.key === 'r') {
     cy_basis.fit();
+  }
+  if (e.key === 'm') {
+    toggleHideMaps(cy_basis.filter('[outer][^conflict]'));
   }
   if (e.key === 'p') {
     let screenlink = document.getElementById('screenlink');
