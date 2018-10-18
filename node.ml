@@ -293,8 +293,7 @@ module KappaNode =
       let gluable u v = (*same id, same label and different ports*)
         (id u = id v) && (u.label = v.label) && (u.port_id <> v.port_id)
 
-      let compare u v =
-        Pervasives.compare (u.ag_id,u.port_id,u.label) (v.ag_id,v.port_id,v.label)
+      let compare u v = Pervasives.compare u v
 
       let create l =
 	match l with
