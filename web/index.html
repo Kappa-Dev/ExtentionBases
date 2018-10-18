@@ -42,7 +42,7 @@
 .help:not(.idle) {
   opacity: 1;
 }
-.help :first-child {
+.help > :first-child {
   text-align: center;
 }
 .help:not(.idle) :first-child {
@@ -61,6 +61,13 @@
   visibility: hidden;
 }
 
+b.legend {
+  display: inline-block;
+  width: 1em;
+  text-align:right;
+  margin-right: .4em;
+}
+
 </style>
   </head>
   <body>
@@ -74,11 +81,11 @@
     <div class="help idle">
       <div>HELP</div>
       <div class="end"><b>Tap node to keep highlight</b></div>
-      <div><b>x</b>&nbsp;clear highlights</div>
-      <div><b>m</b>&nbsp;hide maps by default</div>
-      <div><b>c</b>&nbsp;toggle conflict</div>
-      <div><b>r</b>&nbsp;reset zoom</div>
-      <div><b>p</b>&nbsp;save picture <a download="basis.png" id="screenlink">[download]</a></div>
+      <div><b class="legend">x</b>&nbsp;clear highlights</div>
+      <div><b class="legend">m</b>&nbsp;hide maps by default</div>
+      <div><b class="legend">c</b>&nbsp;toggle conflict</div>
+      <div><b class="legend">r</b>&nbsp;reset zoom</div>
+      <div><b class="legend">p</b>&nbsp;save picture <a download="basis.png" id="screenlink">[download]</a></div>
     </div>
   </body>
 </html>
