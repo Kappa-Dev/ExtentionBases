@@ -15,7 +15,7 @@ const outer = {
     },
     line: {
       idle: '#1a8416',
-      active: '#0e540b',
+      active: '#0a3007',
       hover: '#27db20'
     },
     arrow: {
@@ -129,6 +129,12 @@ module.exports = [ // the stylesheet for the graph
 
   },
   {
+    selector: "edge[outer].defaultHide",
+    style: {
+      'visibility': 'hidden'
+    }
+  },
+  {
     selector: "edge[outer][conflict].activeCC.visible, edge[outer][conflict].activeCCLong.visible",
     style: {
       'visibility': 'visible'
@@ -139,7 +145,7 @@ module.exports = [ // the stylesheet for the graph
     style: {
       opacity: 0.9,
       width: 7,
-      color: outer.edge.line.hover,
+      'line-color': outer.edge.line.hover,
     }
   },
   {
@@ -147,12 +153,13 @@ module.exports = [ // the stylesheet for the graph
     style: {
       opacity: 0.9,
       width: 7,
-      color: outer.edge.conflict.line.hover,
+      'line-color': outer.edge.conflict.line.hover,
     }
   },
   {
     selector: 'edge[outer].activeCC, edge[outer].activeCCLong',
     style: {
+      'visibility': 'visible',
       opacity: 0.8,
       width: 7,
     }
@@ -160,8 +167,9 @@ module.exports = [ // the stylesheet for the graph
   {
     selector: 'edge[outer].activeCC',
     style: {
+      'visibility': 'visible',
       opacity: 1,
-      color: outer.edge.line.active,
+      'line-color': outer.edge.line.active,
       width: 7,
     }
   },
