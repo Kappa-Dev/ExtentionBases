@@ -53,14 +53,8 @@ let () =
     let file = Sys.argv.(1) in
     Kappa.bench file
   else
-    let shape = ask_shape () in
-    let debug = ask_until "Debug mode y/n (n)? > "
-        (function "y" -> Some true
-                | _ -> Some false
-        )
+    let shape = Kappa in
+    let debug = false
     in
-    let mode = ask_until "Interactive or Simple (i/s)? (i) > "
-        (function "s" -> Some SimpleT
-                | _ -> Some Interactive
-        )
+    let mode = Interactive
     in test shape debug mode
