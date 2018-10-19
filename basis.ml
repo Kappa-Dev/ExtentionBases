@@ -6,8 +6,6 @@ module Make (Node:Node.NodeType) =
 
     let (-->) = Cat.(-->)
     let (@@) = Cat.compose ~check:false
-    let (@@@) = Cat.compose ~check:false
-    let (|/) = Cat.(|/)
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
 
@@ -335,8 +333,8 @@ module Make (Node:Node.NodeType) =
       let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
       let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij)) in
       if safe() then assert (Cat.is_iso to_i') ;
-      let f = a_ij @@@ (Cat.invert to_i') in
-      let g = to_j' @@@ f in
+      let f = a_ij @@ (Cat.invert to_i') in
+      let g = to_j' @@ f in
       add_step i' j' g ext_base
 
     let find_extension_alpha i ext_base inf_path =
@@ -412,13 +410,13 @@ module Make (Node:Node.NodeType) =
           end ;
         let i',to_i' =
           try
-            let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@@ to_i')
+            let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
           with Not_found -> (i',to_i')
         in
         let alpha =
           Lib.IntMap.fold
             (fun j (j',to_j') alpha ->
-              if j'=i then Lib.IntMap.add j (i', to_i' @@@ to_j') alpha
+              if j'=i then Lib.IntMap.add j (i', to_i' @@ to_j') alpha
               else
                 alpha
             ) alpha alpha
@@ -433,17 +431,6 @@ module Make (Node:Node.NodeType) =
             if newp = oldp then inf_path.alpha,inf_path.beta
             else
               let iso_old_to_new = Cat.aliasing oldp_to_i newp_to_i in
-              let () =
-                if safe() then
-                  let to_oldp,to_newp = List.hd (oldp_to_i |/ newp_to_i)
-                  in
-                  if ( Cat.(=~=) (to_newp@@(Cat.invert to_oldp)) iso_old_to_new) then assert true
-                  else
-                    (Term.printf [Term.red] "Aliasing %s and %s produced %s\n"
-                       (Cat.string_of_arrows ~full:true oldp_to_i)
-                       (Cat.string_of_arrows ~full:true newp_to_i)
-                       (Cat.string_of_arrows ~full:true  iso_old_to_new) ; flush stdout ; assert false)
-              in
               if safe() then
                 begin
                   Term.printf [Term.yellow] "Checking that both midpoints (%d,%d) are isomorphic...\n" oldp newp ; flush stdout ;
@@ -451,7 +438,7 @@ module Make (Node:Node.NodeType) =
                   Term.printf [Term.yellow] "OK\n" ; flush stdout
                 end;
               if newp > oldp then
-                (*let new_to_old = to_oldp @@@ (Cat.invert to_newp) in*)
+                (*let new_to_old = to_oldp @@ (Cat.invert to_newp) in*)
                 add_alias newp oldp (Cat.invert iso_old_to_new) inf_path.alpha,inf_path.beta
               else
                 add_alias oldp newp iso_old_to_new inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
@@ -469,7 +456,7 @@ module Make (Node:Node.NodeType) =
         try
           let inf',to_inf' = Lib.IntMap.find inf ip.alpha in
           let from_inf' = Cat.invert to_inf' in
-          (inf', to_inf' @@@ root_to_inf, inf_to_k @@@ from_inf', inf_to_w @@@ from_inf')
+          (inf', to_inf' @@ root_to_inf, inf_to_k @@ from_inf', inf_to_w @@ from_inf')
         with
           Not_found -> (inf,root_to_inf,inf_to_k,inf_to_w)
       in
@@ -482,7 +469,7 @@ module Make (Node:Node.NodeType) =
           if safe() then assert (alias k inf_path = k) ;
           try
             let i',to_i' = Lib.IntMap.find i inf_path.alpha in
-            (k, to_i' @@@ step_ki, i')
+            (k, to_i' @@ step_ki, i')
           with Not_found -> (k,step_ki,i)
         in
         let pi = find i ext_base in
@@ -499,7 +486,7 @@ module Make (Node:Node.NodeType) =
         let () = if safe() then assert (alias inf inf_path = inf) in
 
         let dry_run',compared',inf_path',queue',max_step',cut'=
-          let inf_to_i = step_ki @@@ inf_to_k in
+          let inf_to_i = step_ki @@ inf_to_k in
           let () = if db() then (
                      Printf.printf "Visiting (%d -*-> %d |-> %d )\n" inf k i ;
                      flush stdout )
@@ -545,7 +532,7 @@ module Make (Node:Node.NodeType) =
              let g_i = Cat.src i_to_w in
              let inf_path' =
                update_inf i
-                 (i, inf_to_i @@@ root_to_inf, Cat.identity g_i g_i, i_to_w)
+                 (i, inf_to_i @@ root_to_inf, Cat.identity g_i g_i, i_to_w)
                  inf_path
                  ext_base
              in
@@ -613,7 +600,7 @@ module Make (Node:Node.NodeType) =
                let fresh_id = get_fresh ext_base in
                let inf_path' =
                  update_inf i
-                   (fresh_id,sh_info.to_midpoint @@@ root_to_inf,sh_info.to_base,sh_info.to_w)
+                   (fresh_id,sh_info.to_midpoint @@ root_to_inf,sh_info.to_base,sh_info.to_w)
                    inf_path
                    ext_base
                in
@@ -629,9 +616,9 @@ module Make (Node:Node.NodeType) =
                      with Not_found ->
                        (inf, Cat.identity (Cat.src sh_info.to_midpoint)  (Cat.src sh_info.to_midpoint))
                    in
-                   let inf_to_mp = iso_mp @@@ (sh_info.to_midpoint @@@ (Cat.invert iso_inf)) in (*inf_to_mp: inf_id |--> mp_id*)
-                   let mp_to_base = sh_info.to_base @@@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
-                   let ext_to_mp = inf_to_mp @@@ (find_extension inf_id ext_base) in (*ext_to_mp: root |--> mp_id *)
+                   let inf_to_mp = iso_mp @@ (sh_info.to_midpoint @@ (Cat.invert iso_inf)) in (*inf_to_mp: inf_id |--> mp_id*)
+                   let mp_to_base = sh_info.to_base @@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
+                   let ext_to_mp = inf_to_mp @@ (find_extension inf_id ext_base) in (*ext_to_mp: root |--> mp_id *)
 
                    (*adding root --*--> mp_id in the extension base *)
                    let ext_base =
@@ -716,7 +703,7 @@ module Make (Node:Node.NodeType) =
         in
         ext_base
       with
-        Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@@ obs_emb) obs_id ext_base
+        Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
 
 
     let of_sharings tiles_l =
@@ -737,8 +724,8 @@ module Make (Node:Node.NodeType) =
              let left = point (Cat.trg inf_to_left) in
              let right = point (Cat.trg inf_to_right) in
              let ext_base = add i inf root_to_inf ext_base in
-             let ext_base = if mem l ext_base then ext_base else add l left (inf_to_left @@@ root_to_inf) ext_base in
-             let ext_base = if mem r ext_base then ext_base else add r right (inf_to_right @@@ root_to_inf) ext_base in
+             let ext_base = if mem l ext_base then ext_base else add l left (inf_to_left @@ root_to_inf) ext_base in
+             let ext_base = if mem r ext_base then ext_base else add r right (inf_to_right @@ root_to_inf) ext_base in
              let ext_base = if conflict then add_conflict l r ext_base else ext_base in
              let ext_base = add_step z i root_to_inf
                               (add_step i l inf_to_left
@@ -749,7 +736,7 @@ module Make (Node:Node.NodeType) =
              | Some (left_to_sup,right_to_sup) ->
                 let s = get_fresh ext_base in
                 let sup = point (Cat.trg left_to_sup) in
-                let ext_base = add s sup ((Cat.arrows_of_tile tile) @@@ root_to_inf) ext_base in
+                let ext_base = add s sup ((Cat.arrows_of_tile tile) @@ root_to_inf) ext_base in
                 add_step l s left_to_sup (add_step r s right_to_sup ext_base)
            in
            iter_convert z l r tiles' ext_base

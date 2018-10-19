@@ -25,6 +25,9 @@ module Dict =
 module Util =
   struct
     let histfile = "./session_history"
+    let hi2str = function
+      | None -> ""
+      | Some i -> "highlight = "^(string_of_int i)
 
     let digits x =
       let r = ref x in

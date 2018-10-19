@@ -274,5 +274,5 @@ module Make (Node:Node.NodeType) =
   end:InteractiveType)
 
 module SPrompt = Make (Node.SimpleNode)
-module KPrompt = Make (Node.KappaNode)
-module DPrompt = Make (Node.DegreeNode)
+module KPrompt = Make (PortNode.KappaNode01)
+module DPrompt = Make (PortNode.DegreeNode)
