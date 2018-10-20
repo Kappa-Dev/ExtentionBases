@@ -1,12 +1,15 @@
 module type SymT =
   sig
     val compatible : int -> int -> int -> int -> bool
+    val info : string
   end
 
 module Make (Symmetry:SymT) =
   (struct
     type t = {ag_id : int ; port_id : int ; label : int}
     let arity = 2
+
+    let info = Symmetry.info
 
     let id u = u.ag_id
     let rename i u = {u with ag_id = i}
@@ -109,7 +112,7 @@ module Make (Symmetry:SymT) =
 
 
 module KappaNode =
-  Make (struct let compatible = fun l p l' p' -> l=l' && p=p' end)
+  Make (struct let compatible = fun l p l' p' -> l=l' && p=p' let info = "Kappa Graphs" end)
 
 module KappaNode01 = (*ports 0 and 1 of all agents are equivalent*)
   Make
@@ -118,8 +121,9 @@ module KappaNode01 = (*ports 0 and 1 of all agents are equivalent*)
         l=l' &&
           if p = 0 || p=1 then p'=0 || p'=1
           else p=p'
+      let info = "Kappa Graphs (0~1)"
     end)
 
 (*all ports of the same agents are equivalent!*)
 module DegreeNode =
-  Make (struct let compatible = fun l _ l' _ -> (l=l') end)
+  Make (struct let compatible = fun l _ l' _ -> (l=l') let info = "Port Graphs" end)

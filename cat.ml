@@ -30,7 +30,7 @@ module type Category =
 
 
    (* val share : arrows -> arrows -> (arrows * tile) list*)
-    val share_new : arrows -> arrows -> (arrows * arrows * arrows)
+    val share : arrows -> arrows -> (arrows * arrows * arrows)
 
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
@@ -451,9 +451,12 @@ module Make (Node:Node.NodeType) =
 
     let aliasing f g =
       if safe() then assert (is_cospan (f,g)) ;
+      if db() then
+        Printf.printf "Building iso from cospan: \n <%s,%s>\n" (string_of_arrows ~full:true f) (string_of_arrows ~full:true g) ;
       let hom = hom_of_arrows f in
-      let hom' = hom_of_arrows g in
-      let iso = Hom.compose (Hom.invert hom') hom in
+      let hom' = Hom.invert (hom_of_arrows g) in
+      if db() then Term.printf [Term.yellow] "Composing (%s o %s)" (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom) ;
+      let iso = Hom.compose hom' hom in
       {src = f.src ; trg = g.src ; maps = [iso] ; partial = false}
 
     let (|/) left_to_sup right_to_sup =
@@ -590,7 +593,7 @@ module Make (Node:Node.NodeType) =
 
     exception Throw of Hom.t option
 
-    let share_new f g =
+    let share f g =
       (*Printf.printf "Building extensions for <-%s-.-%s->\n"
         (string_of_arrows f)
         (string_of_arrows g);

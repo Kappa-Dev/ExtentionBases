@@ -61,8 +61,9 @@ module Make (Node:Node.NodeType) =
       let o2_to_w = one =~=> dsquare in
       List.iter (fun o2_o8 ->
           List.iter (fun o2_w ->
-              let inf_to_mp,mp_to_base,mp_to_w = Cat.share_new o2_o8 o2_w in
-              Printf.printf "%s \n %s \n %s \n" (Cat.string_of_span (o2_o8,o2_w)) (Cat.string_of_arrows inf_to_mp) (Cat.string_of_span (mp_to_base,mp_to_w))
+              let inf_to_mp,mp_to_base,mp_to_w = Cat.share o2_o8 o2_w in
+              Printf.printf "%s \n %s \n %s \n" (Cat.string_of_span (o2_o8,o2_w))
+                (Cat.string_of_arrows inf_to_mp) (Cat.string_of_span (mp_to_base,mp_to_w))
             ) o2_to_w
         ) o2_to_o8
 
@@ -253,7 +254,7 @@ module Make (Node:Node.NodeType) =
         let prompt () =
           let db_str = if db() then "db" else "" in
           let safe_str = if safe() then "!" else "" in
-          Printf.sprintf "%s%s> " db_str safe_str
+          Printf.sprintf "(%s)%s%s> " Node.info db_str safe_str
         in
         (match (LNoise.linenoise (prompt ())) with
          | None ->
@@ -266,7 +267,12 @@ module Make (Node:Node.NodeType) =
              | Result.Ok command ->
                 if db() then session (process_command env command)
                 else
-                  (try session (process_command env command) with exn -> if db() then raise exn else log (Printexc.to_string exn) ; session env)
+                  (try
+                     session (process_command env command)
+                   with
+                     Change_shape _ as exn -> raise exn
+                   | exn ->
+                      if db() then raise exn else log (Printexc.to_string exn) ; session env)
              | Result.Error s -> log ("Parse error "^s); session env);
         )
       in

@@ -17,13 +17,19 @@ let shape_matcher = function
   | "degree" -> Some Degree
   | _ -> Some Kappa
 
+let string_of_shape = function
+    Simple -> "simple graphs"
+  | Degree -> "Port graph"
+  | Kappa -> "Kappa graph"
+
 let ask_shape () = ask_until "[kappa|simple|degree] (kappa) " shape_matcher
 
 let rec interactive maybe_shape =
   let shape = match maybe_shape with
     | Some shape -> shape
-    | None -> ask_shape () in
-  log "entering interactive extension base builder."; log "" ;
+    | None -> ask_shape ()
+  in
+  log (Printf.sprintf "entering interactive extension base builder (%s)." (string_of_shape shape)); log "" ;
   try
     match shape with
     | Simple -> Simple.interactive ()

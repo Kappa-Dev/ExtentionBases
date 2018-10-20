@@ -4,6 +4,7 @@ module type NodeType =
   sig
     type t
     val id : t -> int
+    val info : string
     val arity : int
     val compare : t -> t -> int
     val create : int list -> t
@@ -23,6 +24,7 @@ module type NodeType =
 module SimpleNode =
   (struct
       type t = int
+      let info = "Simple Graphs"
       let arity = 0
       let rename i u = i
       let id u = u
