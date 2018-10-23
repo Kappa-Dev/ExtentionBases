@@ -111,6 +111,8 @@ module Make (Node:Node.NodeType) =
               in
               Model.witnesses_of_rule ~obs:obs_id (lg,rg) env.model
          in
+         let n = List.length pw in
+         Term.printf [] "%d witnesses found for observable %s!\n" n ( (function Some o -> o | None -> "") obs_name) ;
          let eb_pos,eb_neg =
            match env.eb with
              None ->
@@ -123,7 +125,6 @@ module Make (Node:Node.NodeType) =
            | Some basis -> basis
          in
          Term.printf [Term.Bold; Term.blue] "Building positive extension base...\n" ;
-         let n = List.length pw in
          let _,pos_ext_base =
            try
              List.fold_left

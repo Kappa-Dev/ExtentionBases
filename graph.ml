@@ -63,6 +63,7 @@ module Make (Node:Node.NodeType) =
     type t =
       {nodes : NodeSet.t ;
        edges : (Node.t list) NodeMap.t ;
+       macro_lnk : (int list) Lib.IntMap.t ;
        idmap : (Node.t list) Lib.IntMap.t ;
        size : int ;
        coherent : bool
@@ -76,6 +77,7 @@ module Make (Node:Node.NodeType) =
                  edges = NodeMap.empty ;
                  idmap = Lib.IntMap.empty ;
                  size = 0 ;
+                 macro_lnk = Lib.IntMap.empty ;
                  coherent = true}
 
     let is_empty g = g.size = 0
@@ -247,6 +249,7 @@ module Make (Node:Node.NodeType) =
        edges = edges ;
        size = size ;
        idmap = if nodes = [] then Lib.IntMap.remove (Node.id u) g.idmap else Lib.IntMap.add (Node.id u) nodes g.idmap;
+       macro_lnk = Lib.IntMap.empty ; (*POUR QUE CA COMPILE*)
        coherent = g.coherent}
 
     (*TODO: maintain max_id when adding a new node to the graph*)

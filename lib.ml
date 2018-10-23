@@ -29,6 +29,11 @@ module Util =
       | None -> ""
       | Some i -> "highlight = "^(string_of_int i)
 
+    let cmp i j =
+      if i=j then 0
+      else if i<j then -1
+      else 1
+
     let digits x =
       let r = ref x in
       let d = ref 0 in
@@ -38,7 +43,7 @@ module Util =
       done ;
       !d
 
-    let log s = print_endline s
+    let log s = print_endline s ; flush stdout
     let db_mode = ref false
     let safe_mode = ref false
     let db () = !db_mode

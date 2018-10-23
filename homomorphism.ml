@@ -2,8 +2,7 @@ module Make (Node:Node.NodeType) =
   struct
     module Term = ANSITerminal
     module NodeBij = Bijection.Make (Node)
-    module IntBij =
-      Bijection.Make (struct type t = int let compare = compare let to_string = string_of_int end)
+    module IntBij =  Bijection.Make (struct type t = int let compare = Lib.Util.cmp let to_string = string_of_int end)
 
     exception Not_structure_preserving
     exception Not_injective

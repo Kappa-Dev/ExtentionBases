@@ -1,0 +1,3 @@
+load scripts/big
+build 2000 (empty,pat_1)
+

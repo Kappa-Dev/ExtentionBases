@@ -19,7 +19,16 @@ module Make (Symmetry:SymT) =
     let gluable u v = (*same id, same label and different ports*)
       (id u = id v) && compatible u v
 
-    let compare u v = Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)
+    let compare u v =
+      let cmp i j =
+        if i=j then 0
+        else if i<j then -1
+        else 1
+      in
+      let c = cmp u.ag_id v.ag_id in
+      if c=0 then cmp u.port_id v.port_id
+      else c
+             (*Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)*)
 
     let create l =
       match l with

@@ -239,27 +239,25 @@ module Make (Node:Node.NodeType) =
 	match hom_list with
 	  [] -> acc
 	| phi::tl ->
-	   try
-	     let iH = Hom.find iG phi in
-	     let opt = try Some (Hom.find jG phi) with Not_found -> None in
-	     match opt with
-	       None ->
-	        let biH = Graph.bound_to iH _H in
-	        let ext =
-		  List.fold_left
-		    (fun cont jH ->
-		      try
-		        let phi_ext = Hom.add jG jH phi in
-		        phi_ext::cont
-		      with
-		        Hom.Not_injective | Hom.Not_structure_preserving -> cont
-		    ) [] biH
-	        in
-	        extend tl iG jG (ext@acc)
-	     | Some jH ->
-		if Graph.has_edge iH jH _H then extend tl iG jG (phi::acc)
-		else extend tl iG jG acc
-	   with Not_found -> failwith "Invariant violation"
+	   let iH = Hom.find iG phi in
+	   let opt = try Some (Hom.find jG phi) with Not_found -> None in
+	   match opt with
+	     None ->
+	      let biH = Graph.bound_to iH _H in
+	      let ext =
+		List.fold_left
+		  (fun cont jH ->
+		    try
+		      let phi_ext = Hom.add jG jH phi in
+		      phi_ext::cont
+		    with
+		      Hom.Not_injective | Hom.Not_structure_preserving -> cont
+		  ) [] biH
+	      in
+	      extend tl iG jG (ext@acc)
+	   | Some jH ->
+	      if Graph.has_edge iH jH _H then extend tl iG jG (phi::acc)
+	      else extend tl iG jG acc
       in
       let rec explore_cc i hom_list already_done =
 	List.fold_left
@@ -680,7 +678,8 @@ module Make (Node:Node.NodeType) =
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =
       try
-        let wit_list = flatten (extension_class (h => obs)) in
+        let arrows = h => obs in
+        let wit_list = flatten (extension_class arrows) in
         List.fold_left (fun tiles h_to_o ->
             {span = (identity h h, h_to_o) ; cospan = Some (h_to_o,identity obs obs)}::tiles
           ) [] wit_list

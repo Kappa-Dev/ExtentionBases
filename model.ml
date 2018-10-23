@@ -18,12 +18,13 @@ module Make (Node:Node.NodeType) =
     let get_obs id m = Lib.IntMap.find id m.obs
 
     let add_obs name o m =
+      Printf.printf "Binding %s to graph %s\n" name (Graph.to_string o) ;
       try
         let id,dict = Lib.Dict.fresh m.dict in
         let dict = Lib.Dict.add id name dict in
         {m with obs = Lib.IntMap.add id o m.obs ; dict = dict}
       with
-        Lib.Dict.Clashing -> m
+        Lib.Dict.Clashing -> (print_endline ("Name "^name^" already used, not adding observable!\n") ; m)
 
     let list m =
       let l_obs =
@@ -53,23 +54,10 @@ module Make (Node:Node.NodeType) =
       }
 
     let witnesses_of_rule ?obs r m =
-      let enum_witnesses obs_name id_emb obs =
+      let enum_witnesses obs_name id_emb obs cont =
 	let h_eps = Cat.src id_emb in
-        List.map (fun tile -> (obs_name,tile)) (h_eps |> obs)
-                 (*
-	List.fold_left
-	  (fun tiles gluing_tile ->
-	   match Cat.upper_bound gluing_tile with
-	     None -> tiles
-	   | Some (h_eps_to_w,_) ->
-              (*Checking that w and pi_eps have a sup.*)
-              match Cat.share h_eps_to_w id_emb with
-                [] -> tiles
-              | (_,tile)::_ ->
-                 if Cat.upper_bound tile = None then tiles
-                 else (obs_name,gluing_tile)::tiles
-	  ) [] (h_eps |> obs)
-                  *)
+        let extensions = h_eps |> obs in
+        List.fold_left (fun cont tile -> (obs_name,tile)::cont) cont extensions
       in
       let build_witnesses effect observables =
 	Lib.IntMap.fold
@@ -77,14 +65,14 @@ module Make (Node:Node.NodeType) =
            let neg_witnesses =
                 match effect.neg with
                   None -> []
-                | Some neg -> enum_witnesses obs_id neg o
+                | Some neg -> enum_witnesses obs_id neg o nw
 	   in
 	   let pos_witnesses =
              match effect.pos with
              | None -> []
-             | Some pos -> enum_witnesses obs_id pos o
+             | Some pos -> enum_witnesses obs_id pos o pw
 	   in
-	   (neg_witnesses@nw, pos_witnesses@pw)
+	   (neg_witnesses, pos_witnesses)
 	  ) observables ([],[])
       in
       match obs with
