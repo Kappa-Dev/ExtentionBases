@@ -638,24 +638,6 @@ module Make (Node:Node.NodeType) =
       in
       if safe() then assert (not (Lib.IntMap.is_empty size_map)) ;
       (*Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;*)
-      let rec find_best_sharing map =
-        let opt,_ =
-          try
-            Lib.IntMap.fold
-              (fun k hom_l (opt,prev_hom_l) ->
-                if List.for_all (fun h -> List.exists (fun h' -> Hom.is_sub h h') hom_l) prev_hom_l
-                then
-                  match hom_l with
-                    [h] -> (Some h,[h])
-                  | _ -> (opt,hom_l)
-                else
-                  raise (Throw opt)
-              ) map (None,[])
-          with
-            Throw opt -> (opt,[])
-        in
-        opt
-      in
       (*let () =
         Printf.printf "Sharing %s \n" (string_of_span (f,g));
         Lib.IntMap.iter
@@ -664,16 +646,21 @@ module Make (Node:Node.NodeType) =
           ) size_map
       in
        *)
-      let h_opt = find_best_sharing size_map in
-      match h_opt with
-        Some h ->
-         let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
-         if safe() then assert (Graph.wf left && Graph.wf right) ;
-         let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
-         if safe() then assert (Graph.wf f.src);
-         if safe() then assert (Graph.wf f'.src);
-         (sh,f',g')
-      | None -> failwith "invariant violation"
+      let sharings =
+        Lib.IntMap.fold
+          (fun n hom_list sharings ->
+            List.fold_left
+              (fun sharings h ->
+                let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
+                if safe() then assert (Graph.wf left && Graph.wf right) ;
+                let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
+                if safe() then assert (Graph.wf f.src);
+                if safe() then assert (Graph.wf f'.src);
+                (sh,f',g')::sharings
+              ) sharings hom_list
+          ) size_map []
+        in
+        List.hd sharings
 
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =
