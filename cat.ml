@@ -30,7 +30,7 @@ module type Category =
 
 
    (* val share : arrows -> arrows -> (arrows * tile) list*)
-    val share : arrows -> arrows -> (arrows * arrows * arrows)
+    val share : arrows -> arrows -> (arrows * arrows * arrows) list
 
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
@@ -646,22 +646,19 @@ module Make (Node:Node.NodeType) =
           ) size_map
       in
        *)
-      let sharings =
-        Lib.IntMap.fold
-          (fun n hom_list sharings ->
-            List.fold_left
-              (fun sharings h ->
-                let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
-                if safe() then assert (Graph.wf left && Graph.wf right) ;
-                let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
-                if safe() then assert (Graph.wf f.src);
-                if safe() then assert (Graph.wf f'.src);
-                (sh,f',g')::sharings
-              ) sharings hom_list
-          ) size_map []
-        in
-        List.hd sharings
-
+      Lib.IntMap.fold
+        (fun n hom_list sharings ->
+          List.fold_left
+            (fun sharings h ->
+              let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
+              if safe() then assert (Graph.wf left && Graph.wf right) ;
+              let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
+              if safe() then assert (Graph.wf f.src);
+              if safe() then assert (Graph.wf f'.src);
+              (sh,f',g')::sharings
+            ) sharings hom_list
+        ) size_map []
+        
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =
       try
