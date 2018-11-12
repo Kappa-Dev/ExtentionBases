@@ -294,7 +294,15 @@ module Make (Node:Node.NodeType) =
          let iso_to_base = Cat.is_iso sh_to_base in
          if iso_to_w then
            if iso_to_base then
-             let () = if safe() then assert (inf_to_i =~= inf_to_w)
+             let () = if safe() then
+                        if (inf_to_i =~= inf_to_w) then assert true
+                        else
+                          begin
+                            Term.printf [Term.red] "Error: %s and %s are not extensionally equivalent!\n"
+                            (Cat.string_of_arrows ~full:true inf_to_i) (Cat.string_of_arrows ~full:true inf_to_w) ;
+                            assert false
+                          end
+
              in
              let () = if safe () then assert (List.length sharings = 1)
              in
