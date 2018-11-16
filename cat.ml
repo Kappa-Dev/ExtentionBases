@@ -29,7 +29,7 @@ module type Category =
     val size : arrows -> int
 
 
-   (* val share : arrows -> arrows -> (arrows * tile) list*)
+    (* val share : arrows -> arrows -> (arrows * tile) list*)
     val share : arrows -> arrows -> (arrows * arrows * arrows) list
 
     val is_iso : arrows -> bool
@@ -44,7 +44,7 @@ module type Category =
     (**Operators*)
     val compose : ?check:bool -> arrows -> arrows -> arrows
     val aliasing : arrows -> arrows -> arrows
-(*    val (|/) : arrows -> arrows -> (arrows * arrows) list*)
+    (*    val (|/) : arrows -> arrows -> (arrows * arrows) list*)
     (*val (===) : arrows -> arrows -> bool*)
     val (-->) : obj -> arrows -> obj list
     val (=~=) : arrows -> arrows -> bool
@@ -323,7 +323,7 @@ module Make (Node:Node.NodeType) =
       with
         Hom.Not_injective | Hom.Not_structure_preserving ->
                              if safe() then assert
-                               (Graph.wf f.src && Graph.wf f.trg && wf f && wf f') ;
+                                              (Graph.wf f.src && Graph.wf f.trg && wf f && wf f') ;
                              Printf.printf "Cannot compose %s and %s\n"
                                (string_of_arrows ~full:true f)
                                (string_of_arrows ~full:true f') ;
@@ -526,17 +526,19 @@ module Make (Node:Node.NodeType) =
     (*extend_hom u f -> [(f1,todo_1);...;(fn,todo_n)]*)
     let rec extend_hom_list left right continuation finished f_todo_list =
       let add_hom h list = h::list in (*could do much better*)
+
       let extend_hom_list_to_node u f visited flist =
         if safe() then assert (Hom.mem u f) ;
-        let nodes_left,nodes_right =
+        let nodes_left,nodes_right,force_extend =
           match
             List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.nodes_of_id (Node.id u) left)
           with
             [] ->
-             List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.bound_to u left),
-             List.filter (fun v -> not (Hom.comem v f)) (Graph.bound_to (Hom.find u f) right)
+             (List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.bound_to u left),
+              List.filter (fun v -> not (Hom.comem v f)) (Graph.bound_to (Hom.find u f) right),
+              false)
           | nodes ->
-             nodes, List.filter (fun v -> not (Hom.comem v f)) (Graph.nodes_of_id (Node.id (Hom.find u f)) right)
+             (nodes, List.filter (fun v -> not (Hom.comem v f)) (Graph.nodes_of_id (Node.id (Hom.find u f)) right),true)
         in
         (*Printf.printf "Succ(%s): lft={%s} <-?-> rgt={%s} to %s\ncalling:%s\n"
           (Node.to_string u)
@@ -552,13 +554,15 @@ module Make (Node:Node.NodeType) =
                 List.fold_left
                   (fun cont (f,todo,visited) ->
                     (*print_endline (Printf.sprintf "%s|->%s + %s"
-                                     (Node.to_string v)
-                                     (Node.to_string v')
-                                     (Hom.to_string ~full:true f)
-                      ) ;*)
+                        (Node.to_string v)
+                        (Node.to_string v')
+                        (Hom.to_string ~full:true f)
+                      )                ;*)
                     try
-                      (Hom.add v v' f,NodeSet.add v todo,visited)::cont
-                      (*Hom.add v v' f,NodeSet.add v todo,visited)::((f,todo,NodeSet.add v visited)::cont*)
+                      if force_extend then
+                        (Hom.add v v' f,NodeSet.add v todo,visited)::cont
+                      else
+                        (Hom.add v v' f,NodeSet.add v todo,visited)::(f,todo,NodeSet.add v visited)::cont
                     with
                       Hom.Not_injective | Hom.Not_structure_preserving ->
                                            (*print_endline "would be incoherent!" ;*)
@@ -595,7 +599,7 @@ module Make (Node:Node.NodeType) =
       (*Printf.printf "Building extensions for <-%s-.-%s->\n"
         (string_of_arrows f)
         (string_of_arrows g);
-      *)
+       *)
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
@@ -626,39 +630,34 @@ module Make (Node:Node.NodeType) =
            iter_extend finished continuation
       in
       let ext_f_list = iter_extend [] [(f_0,todo_0,NodeSet.empty)] in
-      let size_map =
-        List.fold_left (fun smap hom ->
-            let n = Hom.size hom in
-            let l = try Lib.IntMap.find n smap with Not_found -> [] in
-            if List.exists (fun hom' -> Hom.is_equal hom hom') l then
-              smap
-            else
-              Lib.IntMap.add n (hom::l) smap
-          ) Lib.IntMap.empty ext_f_list
-      in
-      if safe() then assert (not (Lib.IntMap.is_empty size_map)) ;
-      (*Lib.IntMap.iter (fun n hom_l -> Printf.printf "%d %d\n" n (List.length hom_l)) size_map ;*)
+
       (*let () =
         Printf.printf "Sharing %s \n" (string_of_span (f,g));
-        Lib.IntMap.iter
-          (fun n hom_l ->
-            Printf.printf "%d : {%s}\n" n (String.concat "," (List.map (Hom.to_string ~full:true) hom_l))
-          ) size_map
+        List.iter
+          (fun hom ->
+            Term.printf [Term.blue] "%s\n" (Hom.to_string ~full:true hom)
+          ) ext_f_list
+      in*)
+
+      (*This is cubic !! *)
+      let rec reduce_list acc = function
+          [] -> acc
+         | hom::tl ->
+            if List.exists (fun hom' -> Hom.is_sub hom hom') tl || List.exists (fun hom' -> Hom.is_sub hom hom') acc
+            then reduce_list acc tl
+            else
+              reduce_list (hom::acc) tl
       in
-       *)
-      Lib.IntMap.fold
-        (fun n hom_list sharings ->
-          List.fold_left
-            (fun sharings h ->
-              let (f',g') = span_of_partial {src=left ; trg = right ; maps = [h] ; partial = true} in
-              if safe() then assert (Graph.wf left && Graph.wf right) ;
-              let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
-              if safe() then assert (Graph.wf f.src);
-              if safe() then assert (Graph.wf f'.src);
-              (sh,f',g')::sharings
-            ) sharings hom_list
-        ) size_map []
-        
+      List.fold_left
+        (fun sharings hom ->
+          let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom] ; partial = true} in
+          if safe() then assert (Graph.wf left && Graph.wf right) ;
+          let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
+          if safe() then assert (Graph.wf f.src);
+          if safe() then assert (Graph.wf f'.src);
+          (sh,f',g')::sharings
+        ) [] (reduce_list [] ext_f_list)
+
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =
       try
@@ -670,4 +669,4 @@ module Make (Node:Node.NodeType) =
       with Undefined -> []
 
 
-end:Category with type obj = Graph.Make(Node).t)
+ end:Category with type obj = Graph.Make(Node).t)

@@ -630,8 +630,7 @@ module Make (Node:Node.NodeType) =
                  in
                  if db() then print_string
 			        (green (Printf.sprintf
-                                          "I found midpoints {%s} (%d)!\n" (string_of_sharings sh_info)
-				          ext_base.fresh
+                                          "I found %d midpoint(s) {%s}!\n"  (List.length sh_info) (string_of_sharings sh_info)
                                    )
 			        );
 	         (*No better comparison with w exists*)
@@ -654,48 +653,57 @@ module Make (Node:Node.NodeType) =
                    (dry_run',compared',inf_path',queue',dec_step ext_base max_step, cut)
                  else
                    (*Not a trivial midpoint*)
-                   let fresh_id = get_fresh ext_base in
+                   let fresh_ids,inf_list =
+                     List.fold_left (fun (fresh_ids,inf_list) (to_midpoint,to_base,to_w) ->
+                         let id = get_fresh ext_base in (*side effect*)
+                         let () =
+                           if db() then
+                             Term.printf [Term.cyan] "Midpoint %d: %s\n" id (Graph.to_string (Cat.trg to_midpoint))
+                         in
+                         (id::fresh_ids,(id,to_midpoint @@ root_to_inf,to_base,to_w)::inf_list)
+                       ) ([],[]) sh_info
+                   in
                    let inf_path' =
                      update_infs i
-                       (List.map
-                          (fun (to_midpoint,to_base,to_w) ->
-                            (fresh_id,to_midpoint @@ root_to_inf,to_base,to_w)
-                          ) sh_info)
+                       inf_list
                        inf_path
                        ext_base
                    in
                    let dry_run' =
                      (fun w ext_base inf_path ->
-                       let mp_id,iso_mp =  (* fresh_id ---iso_mp--> mp_id *)
-                         try Lib.IntMap.find fresh_id inf_path.alpha
-                         with Not_found -> (fresh_id,Cat.identity (Cat.trg to_midpoint)  (Cat.trg to_midpoint))
-                       in
-                       let mp = point (Cat.trg iso_mp) in
-                       let inf_id,iso_inf = (* inf ---iso_inf--> inf_id *)
-                         try Lib.IntMap.find inf inf_path.alpha
-                         with Not_found ->
-                           (inf, Cat.identity (Cat.src to_midpoint)  (Cat.src to_midpoint))
-                       in
-                       let inf_to_mp = iso_mp @@ (to_midpoint @@ (Cat.invert iso_inf)) in (*inf_to_mp: inf_id |--> mp_id*)
-                       let mp_to_base = to_base @@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
-                       let ext_to_mp = inf_to_mp @@ (find_extension inf_id ext_base) in (*ext_to_mp: root |--> mp_id *)
+                       List.fold_left (fun ext_base fresh_id ->
+                           let mp_id,iso_mp =  (* fresh_id ---iso_mp--> mp_id *)
+                             try Lib.IntMap.find fresh_id inf_path.alpha
+                             with Not_found -> (fresh_id,Cat.identity (Cat.trg to_midpoint)  (Cat.trg to_midpoint))
+                           in
+                           let mp = point (Cat.trg iso_mp) in
+                           let inf_id,iso_inf = (* inf ---iso_inf--> inf_id *)
+                             try Lib.IntMap.find inf inf_path.alpha
+                             with Not_found ->
+                               (inf, Cat.identity (Cat.src to_midpoint)  (Cat.src to_midpoint))
+                           in
+                           let inf_to_mp = iso_mp @@ (to_midpoint @@ (Cat.invert iso_inf)) in (*inf_to_mp: inf_id |--> mp_id*)
+                           let mp_to_base = to_base @@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
+                           let ext_to_mp = inf_to_mp @@ (find_extension inf_id ext_base) in (*ext_to_mp: root |--> mp_id *)
 
-                       (*adding root --*--> mp_id in the extension base *)
-                       let ext_base =
-                         if mem mp_id ext_base then ext_base
-                         else
-                           add mp_id mp ext_to_mp ext_base
-                       in
-                       let ext_base = add_step mp_id i mp_to_base ext_base
-                       in
-                       (*adding step from inf to midpoint or its alias
+                           (*adding root --*--> mp_id in the extension base *)
+                           let ext_base =
+                             if mem mp_id ext_base then ext_base
+                             else
+                               add mp_id mp ext_to_mp ext_base
+                           in
+                           let ext_base = add_step mp_id i mp_to_base ext_base
+                           in
+                           (*adding step from inf to midpoint or its alias
                      (in this    case verify that inf is not already below the alias*)
-                       let ext_base = add_step inf_id mp_id inf_to_mp ext_base
-                       in
-		       if has_sup then ext_base else add_conflict i w ext_base
+                           let ext_base = add_step inf_id mp_id inf_to_mp ext_base
+                           in
+		           if has_sup then ext_base else add_conflict i w ext_base
+                         ) ext_base fresh_ids
                      )::dry_run
                    in
-	           (dry_run',compared',inf_path',queue',dec_step ext_base max_step, subst fresh_id inf cut)
+	           (dry_run',compared',inf_path',queue',dec_step ext_base max_step,
+                    List.fold_left (fun cut fresh_id -> subst fresh_id inf cut) cut fresh_ids)
             ) (dry_run,compared,inf_path,queue,max_step,cut) (get_best_inf k inf_path)
         in
         progress ext_base dry_run' compared' inf_path' queue' max_step' cut'

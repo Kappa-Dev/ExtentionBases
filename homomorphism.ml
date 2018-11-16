@@ -13,14 +13,15 @@ module Make (Node:Node.NodeType) =
 
     let size hom = NodeBij.size hom.tot
 
-    let is_equal hom hom' = NodeBij.is_equal (fun u v -> Node.compare u v = 0) hom.tot hom'.tot
+    let is_equal hom hom' =
+      NodeBij.is_equal (fun u v -> Node.compare u v = 0) hom.tot hom'.tot
 
     let is_sub hom hom' =
       try
 	NodeBij.fold
 	  (fun u v b ->
 	    let v' = NodeBij.find u hom'.tot in
-	    (compare v v' = 0) && b
+	    if (compare v v' = 0) then b else raise Not_found
 	  ) hom.tot true
       with
 	Not_found -> false
