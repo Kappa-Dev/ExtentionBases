@@ -43,7 +43,7 @@ module type Category =
 
     (**Operators*)
     val compose : ?check:bool -> arrows -> arrows -> arrows
-    val aliasing : arrows -> arrows -> arrows
+    val aliasing : arrows -> arrows -> arrows option
     (*    val (|/) : arrows -> arrows -> (arrows * arrows) list*)
     (*val (===) : arrows -> arrows -> bool*)
     val (-->) : obj -> arrows -> obj list
@@ -448,14 +448,16 @@ module Make (Node:Node.NodeType) =
       | _ -> failwith "Invariant violation, not a flat embedding"
 
     let aliasing f g =
-      if safe() then assert (is_cospan (f,g)) ;
-      if db() then
-        Printf.printf "Building iso from cospan: \n <%s,%s>\n" (string_of_arrows ~full:true f) (string_of_arrows ~full:true g) ;
+      let () = if safe() then assert (is_cospan (f,g)) ;
+               if db() then
+                 Printf.printf "Building iso from cospan: \n <%s,%s>\n" (string_of_arrows ~full:true f) (string_of_arrows ~full:true g)
+      in
       let hom = hom_of_arrows f in
       let hom' = Hom.invert (hom_of_arrows g) in
-      if db() then Term.printf [Term.yellow] "Composing (%s o %s)" (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom) ;
-      let iso = Hom.compose hom' hom in
-      {src = f.src ; trg = g.src ; maps = [iso] ; partial = false}
+      let () = if db() then Term.printf [Term.yellow] "Composing (%s o %s)" (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
+      in
+      try Some {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false}
+      with Hom.Not_injective -> None
 
     let (|/) left_to_sup right_to_sup =
       List.fold_left
@@ -529,16 +531,15 @@ module Make (Node:Node.NodeType) =
 
       let extend_hom_list_to_node u f visited flist =
         if safe() then assert (Hom.mem u f) ;
-        let nodes_left,nodes_right,force_extend =
+        let nodes_left,nodes_right =
           match
             List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.nodes_of_id (Node.id u) left)
           with
             [] ->
              (List.filter (fun v -> not (Hom.mem v f || NodeSet.mem v visited)) (Graph.bound_to u left),
-              List.filter (fun v -> not (Hom.comem v f)) (Graph.bound_to (Hom.find u f) right),
-              false)
+              List.filter (fun v -> not (Hom.comem v f)) (Graph.bound_to (Hom.find u f) right))
           | nodes ->
-             (nodes, List.filter (fun v -> not (Hom.comem v f)) (Graph.nodes_of_id (Node.id (Hom.find u f)) right),true)
+             (nodes, List.filter (fun v -> not (Hom.comem v f)) (Graph.nodes_of_id (Node.id (Hom.find u f)) right))
         in
         (*Printf.printf "Succ(%s): lft={%s} <-?-> rgt={%s} to %s\ncalling:%s\n"
           (Node.to_string u)
@@ -559,14 +560,13 @@ module Make (Node:Node.NodeType) =
                         (Hom.to_string ~full:true f)
                       )                ;*)
                     try
-                      if force_extend then
-                        (Hom.add v v' f,NodeSet.add v todo,visited)::cont
-                      else
-                        (Hom.add v v' f,NodeSet.add v todo,visited)::(f,todo,NodeSet.add v visited)::cont
+                      (*this is not exhaustive!*)
+                      (Hom.add v v' f,NodeSet.add v todo,visited)::cont (*making optimist modification*)
                     with
-                      Hom.Not_injective | Hom.Not_structure_preserving ->
-                                           (*print_endline "would be incoherent!" ;*)
-                                           (f,todo,NodeSet.add v visited)::cont
+                      Hom.Not_structure_preserving -> (f,todo,NodeSet.add v visited)::cont
+                    | Hom.Not_injective -> (*id(v') is already assigned to i<>id(v)*)
+                       (*v |->v' is ok but violates injectivity*)
+                       (f,todo,NodeSet.add v visited)::cont
                   ) [] flist_vv'
               ) flist_v nodes_right
           ) flist nodes_left

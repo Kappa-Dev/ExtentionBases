@@ -116,14 +116,11 @@ module Make (Node:Node.NodeType) =
     (*[compose h h'] = (h o h') *)
     let compose ?(check=true) hom hom' =
       let comp_bij () =
-        try
-	  fold (fun u v hom'' ->
-              add u
-                (try find v hom with Not_found -> Printf.printf "%s has no image by 2nd hom\n" (Node.to_string v) ; raise Not_found)
-                hom''
-            ) hom' empty
-        with
-	  Not_found -> raise Not_injective
+	fold (fun u v hom'' ->
+            add u
+              (try (find v hom) with Not_found -> raise Not_injective)
+              hom''
+          ) hom' empty
       in
       if check then comp_bij ()
       else

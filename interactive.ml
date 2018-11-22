@@ -89,6 +89,7 @@ module Make (Node:Node.NodeType) =
          close_out d
 
     let build_base ?obs_name max_step env =
+      Printexc.record_backtrace true ;
       match env.rule with
         None -> env
       | Some (l,r) ->

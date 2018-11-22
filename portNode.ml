@@ -10,6 +10,7 @@ module Make (Symmetry:SymT) =
     let arity = 2
 
     let info = Symmetry.info
+    let label u = u.label
 
     let id u = u.ag_id
     let rename i u = {u with ag_id = i}
@@ -40,7 +41,7 @@ module Make (Symmetry:SymT) =
 
     let to_dot u ?(highlight=None) i =
       let ref_node = string_of_int i in
-      ref_node^" [label=\""^(string_of_int (id u))^"\" "^(Lib.Util.hi2str highlight)^"]"
+      ref_node^" [label=\""^(string_of_int (label u))^"\" "^(Lib.Util.hi2str highlight)^"]"
 
       let dot_of_edge u i v j =
 	let tl = string_of_int u.port_id in

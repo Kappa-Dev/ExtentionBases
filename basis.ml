@@ -5,7 +5,7 @@ module Make (Node:Node.NodeType) =
     module Term = ANSITerminal
 
     let (-->) = Cat.(-->)
-    let (@@) = Cat.compose ~check:false
+    let (@@) = Cat.compose ~check:true
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
 
@@ -432,6 +432,7 @@ module Make (Node:Node.NodeType) =
             let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
           with Not_found -> (i',to_i')
         in
+        (*super inneficient*)
         let alpha =
           Lib.IntMap.fold
             (fun j (j',to_j') alpha ->
@@ -479,14 +480,16 @@ module Make (Node:Node.NodeType) =
               else
                 if newp = oldp then (true,alpha,old::infs)
                 else
-                  let old_to_new = Cat.aliasing oldp_to_i newp_to_i in
-                  if Cat.is_iso old_to_new then
-                    if newp > oldp then
-                      (true,add_alias newp oldp (Cat.invert old_to_new) alpha,old::infs)
-                    else
-                      (true, add_alias oldp newp old_to_new alpha, nw::infs)
-                  else
-                    (is_found, alpha, old::infs)
+                  match Cat.aliasing oldp_to_i newp_to_i with
+                    None -> (is_found, alpha, old::infs)
+                  | Some old_to_new ->
+                     if Cat.is_iso old_to_new then
+                       if newp > oldp then
+                         (true,add_alias newp oldp (Cat.invert old_to_new) alpha,old::infs)
+                       else
+                         (true, add_alias oldp newp old_to_new alpha, nw::infs)
+                     else
+                       (is_found, alpha, old::infs)
             ) (false,alpha,[]) old_infs
         in
         match (try Lib.IntMap.find i inf_path.beta with Not_found -> []) with
@@ -671,7 +674,8 @@ module Make (Node:Node.NodeType) =
                    in
                    let dry_run' =
                      (fun w ext_base inf_path ->
-                       List.fold_left (fun ext_base fresh_id ->
+                       List.fold_left
+                         (fun ext_base fresh_id ->
                            let mp_id,iso_mp =  (* fresh_id ---iso_mp--> mp_id *)
                              try Lib.IntMap.find fresh_id inf_path.alpha
                              with Not_found -> (fresh_id,Cat.identity (Cat.trg to_midpoint)  (Cat.trg to_midpoint))
