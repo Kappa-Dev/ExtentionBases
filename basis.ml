@@ -5,7 +5,7 @@ module Make (Node:Node.NodeType) =
     module Term = ANSITerminal
 
     let (-->) = Cat.(-->)
-    let (@@) = Cat.compose ~check:true
+    let (@@) = Cat.compose ~check:false
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
 
@@ -443,33 +443,6 @@ module Make (Node:Node.NodeType) =
         in
         Lib.IntMap.add i (i',to_i') alpha
       in
-(*
-      let update_inf i (newp,root_to_newp,newp_to_i,newp_to_w as new_inf) inf_path ext_base =
-        let alpha', beta' =
-          try
-            let oldp,root_to_oldp,oldp_to_i,oldp_to_w = Lib.IntMap.find i inf_path.beta
-            in
-            if newp = oldp then inf_path.alpha,inf_path.beta
-            else
-              let iso_old_to_new = Cat.aliasing oldp_to_i newp_to_i in
-              if safe() then
-                begin
-                  Term.printf [Term.yellow] "Checking that both midpoints (%d,%d) are isomorphic...\n" oldp newp ; flush stdout ;
-                  assert (Cat.is_iso iso_old_to_new) ;
-                  Term.printf [Term.yellow] "OK\n" ; flush stdout
-                end;
-              if newp > oldp then
-                (*let new_to_old = to_oldp @@ (Cat.invert to_newp) in*)
-                add_alias newp oldp (Cat.invert iso_old_to_new) inf_path.alpha,inf_path.beta
-              else
-                add_alias oldp newp iso_old_to_new inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
-          with Not_found -> inf_path.alpha,Lib.IntMap.add i new_inf inf_path.beta
-        in
-        let inf_path' = {beta = beta' ; alpha = alpha'} in
-        if db() then print_inf_path inf_path' ;
-        inf_path'
-      in
- *)
 
       let update_infs i inf_list inf_path ext_base =
         (*newp might be a hard point while oldp a temporary one*)
@@ -481,7 +454,9 @@ module Make (Node:Node.NodeType) =
                 if newp = oldp then (true,alpha,old::infs)
                 else
                   match Cat.aliasing oldp_to_i newp_to_i with
-                    None -> (is_found, alpha, old::infs)
+                    None ->
+                     (*to_oldp and to_newp are not equivalent extensions*)
+                     (is_found, alpha, old::infs)
                   | Some old_to_new ->
                      if Cat.is_iso old_to_new then
                        if newp > oldp then

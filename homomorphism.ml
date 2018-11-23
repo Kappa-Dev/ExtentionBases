@@ -6,6 +6,7 @@ module Make (Node:Node.NodeType) =
 
     exception Not_structure_preserving
     exception Not_injective
+    exception Undefined
 
     type t = {tot : NodeBij.t ; sub : IntBij.t }
 
@@ -118,7 +119,7 @@ module Make (Node:Node.NodeType) =
       let comp_bij () =
 	fold (fun u v hom'' ->
             add u
-              (try (find v hom) with Not_found -> raise Not_injective)
+              (try (find v hom) with Not_found -> raise Undefined)
               hom''
           ) hom' empty
       in

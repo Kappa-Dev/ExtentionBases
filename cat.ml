@@ -321,13 +321,16 @@ module Make (Node:Node.NodeType) =
          partial = f.partial || f'.partial
         }
       with
-        Hom.Not_injective | Hom.Not_structure_preserving ->
-                             if safe() then assert
-                                              (Graph.wf f.src && Graph.wf f.trg && wf f && wf f') ;
-                             Printf.printf "Cannot compose %s and %s\n"
-                               (string_of_arrows ~full:true f)
-                               (string_of_arrows ~full:true f') ;
-                             raise Undefined
+        Hom.Undefined ->
+        let () = if db() then
+                   Printf.printf "Cannot compose %s and %s\n"
+                     (string_of_arrows ~full:true f)
+                     (string_of_arrows ~full:true f')
+        in
+        let () = if safe () then
+                   assert (Graph.wf f.src && Graph.wf f.trg && wf f && wf f')
+        in
+        raise Undefined
 
 
     let eq_class matching f auto =
@@ -396,7 +399,9 @@ module Make (Node:Node.NodeType) =
     let (@@) = compose ~check:true
 
     let is_iso f =
-      not f.partial && (Graph.size_edge f.trg) = (Graph.size_edge f.src)
+      not f.partial
+      && (Graph.size_edge f.trg) = (Graph.size_edge f.src)
+      && Graph.size_node f.trg = Graph.size_node f.trg
 
     let invert f =
       let f' = {src = f.trg ;
@@ -448,16 +453,19 @@ module Make (Node:Node.NodeType) =
       | _ -> failwith "Invariant violation, not a flat embedding"
 
     let aliasing f g =
-      let () = if safe() then assert (is_cospan (f,g)) ;
-               if db() then
-                 Printf.printf "Building iso from cospan: \n <%s,%s>\n" (string_of_arrows ~full:true f) (string_of_arrows ~full:true g)
+      let () =
+        if safe() then assert (is_cospan (f,g)) ;
+        if db() then
+          Printf.printf "Building iso from cospan: \n <%s,%s>\n" (string_of_arrows ~full:true f) (string_of_arrows ~full:true g)
       in
       let hom = hom_of_arrows f in
       let hom' = Hom.invert (hom_of_arrows g) in
-      let () = if db() then Term.printf [Term.yellow] "Composing (%s o %s)" (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
+      let () =
+        if db() then
+          Term.printf [Term.yellow] "Composing (%s o %s)" (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
       in
       try Some {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false}
-      with Hom.Not_injective -> None
+      with Hom.Undefined -> None
 
     let (|/) left_to_sup right_to_sup =
       List.fold_left
