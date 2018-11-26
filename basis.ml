@@ -5,7 +5,7 @@ module Make (Node:Node.NodeType) =
     module Term = ANSITerminal
 
     let (-->) = Cat.(-->)
-    let (@@) = Cat.compose ~check:false
+    let (@@) = Cat.compose ~check:true
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
 
@@ -605,6 +605,7 @@ module Make (Node:Node.NodeType) =
                        ) (find i ext_base).next queue
                  in
                  let to_midpoint,to_base,to_w = List.hd sh_info in
+                 assert (Cat.wf to_midpoint) ;
                  let has_sup = true in
                  let compared' = Lib.Int2Set.add (k,i) compared
                  in
@@ -663,7 +664,14 @@ module Make (Node:Node.NodeType) =
                              with Not_found ->
                                (inf, Cat.identity (Cat.src to_midpoint)  (Cat.src to_midpoint))
                            in
-                           let inf_to_mp = iso_mp @@ (to_midpoint @@ (Cat.invert iso_inf)) in (*inf_to_mp: inf_id |--> mp_id*)
+                           let inf_to_mp =
+                             let f = to_midpoint @@ (Cat.invert iso_inf) in (*inf_to_mp: inf_id |--> mp_id*)
+                             assert (Cat.wf iso_mp) ;
+                             assert (Cat.is_iso iso_inf) ;
+                             assert (Cat.wf to_midpoint) ;(*fails*)
+                             assert (Cat.wf f) ;
+                             iso_mp @@ f
+                           in
                            let mp_to_base = to_base @@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
                            let ext_to_mp = inf_to_mp @@ (find_extension inf_id ext_base) in (*ext_to_mp: root |--> mp_id *)
 

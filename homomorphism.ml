@@ -115,17 +115,17 @@ module Make (Node:Node.NodeType) =
       IntBij.to_string hom.sub
 
     (*[compose h h'] = (h o h') *)
-    let compose ?(check=true) hom hom' =
+    let compose ?(check=true) hom' hom =
       let comp_bij () =
 	fold (fun u v hom'' ->
             add u
-              (try (find v hom) with Not_found -> raise Undefined)
+              (try (find v hom') with Not_found -> raise Undefined)
               hom''
-          ) hom' empty
+          ) hom empty
       in
       if check then comp_bij ()
       else
-        if is_identity hom then hom'
+        if is_identity hom' then hom
         else
             comp_bij ()
 

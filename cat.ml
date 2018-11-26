@@ -27,6 +27,7 @@ module type Category =
     val fold_arrow : arrows -> (int * int) list
 
     val size : arrows -> int
+    val wf : arrows -> bool
 
 
     (* val share : arrows -> arrows -> (arrows * tile) list*)
@@ -468,7 +469,9 @@ module Make (Node:Node.NodeType) =
       in
       try
         let h = {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false} in
-        let () = if safe() then assert (wf h) in
+        let () =
+          if safe() then assert ((wf h) && (is_iso h))
+        in
         Some h
       with Hom.Undefined -> None
 
@@ -643,7 +646,7 @@ module Make (Node:Node.NodeType) =
            iter_extend finished continuation
       in
       let ext_f_list = iter_extend [] [(f_0,todo_0,NodeSet.empty)] in
-
+      (**BUG `REMOVE HOM that HAS HALF AN EDGE**)
       (*let () =
         Printf.printf "Sharing %s \n" (string_of_span (f,g));
         List.iter
@@ -666,9 +669,14 @@ module Make (Node:Node.NodeType) =
           let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom] ; partial = true} in
           if safe() then assert (Graph.wf left && Graph.wf right) ;
           let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
-          if safe() then assert (Graph.wf f.src);
-          if safe() then assert (Graph.wf f'.src);
-          (sh,f',g')::sharings
+          if wf sh then
+            let () =
+              if safe() then assert (Graph.wf f.src);
+              if safe() then assert (Graph.wf f'.src);
+            in
+            (sh,f',g')::sharings
+          else
+            sharings 
         ) [] (reduce_list [] ext_f_list)
 
     (** [h |> obs] [h] may create/destroy an instance of obs*)
