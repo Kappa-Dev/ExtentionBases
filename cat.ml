@@ -456,15 +456,20 @@ module Make (Node:Node.NodeType) =
       let () =
         if safe() then assert (is_cospan (f,g)) ;
         if db() then
-          Printf.printf "Building iso from cospan: \n <%s,%s>\n" (string_of_arrows ~full:true f) (string_of_arrows ~full:true g)
+          Printf.printf "Building iso from cospan: \n <%s,%s>\n"
+            (string_of_arrows ~full:true f) (string_of_arrows ~full:true g)
       in
       let hom = hom_of_arrows f in
       let hom' = Hom.invert (hom_of_arrows g) in
       let () =
         if db() then
-          Term.printf [Term.yellow] "Composing (%s o %s)" (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
+          Term.printf [Term.yellow] "Composing (%s o %s)"
+            (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
       in
-      try Some {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false}
+      try
+        let h = {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false} in
+        let () = if safe() then assert (wf h) in
+        Some h
       with Hom.Undefined -> None
 
     let (|/) left_to_sup right_to_sup =

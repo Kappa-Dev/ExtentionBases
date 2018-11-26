@@ -449,6 +449,7 @@ module Make (Node:Node.NodeType) =
         let unify_meet ((newp,root_to_newp,newp_to_i,newp_to_w) as nw) old_infs alpha =
           List.fold_left
             (fun (is_found,alpha,infs) ((oldp,root_to_oldp,oldp_to_i,oldp_to_w) as old) ->
+              assert (alias oldp inf_path = oldp) ;
               if is_found then (is_found,alpha,old::infs)
               else
                 if newp = oldp then (true,alpha,old::infs)
@@ -464,7 +465,8 @@ module Make (Node:Node.NodeType) =
                        else
                          (true, add_alias oldp newp old_to_new alpha, nw::infs)
                      else
-                       (is_found, alpha, old::infs)
+                       assert false
+                         (*is_found, alpha, old::infs*)
             ) (false,alpha,[]) old_infs
         in
         match (try Lib.IntMap.find i inf_path.beta with Not_found -> []) with
