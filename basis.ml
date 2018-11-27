@@ -282,42 +282,33 @@ module Make (Node:Node.NodeType) =
       Iso of Cat.arrows
     | Below of Cat.arrows
     | Above of Cat.arrows
-    | Incomp of (Cat.arrows * Cat.arrows * Cat.arrows) list (*inf_to_sh,sh_to_base,sh_to_w*)
+    | Incomp of (Cat.arrows * Cat.arrows * Cat.arrows) (*inf_to_sh,sh_to_base,sh_to_w*)
 
     let compare inf_to_i inf_to_w =
       if db() then
         Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ; flush stdout ;
-      match Cat.share inf_to_i inf_to_w with
-        [] -> failwith "Empty sharing"
-      | (inf_to_sh,sh_to_base,sh_to_w)::_ as sharings ->
-         let iso_to_w = Cat.is_iso sh_to_w in
-         let iso_to_base = Cat.is_iso sh_to_base in
-         if iso_to_w then
-           if iso_to_base then
-             let () = if safe() then
-                        if (inf_to_i =~= inf_to_w) then assert true
-                        else
-                          begin
-                            Term.printf [Term.red] "Error: %s and %s are not extensionally equivalent!\n"
-                            (Cat.string_of_arrows ~full:true inf_to_i) (Cat.string_of_arrows ~full:true inf_to_w) ;
-                            assert false
-                          end
-
-             in
-             let () = if safe () then assert (List.length sharings = 1)
-             in
-             Iso (sh_to_base @@ (Cat.invert sh_to_w))
-           else
-             let () = if safe () then assert (List.length sharings = 1)
-             in
-             Below (sh_to_base @@ (Cat.invert sh_to_w))
-         else
-           if not iso_to_base then
-             Incomp sharings
-           else
-             let () = if safe () then assert (List.length sharings = 1)
-             in
-             Above (sh_to_w @@ (Cat.invert sh_to_base))
+      let (inf_to_sh,sh_to_base,sh_to_w) as sharing = Cat.share inf_to_i inf_to_w in
+      let iso_to_w = Cat.is_iso sh_to_w in
+      let iso_to_base = Cat.is_iso sh_to_base in
+      if iso_to_w then
+        if iso_to_base then
+          let () = if safe() then
+                     if (inf_to_i =~= inf_to_w) then assert true
+                     else
+                       begin
+                         Term.printf [Term.red] "Error: %s and %s are not extensionally equivalent!\n"
+                           (Cat.string_of_arrows ~full:true inf_to_i) (Cat.string_of_arrows ~full:true inf_to_w) ;
+                         assert false
+                       end
+          in
+          Iso (sh_to_base @@ (Cat.invert sh_to_w))
+        else
+          Below (sh_to_base @@ (Cat.invert sh_to_w))
+      else
+        if not iso_to_base then
+          Incomp sharing
+        else
+          Above (sh_to_w @@ (Cat.invert sh_to_base))
 
     exception Found_iso of Cat.arrows * int
 
@@ -604,14 +595,14 @@ module Make (Node:Node.NodeType) =
                          QueueList.add_lp (i, step_ij, j) cont
                        ) (find i ext_base).next queue
                  in
-                 let to_midpoint,to_base,to_w = List.hd sh_info in
+                 let to_midpoint,to_base,to_w = sh_info in
                  assert (Cat.wf to_midpoint) ;
                  let has_sup = true in
                  let compared' = Lib.Int2Set.add (k,i) compared
                  in
                  if db() then print_string
 			        (green (Printf.sprintf
-                                          "I found %d midpoint(s) {%s}!\n"  (List.length sh_info) (string_of_sharings sh_info)
+                                          "I found 1 midpoint(s) {%s}!\n" (string_of_sharings [sh_info])
                                    )
 			        );
 	         (*No better comparison with w exists*)
@@ -634,19 +625,17 @@ module Make (Node:Node.NodeType) =
                    (dry_run',compared',inf_path',queue',dec_step ext_base max_step, cut)
                  else
                    (*Not a trivial midpoint*)
-                   let fresh_ids,inf_list =
-                     List.fold_left (fun (fresh_ids,inf_list) (to_midpoint,to_base,to_w) ->
-                         let id = get_fresh ext_base in (*side effect*)
-                         let () =
-                           if db() then
-                             Term.printf [Term.cyan] "Midpoint %d: %s\n" id (Graph.to_string (Cat.trg to_midpoint))
-                         in
-                         (id::fresh_ids,(id,to_midpoint @@ root_to_inf,to_base,to_w)::inf_list)
-                       ) ([],[]) sh_info
+                   let fresh_id,inf =
+                     let id = get_fresh ext_base in (*side effect*)
+                     let () =
+                       if db() then
+                         Term.printf [Term.cyan] "Midpoint %d: %s\n" id (Graph.to_string (Cat.trg to_midpoint))
+                     in
+                     (id,(id,to_midpoint @@ root_to_inf,to_base,to_w))
                    in
                    let inf_path' =
-                     update_infs i
-                       inf_list
+                     update_inf i
+                       inf
                        inf_path
                        ext_base
                    in

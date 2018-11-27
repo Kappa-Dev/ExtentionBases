@@ -22,6 +22,7 @@ module type GraphType =
 
     (**Properties*)
     val bound_to : node -> t -> node list
+    val is_free : node -> t -> bool
     val has_edge : node -> node -> t -> bool
     val has_node : node -> t -> bool
     val nodes_of_id : int -> t -> node list
@@ -82,7 +83,7 @@ module Make (Node:Node.NodeType) =
 
     let is_empty g = g.size = 0
 
-
+    let is_free u g = try let l = NodeMap.find u g.edges in l=[] with Not_found -> true
 
     let equal_support g h =
       try
