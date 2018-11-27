@@ -6,8 +6,8 @@ module Make (Content:Lib.OrderedType) =
     type t = I of CSet.t | B of ((Content.t CMap.t) * (Content.t CMap.t))
 
     let domain = function
-        I s -> s
-      | B (m,_) -> CMap.fold (fun i _ s -> CSet.add i s) m CSet.empty
+        I s -> CSet.elements s
+      | B (m,_) -> CMap.fold (fun i _ cont -> i::cont) m []
 
     exception Not_bijective of Content.t * Content.t * t
 

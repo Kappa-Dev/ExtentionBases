@@ -507,20 +507,11 @@ module Make (Node:Node.NodeType) =
 
     let (=~=) f f' = match equalize f f' with Some _ -> true | None -> false
 
-    let shl l = String.concat ";"
-                  (List.map
-                     (fun (h,todo,visited) ->
-                       Printf.sprintf "%s{%s}"
-                         (Hom.to_string ~full:true h)
-                         (yellow (String.concat "," (List.map Node.to_string (NodeSet.elements todo))))
-                     ) l
-                  )
-
     let span_of_partial f_part =
       let p_hom = hom_of_arrows f_part in
       let () =
         if db() then
-          (Term.printf [Term.red] "Completing %s --%s--\\ %s\n"
+          (Term.printf [Term.red] "Building span of partial map %s --%s--\\ %s\n"
              (Graph.to_string f_part.src)
              (Hom.to_string ~full:true p_hom)
              (Graph.to_string f_part.trg) ; flush stdout)
@@ -531,6 +522,7 @@ module Make (Node:Node.NodeType) =
                  List.exists (fun v -> Hom.mem v p_hom) (Graph.bound_to u d)
             then d
             else
+              let () = if db() then Printf.printf "removing %s\n" (Node.to_string u) in
               Graph.remove u d
           ) f_part.src f_part.src
       in
@@ -541,66 +533,56 @@ module Make (Node:Node.NodeType) =
       if safe() then assert (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 
-    let rec extend_hom left right p_hom u =
+    let extend_hom left right p_hom u todo =
       let () = if safe() then assert (Hom.mem u p_hom)
       in
       let nodes_left,nodes_right =
         match
-          (List.filter (fun v -> not (Hom.mem v p_hom || Graph.is_free v left)) (Graph.nodes_of_id (Node.id u) left))
+          (List.filter
+             (fun v -> not (Hom.mem v p_hom))
+             (Graph.nodes_of_id (Node.id u) left))
         with
           [] ->
-           (List.filter (fun v -> not (Hom.mem v p_hom)) (Graph.bound_to u left),
-            List.filter (fun v -> not (Hom.comem v p_hom)) (Graph.bound_to (Hom.find u p_hom) right))
+           (List.filter
+              (fun v -> not (Hom.mem v p_hom))
+              (Graph.bound_to u left),
+            List.filter
+              (fun v -> not (Hom.comem v p_hom))
+              (Graph.bound_to (Hom.find u p_hom) right)
+           )
         | nodes ->
-           (nodes, List.filter (fun v -> not (Hom.comem v p_hom || Graph.is_free v right)) (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right))
+           (nodes, List.filter
+                     (fun v -> not (Hom.comem v p_hom))
+                     (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right)
+           )
       in
       List.fold_left
-        (fun hom_p v ->
+        (fun (p_hom,todo) v ->
           List.fold_left
-            (fun hom_p v' ->
+            (fun (p_hom,todo) v' ->
               try
-                Hom.add v v' hom_p
+                let () = if db() then
+                           Printf.printf "Trying to map %s |-> %s\n" (Node.to_string v) (Node.to_string v')
+                in
+                (Hom.add v v' p_hom,v::todo)
               with
-                Hom.Not_structure_preserving | Hom.Not_injective -> hom_p
-            ) hom_p nodes_right
-        ) p_hom nodes_left
-
-
-    exception Throw of Hom.t option
+                Hom.Not_structure_preserving | Hom.Not_injective ->
+                                                (if db() then print_endline "Failed" ; (p_hom,todo))
+            ) (p_hom,todo) nodes_right
+        ) (p_hom,todo) nodes_left
 
     let share f g =
-      (*Printf.printf "Building extensions for <-%s-.-%s->\n"
-        (string_of_arrows f)
-        (string_of_arrows g);
-       *)
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
-      (*
-      let () = Printf.printf "(Left) %s || %s (Right)\n" (Graph.to_string left) (Graph.to_string right) in
-      let () =
-        let str =
-          String.concat "\n"
-            (Graph.fold_ids (fun i cont ->
-                 let str = Printf.sprintf "%d:%s" i (String.concat "," (List.map Node.to_string (Graph.nodes_of_id i left)))
-                 in
-                 str::cont) left []
-            )
-        in
-        print_string str ; print_newline()
-      in
-       *)
       let rec iter_extend hom_p = function
           [] -> hom_p
         | u::tl ->
-           (*print_endline "********" ;
-           print_endline (shl f_list) ;
-           print_endline (String.concat "," (List.map (Hom.to_string ~full:true) finished)) ;
-           print_endline "********" ;
-            *)
-           iter_extend (extend_hom left right hom_p u) tl
+           let () = if db() then Printf.printf "Extending node %s \n" (Node.to_string u) in
+           let hom_p,todo = extend_hom left right hom_p u tl in
+           iter_extend hom_p todo
       in
-      let hom_p = iter_extend f_0 (NodeSet.elements todo_0) in
+      let hom_p = iter_extend f_0 todo_0 in
       let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom_p] ; partial = true} in
       if safe() then assert (Graph.wf left && Graph.wf right) ;
       let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
