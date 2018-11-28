@@ -335,8 +335,14 @@ module Make (Node:Node.NodeType) =
       try Lib.Util.proj_left (Lib.IntMap.find i inf_path.alpha) with Not_found -> i
 
     let add_step_alpha i j a_ij ext_base inf_path =
-      let i',to_i' = try Lib.IntMap.find i inf_path.alpha with Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij)) in
-      let j',to_j' = try Lib.IntMap.find j inf_path.alpha with Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij)) in
+      let i',to_i' =
+        try Lib.IntMap.find i inf_path.alpha with
+          Not_found -> (i,Cat.identity (Cat.src a_ij) (Cat.src a_ij))
+      in
+      let j',to_j' =
+        try Lib.IntMap.find j inf_path.alpha with
+          Not_found -> (j,Cat.identity (Cat.trg a_ij) (Cat.trg a_ij))
+      in
       if safe() then assert (Cat.is_iso to_i') ;
       let f = a_ij @@ (Cat.invert to_i') in
       let g = to_j' @@ f in
@@ -435,12 +441,20 @@ module Make (Node:Node.NodeType) =
         Lib.IntMap.add i (i',to_i') alpha
       in
 
+      let alias_inf ((p,root_to_p,p_to_i,p_to_w) as inf) alpha =
+        try
+          let p',to_p' = Lib.IntMap.find p alpha in
+          let from_p' = Cat.invert to_p' in
+          (p', to_p'@@root_to_p, p_to_i@@from_p', p_to_w@@from_p')
+          with
+            Not_found -> inf
+      in
       let update_inf i inf inf_path ext_base =
         (*newp might be a hard point while oldp a temporary one*)
         let unify_meet ((newp,root_to_newp,newp_to_i,newp_to_w) as nw) old_infs alpha =
           List.fold_left
-            (fun (is_found,alpha,infs) ((oldp,root_to_oldp,oldp_to_i,oldp_to_w) as old) ->
-              assert (alias oldp inf_path = oldp) ;
+            (fun (is_found,alpha,infs) old ->
+              let ((oldp,root_to_oldp,oldp_to_i,oldp_to_w) as old) = alias_inf old alpha in
               if is_found then (is_found,alpha,old::infs)
               else
                 if newp = oldp then (true,alpha,old::infs)
@@ -456,6 +470,11 @@ module Make (Node:Node.NodeType) =
                        else
                          (true, add_alias oldp newp old_to_new alpha, nw::infs)
                      else
+                       let () =
+                         Term.printf [Term.red] "I found an aliasing that is not an iso !\n" ;
+                         Printf.printf "cospan was %s \n" (Cat.string_of_cospan (oldp_to_i, newp_to_i) ) ;
+                         Printf.printf "Aliasing found is %s \n" (Cat.string_of_arrows old_to_new)
+                       in
                        assert false
                          (*is_found, alpha, old::infs*)
             ) (false,alpha,[]) old_infs
@@ -473,15 +492,7 @@ module Make (Node:Node.NodeType) =
       in
 
       let get_best_inf i ip =
-        List.map
-          (fun (inf,root_to_inf,inf_to_k,inf_to_w) ->
-            try
-              let inf',to_inf' = Lib.IntMap.find inf ip.alpha in
-              let from_inf' = Cat.invert to_inf' in
-              (inf', to_inf' @@ root_to_inf, inf_to_k @@ from_inf', inf_to_w @@ from_inf')
-            with
-              Not_found -> (inf,root_to_inf,inf_to_k,inf_to_w)
-          ) (Lib.IntMap.find i ip.beta)
+        List.map (fun inf -> alias_inf inf ip.alpha) (Lib.IntMap.find i ip.beta)
       in
 
       if QueueList.is_empty queue then (inf_path,dry_run,cut)
