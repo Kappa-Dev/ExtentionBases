@@ -6,6 +6,7 @@ module Make (Node:Node.NodeType) =
 
     let (-->) = Cat.(-->)
     let (@@) = Cat.compose ~check:true
+    let (===) = Cat.(===)
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
 
@@ -459,24 +460,20 @@ module Make (Node:Node.NodeType) =
               else
                 if newp = oldp then (true,alpha,old::infs)
                 else
-                  match Cat.aliasing oldp_to_i newp_to_i with
-                    None ->
-                     (*to_oldp and to_newp are not equivalent extensions*)
-                     (is_found, alpha, old::infs)
-                  | Some old_to_new ->
-                     if Cat.is_iso old_to_new then
-                       if newp > oldp then
-                         (true,add_alias newp oldp (Cat.invert old_to_new) alpha,old::infs)
-                       else
-                         (true, add_alias oldp newp old_to_new alpha, nw::infs)
-                     else
-                       let () =
-                         Term.printf [Term.red] "I found an aliasing that is not an iso !\n" ;
-                         Printf.printf "cospan was %s \n" (Cat.string_of_cospan (oldp_to_i, newp_to_i) ) ;
-                         Printf.printf "Aliasing found is %s \n" (Cat.string_of_arrows old_to_new)
-                       in
-                       assert false
-                         (*is_found, alpha, old::infs*)
+                  if oldp_to_i@@root_to_oldp === newp_to_i@@root_to_newp then
+                    begin
+                      match Cat.aliasing oldp_to_i newp_to_i with
+                        None -> assert false (*is_found, alpha, old::infs*)
+                      | Some old_to_new ->
+                         if safe () then
+                           assert (Cat.is_iso old_to_new) ;
+                         if newp > oldp then
+                           (true,add_alias newp oldp (Cat.invert old_to_new) alpha,old::infs)
+                         else
+                           (true, add_alias oldp newp old_to_new alpha, nw::infs)
+                    end
+                  else (*new mp is not equivalent to the told one*)
+                    (is_found,alpha,old::infs)
             ) (false,alpha,[]) old_infs
         in
         match (try Lib.IntMap.find i inf_path.beta with Not_found -> []) with

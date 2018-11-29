@@ -46,7 +46,7 @@ module type Category =
     val compose : ?check:bool -> arrows -> arrows -> arrows
     val aliasing : arrows -> arrows -> arrows option
     (*    val (|/) : arrows -> arrows -> (arrows * arrows) list*)
-    (*val (===) : arrows -> arrows -> bool*)
+    val (===) : arrows -> arrows -> bool
     val (-->) : obj -> arrows -> obj list
     val (=~=) : arrows -> arrows -> bool
 
@@ -207,33 +207,11 @@ module Make (Node:Node.NodeType) =
 
     let co_domains f = f.src --> f
 
+    (*Assuming two coinitial and cofinal arrows*)
     let (===) f f' =
-      if not (Graph.is_equal f.src f'.src) then false
-      else
-        let commute =
-          try
-            List.iter2
-              (fun hom hom' ->
-                Hom.fold
-                  (fun u v () ->
-                    if v <> Hom.find u hom' then raise Exit
-                  ) hom ()
-              ) f.maps f'.maps ;
-            true
-          with
-            Exit -> false
-        in
-        if not commute then false
-        else
-          try
-            List.iter2
-              (fun cod cod' ->
-                if not (Graph.is_equal cod cod') then raise Exit
-              ) (co_domains f) (co_domains f') ;
-            true
-          with
-            Exit -> false
-
+      assert (not (f.partial || f'.partial) && flat f && flat f') ;
+      let h,h' = List.hd f.maps,List.hd f'.maps in
+      Hom.is_equal h h'
 
     let embed _G _H =
       let rec extend hom_list iG jG acc =
