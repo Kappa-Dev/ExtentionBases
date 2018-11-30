@@ -20,8 +20,8 @@ let nodes = (...rest) => {
 }
 
 // Turn id pair into edge
-let edge = (i,j,info) => {
-  return ({data: _.extend({id:`${i}-${j}`, source: i, target: j},info||{})});
+let edge = (i,j,info={})=> {
+  return ({data: _.extend({id:`${i}-${j}#${info.name || ''}`, source: i, target: j},info||{})});
 }
 
 //let edge_label = (i,j) => ({data: _.extend({sourceLabel: i, targetLabel: j},edge(i,j).data)});
@@ -59,7 +59,7 @@ let basis = {info: {id: "basis"}, elements: _.union(basis_nodes,basis_edges)};
 // graphlib -> cytoscape-ready data with shape: {info, elements}
 let gl_to_cy_data = (gl) => {
   let l_nodes = nodes(... _.map(gl.nodes(),n => [n,gl.node(n).label,gl.node(n)]));
-  let l_edges = edges(... _.map(gl.edges(), ({v,w}) => [v,w,gl.edge({v,w})]));
+  let l_edges = edges(... _.map(gl.edges(), ({v,w,...k}) => [v,w,{...k,...gl.edge({v,w,...k})}]));
   let data = gl.graph();
   let loaded = {info: (_.isString(data) ? {id: data} : data), elements: _.union(l_nodes,l_edges)};
 
