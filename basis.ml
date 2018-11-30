@@ -5,7 +5,7 @@ module Make (Node:Node.NodeType) =
     module Term = ANSITerminal
 
     let (-->) = Cat.(-->)
-    let (@@) = Cat.compose ~check:true
+    let (@@) = Cat.compose ~check:false
     let (===) = Cat.(===)
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
