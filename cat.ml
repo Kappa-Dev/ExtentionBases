@@ -94,12 +94,18 @@ module Make (Node:Node.NodeType) =
          with Exit -> true
 
     let wf f =
+      assert (flat f) ;
       try
         List.iter
           (fun hom -> Hom.fold
                         (fun u v _ ->
                           if Graph.has_node u f.src && Graph.has_node v f.trg then ()
-                          else raise Exit
+                          else
+                            let () =
+                              if db() then
+                                Printf.printf "(%s,%s) is problematic" (Node.to_string u) (Node.to_string v)
+                            in
+                            raise Exit
                         ) hom ()
           ) f.maps ; true
       with
@@ -496,11 +502,20 @@ module Make (Node:Node.NodeType) =
       in
       let dom =
         Graph.fold_nodes (fun u d ->
-            if Hom.mem u p_hom &&
-                 List.exists (fun v -> Hom.mem v p_hom) (Graph.bound_to u d)
-            then d
+            if Hom.mem u p_hom then
+              if List.exists (fun v -> Hom.mem v p_hom) (Graph.bound_to u d)
+              then d
+              else
+                let () =
+                  if db() then
+                    Printf.printf "removing %s because it has no binding partner\n" (Node.to_string u)
+                in
+                Graph.remove u d
             else
-              let () = if db() then Printf.printf "removing %s\n" (Node.to_string u) in
+              let () = if db() then
+                         Printf.printf
+                           "removing %s because it is not in the domain of partial hom\n" (Node.to_string u)
+              in
               Graph.remove u d
           ) f_part.src f_part.src
       in
@@ -562,8 +577,15 @@ module Make (Node:Node.NodeType) =
       in
       let hom_p = iter_extend f_0 todo_0 in
       let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom_p] ; partial = true} in
+
+      (*Construction guarantees that f' is the identity*)
+      assert (is_identity f') ;
+
+      if db () then Printf.printf "Returning span %s\n\n" (string_of_span (f',g')) ;
       if safe() then assert (Graph.wf left && Graph.wf right) ;
-      let sh = {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false} in
+      let sh =
+        {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false}
+      in
       let () =
         if safe() then assert (Graph.wf f.src);
         if safe() then assert (Graph.wf f'.src);
@@ -582,3 +604,4 @@ module Make (Node:Node.NodeType) =
 
 
  end:Category with type obj = Graph.Make(Node).t)
+
