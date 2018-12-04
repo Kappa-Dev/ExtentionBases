@@ -179,7 +179,7 @@ module Make (Node:Node.NodeType) =
           let str = Printf.sprintf " %s " (Graph.to_string f.src) in
           let str' = Printf.sprintf " %s " (Graph.to_string f.trg) in
           let str'' = Printf.sprintf " %s " (Graph.to_string f'.trg) in
-          str'^"<-"^(string_of_arrows f)^"-"^str^"-"^(string_of_arrows f')^"->"^str''
+          str'^"<-"^(string_of_arrows ~full:true f)^"-"^str^"-"^(string_of_arrows ~full:true f')^"->"^str''
         end
       else
         let str0 = Printf.sprintf " %s " (Graph.to_string f.src) in
@@ -187,8 +187,8 @@ module Make (Node:Node.NodeType) =
         let str' = Printf.sprintf " %s " (Graph.to_string f.trg) in
         let str'' = Printf.sprintf " %s " (Graph.to_string f'.trg) in
         print_string
-          (str'^"<-"^(string_of_arrows f)^"-"^str0^"<<>>"^str1^"-"
-           ^(string_of_arrows f')^"->"^str'') ;
+          (str'^"<-"^(string_of_arrows ~full:true f)^"-"^str0^"<<>>"^str1^"-"
+           ^(string_of_arrows ~full:true f')^"->"^str'') ;
         failwith "Invalid argument"
 
 
@@ -444,20 +444,23 @@ module Make (Node:Node.NodeType) =
           Printf.printf "Building iso from cospan: \n <%s,%s>\n"
             (string_of_arrows ~full:true f) (string_of_arrows ~full:true g)
       in
-      let hom = hom_of_arrows f in
-      let hom' = Hom.invert (hom_of_arrows g) in
-      let () =
-        if db() then
-          Term.printf [Term.yellow] "Composing (%s o %s)"
-            (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
-      in
-      try
-        let h = {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false} in
+      if (Graph.size_node f.src, Graph.size_edge f.src) <> (Graph.size_node g.src, Graph.size_edge g.src)
+      then None
+      else
+        let hom = hom_of_arrows f in
+        let hom' = Hom.invert (hom_of_arrows g) in
         let () =
-          if safe() then assert ((wf h) && (is_iso h))
+          if db() then
+            Term.printf [Term.yellow] "Composing (%s o %s)"
+              (Hom.to_string ~full:true hom') (Hom.to_string ~full:true hom)
         in
-        Some h
-      with Hom.Undefined -> None
+        try
+          let h = {src = f.src ; trg = g.src ; maps = [Hom.compose hom' hom] ; partial = false} in
+          if is_iso h then
+            Some h
+          else
+            None
+        with Hom.Undefined -> None
 
     let (|/) left_to_sup right_to_sup =
       List.fold_left
@@ -479,12 +482,15 @@ module Make (Node:Node.NodeType) =
                  maps = [Hom.restrict (Hom.invert g) (Graph.nodes inf)] ;
                  partial = false}
               in
-              begin
-                if safe() then assert (Graph.wf inf_to_left.src) ;
-                if safe() then assert (Graph.wf inf_to_left.trg) ;
-                if safe() then assert (Graph.wf inf_to_right.src) ;
-                if safe() then assert (Graph.wf inf_to_right.trg) ;
-              end ;
+              let () =
+                if safe() then
+                  begin
+                    assert (Graph.wf inf_to_left.src) ;
+                    assert (Graph.wf inf_to_left.trg) ;
+                    assert (Graph.wf inf_to_right.src) ;
+                    assert (Graph.wf inf_to_right.trg) ;
+                  end
+              in
               (inf_to_left,inf_to_right)::pb
             ) pb right_to_sup.maps
         ) [] left_to_sup.maps
@@ -503,7 +509,11 @@ module Make (Node:Node.NodeType) =
       let dom =
         Graph.fold_nodes (fun u d ->
             if Hom.mem u p_hom then
-              if List.exists (fun v -> Hom.mem v p_hom) (Graph.bound_to u d)
+              if List.exists
+                   (fun v ->
+                     Hom.mem v p_hom
+                     && Graph.has_edge (Hom.find u p_hom) (Hom.find v p_hom) f_part.trg
+                   ) (Graph.bound_to u d)
               then d
               else
                 let () =

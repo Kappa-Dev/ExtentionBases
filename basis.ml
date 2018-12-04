@@ -463,7 +463,7 @@ module Make (Node:Node.NodeType) =
                   if oldp_to_i@@root_to_oldp === newp_to_i@@root_to_newp then
                     begin
                       match Cat.aliasing oldp_to_i newp_to_i with
-                        None -> assert false (*is_found, alpha, old::infs*)
+                        None -> (is_found, alpha, old::infs) (*commutes but different midpoints*)
                       | Some old_to_new ->
                          if safe () then
                            assert (Cat.is_iso old_to_new) ;
@@ -600,7 +600,7 @@ module Make (Node:Node.NodeType) =
                        ) (find i ext_base).next queue
                  in
                  let to_midpoint,to_base,to_w = sh_info in
-                 assert (Cat.wf to_midpoint) ;
+                 let () = if safe() then assert (Cat.wf to_midpoint) in
                  let has_sup = true in
                  let compared' = Lib.Int2Set.add (k,i) compared
                  in
@@ -655,10 +655,15 @@ module Make (Node:Node.NodeType) =
                        in
                        let inf_to_mp =
                          let f = to_midpoint @@ (Cat.invert iso_inf) in (*inf_to_mp: inf_id |--> mp_id*)
-                         assert (Cat.wf iso_mp) ;
-                         assert (Cat.is_iso iso_inf) ;
-                         assert (Cat.wf to_midpoint) ;(*fails*)
-                         assert (Cat.wf f) ;
+                         let () =
+                           if safe () then
+                             begin
+                               assert (Cat.wf iso_mp) ;
+                               assert (Cat.is_iso iso_inf) ;
+                               assert (Cat.wf to_midpoint) ;(*fails*)
+                               assert (Cat.wf f)
+                             end
+                         in
                          iso_mp @@ f
                        in
                        let mp_to_base = to_base @@ (Cat.invert iso_mp) in (* mp_to_base : mp_id |--> i *)
@@ -700,7 +705,8 @@ module Make (Node:Node.NodeType) =
         in
         let compared_0 = Lib.Int2Set.empty in
         let dry_run_0 = [] in
-        let inf_path,dry_run,cut = progress ext_base dry_run_0 compared_0 inf_path_0 queue_0 max_step (Lib.IntSet.singleton 0)
+        let inf_path,dry_run,cut =
+          progress ext_base dry_run_0 compared_0 inf_path_0 queue_0 max_step (Lib.IntSet.singleton 0)
         in
         let () = if db() then print_inf_path inf_path in
         (* 1. Adding witness point *)
@@ -709,7 +715,8 @@ module Make (Node:Node.NodeType) =
           if db() then
             begin
               print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ;
-              print_string (Printf.sprintf "Cut is {%s}\n" (String.concat "," (List.map string_of_int (Lib.IntSet.elements cut)))) ;
+              print_string (Printf.sprintf "Cut is {%s}\n"
+                              (String.concat "," (List.map string_of_int (Lib.IntSet.elements cut)))) ;
               flush stdout
             end
         in
@@ -744,7 +751,8 @@ module Make (Node:Node.NodeType) =
         let ext_base =
           List.fold_left
             (fun ext_base (inf,_,_,inf_to_w) ->
-              if inf=w || not (Lib.IntSet.mem inf cut) then (if db() then Printf.printf "%d not in cut skipping\n" inf ; ext_base)
+              if inf=w || not (Lib.IntSet.mem inf cut) then
+                (if db() then Printf.printf "%d not in cut skipping\n" inf ; ext_base)
               else
                 add_step_alpha inf w inf_to_w ext_base inf_path
             ) ext_base (List.rev inf_list)
