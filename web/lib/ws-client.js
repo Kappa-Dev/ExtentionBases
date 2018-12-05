@@ -2,7 +2,7 @@ let ws_client = ({url,cb}) => {
   let connection = null;
   let timeout = null;
   let connection_counter = 0;
-  let debug = false;
+  let debug = true;
 
   let _log = (str) => { if (debug) { console.log(str); } }
 

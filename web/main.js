@@ -5,6 +5,26 @@ let styles = require('./lib/styles');
 
 let WS = require('./lib/ws-client');
 
+let perfNum = 0;
+let perf = (a) => {
+  let t0  = 0;
+  let pnum = 0;
+  const start = a => {
+    t0 = performance.now();
+    pnum = a ? a : perfNum++;
+    console.log(`Start timing #${pnum}`);
+  };
+  const end = () => {
+    let t1 = performance.now();
+    console.log(`End timing #${pnum}: ${Math.round((t1-t0))}ms.`);
+  };
+  start(a);
+  return {
+    end,
+    next: (a) => {end(); start(a);}
+  }
+}
+
 
 let clear = () => {
   if (window.cy_graphs) {
@@ -32,6 +52,7 @@ let toggleHideMaps = col => setHideMaps(col, getHideMaps() === "false")
 // websocket callback
 let websocket_callback = (type,content) => {
 
+
   if (type == "log") {
     console.log("Received from server: "+content);
   } else if (type == "graph") {
@@ -45,6 +66,8 @@ let websocket_callback = (type,content) => {
 
     let cyd_basis = graph.gl_to_cy_data(gl_basis);
     let cyd_graphs = _.map(gl_graphs,graph.gl_to_cy_data);
+
+
 
     init(cyd_basis, cyd_graphs);
   } else {
@@ -64,6 +87,7 @@ cytoscape.use(require('./vendor/cytoscape-cose-bilkent'));
 let init = (cyd_basis,cyd_graphs) => {
   clear();
 
+  let p0 = perf();
   // Attach metadata to basis elements (outer) and midpoint elements (inner)
   _.each(cyd_basis.elements, g => { g.data.outer = true; });
   _.each(cyd_graphs, ({info,elements}) => {
@@ -75,6 +99,10 @@ let init = (cyd_basis,cyd_graphs) => {
       if (g.data.target) g.data.target = `${info.id}/${g.data.target}`;
     });
   });
+
+  p0.end();
+
+  let p1 = perf();
 
 
   // Setup full graph
@@ -92,8 +120,11 @@ let init = (cyd_basis,cyd_graphs) => {
     autounselectify: true,
     maxZoom: 5,
     minZoom: 0.01,
-    style: styles ,
+    style: styles
   });
+
+  p1.end();
+  let p2 = perf();
 
 
 
@@ -113,10 +144,19 @@ let init = (cyd_basis,cyd_graphs) => {
     return [info.id, inner];
   }));
 
+  p2.end();
+
+  let p3 = perf();
+
 
   // Run each layout separately
   outers.layout(dagre_data).run();
+  p3.end();
+  let p4 = perf();
   conflicts.layout(conflict_data).run();
+  p4.end();
+
+  let p5 = perf();
 
   // Adapt inner_nodes size to inner graph size
   _.each(inners, (inner,id) => {
@@ -134,7 +174,9 @@ let init = (cyd_basis,cyd_graphs) => {
     });
   });
 
+  p5.end();
 
+  let p6 = perf();
 
   let paddingPc = 0.05;
   _.each(inners, (inner,id) => {
@@ -154,6 +196,9 @@ let init = (cyd_basis,cyd_graphs) => {
     }).run()
   });
 
+  p6.end();
+  let p7 = perf();
+
   //window.inners = inners;
 
   let edgeLength = e => {
@@ -163,6 +208,10 @@ let init = (cyd_basis,cyd_graphs) => {
     let tPos = e.targetEndpoint();
     return Math.sqrt(Math.pow(sPos.x - tPos.x,2) + Math.pow(sPos.y - tPos.y,2));
   }
+
+  p7.end();
+  let p8 = perf();
+
 
   //window.edgeLength = edgeLength;
 
@@ -178,6 +227,8 @@ let init = (cyd_basis,cyd_graphs) => {
     let initEdgeFont = 4;
     let initOffset = 5;
     let initMainFont = 14;
+    let callbacks = [];
+    let px = perf('x');
     _.each(inners, (inner,id) => {
       //console.log("ID ", id);
       let nodes = inner.filter(e => !e.data().source);
@@ -186,21 +237,39 @@ let init = (cyd_basis,cyd_graphs) => {
       num = nodes.size();
       let factorFont = linearCutoff(1,5,1,20,num);
       //console.log(nodes.size(),factorFont);
-      _.each(nodes, (n,k) => {
-        n.style('font-size',(initMainFont/factorFont)+'px');
+
+        _.each(nodes, (n,k) => {
+
+          callbacks.push(() => {
+            n.data('fontSize',(initMainFont/factorFont)+'px');
+            n.addClass('localnode');
+          });
+
+        });
+        _.each(edges, (e,k) => {
+          let length = edgeLength(e);
+          let factor = linearCutoff(2,1,1,20,length);
+          //console.log("length: ",length,", factor: ", factor);
+          callbacks.push(() => {
+            //e.style('font-size','5px');
+            e.data('fontSize',(initEdgeFont/factor)+'px');
+            e.data('sourceTextOffset', (initOffset/(factor*1.5))+'px');
+            e.data('targetTextOffset', (initOffset/(factor*1.5))+'px');
+            e.addClass('localedge');
+          });
+        });
       });
-      _.each(edges, (e,k) => {
-        let length = edgeLength(e);
-        let factor = linearCutoff(2,1,1,20,length);
-        //console.log("length: ",length,", factor: ", factor);
-        e.style('font-size',(initEdgeFont/factor)+'px');
-        //e.style('font-size','5px');
-        e.style('source-text-offset', (initOffset/(factor*1.5))+'px');
-        e.style('target-text-offset', (initOffset/(factor*1.5))+'px');
-      });
-    });
+     px.end();
+    cy_basis.startBatch();
+    let py = perf('cb');
+    _.each(callbacks, f => { f(); })
+    py.end();
+    cy_basis.endBatch();
   }
   adjust();
+
+  p8.end();
+  let p9 = perf();
 
 
   // show conflicts or not
@@ -211,6 +280,7 @@ let init = (cyd_basis,cyd_graphs) => {
   if (getHideMaps() === null || getHideMaps() === "false") {
     setHideMaps(cy_basis.filter('[outer][^conflict]'),false);
   }
+
 
   // Interactivity
   cy_basis.filter('edge[outer]').on('mouseover', evt => evt.target.addClass('hover'));
@@ -259,6 +329,8 @@ let init = (cyd_basis,cyd_graphs) => {
     evt.target.toggleClass('hoverLong');
     updateActives();
   });
+
+  p9.end();
 
 };
 

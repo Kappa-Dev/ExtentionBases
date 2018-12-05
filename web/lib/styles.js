@@ -75,6 +75,21 @@ module.exports = [ // the stylesheet for the graph
       'shape': 'square'
     }
   },
+
+  {
+    selector: 'node.localnode',
+    style: {
+      'font-size': 'data(fontSize)'
+    }
+  },
+  {
+    selector: 'edge.localedge',
+    style: {
+      'font-size': 'data(fontSize)',
+      'source-text-offset': 'data(sourceTextOffset)',
+      'target-text-offset': 'data(targetTextOffset)',
+    }
+  },
   {
     selector: 'node[outer].activeCC, node[outer].activeCCLong',
     style: {
