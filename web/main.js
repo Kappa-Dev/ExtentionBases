@@ -198,7 +198,7 @@ let init = (cyd_basis,cyd_graphs) => {
   });
   cy_basis.endBatch();
 
-  //window.inners = inners;
+  window.inners = inners;
 
   let edgeLength = e => {
     //console.log("edge", e.data().source, e.data().target);
@@ -343,7 +343,7 @@ document.addEventListener('keypress', e => {
   if (e.key === 'p') {
     let screenlink = document.getElementById('screenlink');
 
-    let dataUrl = cy_basis.png({full:true,bg: "white"});
+    let dataUrl = cy_basis.png({full:true,bg: "white",maxWidth: 4000});
     screenlink.classList.add('ready');
     screenlink.href = dataUrl;
     screenlink.click();
