@@ -179,7 +179,8 @@ module Make (Node:Node.NodeType) =
           let str = Printf.sprintf " %s " (Graph.to_string f.src) in
           let str' = Printf.sprintf " %s " (Graph.to_string f.trg) in
           let str'' = Printf.sprintf " %s " (Graph.to_string f'.trg) in
-          str'^"<-"^(string_of_arrows ~full:true f)^"-"^str^"-"^(string_of_arrows ~full:true f')^"->"^str''
+          str'^"<-"^(Hom.to_string ~full:true (List.hd f.maps))
+          ^"-"^str^"-"^(Hom.to_string ~full:true (List.hd f'.maps))^"->"^str''
         end
       else
         let str0 = Printf.sprintf " %s " (Graph.to_string f.src) in
@@ -197,7 +198,7 @@ module Make (Node:Node.NodeType) =
       let str = Printf.sprintf " %s " (Graph.to_string f.trg) in
       let str' = Printf.sprintf " %s " (Graph.to_string f.src) in
       let str'' = Printf.sprintf " %s " (Graph.to_string f'.src) in
-      str'^"-"^(string_of_arrows f)^"->"^str^"<-"^(string_of_arrows f')^"-"^str''
+      str'^"-"^(Hom.to_string ~full:true (List.hd f.maps))^"->"^str^"<-"^(Hom.to_string ~full:true (List.hd f'.maps))^"-"^str''
 
     let string_of_tile tile =
       match tile.cospan with

@@ -64,12 +64,7 @@ module Make (Content:Lib.OrderedType) =
 
     let add i j bij =
       let valid =
-	if mem i bij then
-	  try
-	    j = find i bij
-	  with Not_found -> failwith "Invariant violation"
-	else
-	  not (comem j bij)
+        try find i bij = j with Not_found -> not (comem j bij)
       in
       if not valid then raise (Not_bijective (i,j,bij))
       else

@@ -55,15 +55,6 @@ module Make (Node:Node.NodeType) =
       try
 	let hom' = add_sub u_i v_i hom
 	in
-        let () =
-          if Lib.Util.safe () then
-	    assert (
-	        match (try Some (NodeBij.find u hom.tot) with Not_found -> None) with
-	          None -> true
-	        | Some v' -> (Node.compare v v') = 0
-	      )
-          else ()
-        in
 	{hom' with tot = NodeBij.add u v hom.tot}
       with
 	NodeBij.Not_bijective _ | IntBij.Not_bijective _ -> raise Not_injective

@@ -51,7 +51,9 @@ module Make (Node:Node.NodeType) =
     let dump eb =
       Lib.IntMap.iter
       (fun i p ->
-        let next = Lib.IntMap.fold (fun j _ cont -> (Printf.sprintf "%d" j)::cont) p.next []
+        let next = Lib.IntMap.fold
+                     (fun j _ cont -> (Printf.sprintf "%d" j)::cont)
+                     p.next []
         in
         Term.printf [] "%d |--> [%s]\n" i (String.concat "," next);
       ) eb.points
@@ -286,21 +288,26 @@ module Make (Node:Node.NodeType) =
     | Incomp of (Cat.arrows * Cat.arrows * Cat.arrows) (*inf_to_sh,sh_to_base,sh_to_w*)
 
     let compare inf_to_i inf_to_w =
-      if db() then
-        Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w)) ; flush stdout ;
+      let () =
+        if db() then
+          Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w))
+      in
       let (inf_to_sh,sh_to_base,sh_to_w) as sharing = Cat.share inf_to_i inf_to_w in
       let iso_to_w = Cat.is_iso sh_to_w in
       let iso_to_base = Cat.is_iso sh_to_base in
       if iso_to_w then
         if iso_to_base then
-          let () = if safe() then
-                     if (inf_to_i =~= inf_to_w) then assert true
-                     else
-                       begin
-                         Term.printf [Term.red] "Error: %s and %s are not extensionally equivalent!\n"
-                           (Cat.string_of_arrows ~full:true inf_to_i) (Cat.string_of_arrows ~full:true inf_to_w) ;
-                         assert false
-                       end
+          let () =
+            if safe() then
+              if (inf_to_i =~= inf_to_w) then assert true
+              else
+                begin
+                  Term.printf [Term.red]
+                    "Error: %s and %s are not extensionally equivalent!\n"
+                    (Cat.string_of_arrows ~full:true inf_to_i)
+                    (Cat.string_of_arrows ~full:true inf_to_w) ;
+                  assert false
+                end
           in
           Iso (sh_to_base @@ (Cat.invert sh_to_w))
         else
@@ -313,7 +320,9 @@ module Make (Node:Node.NodeType) =
 
     exception Found_iso of Cat.arrows * int
 
-    type inf_path = {beta : (int*arrows*arrows*arrows) list Lib.IntMap.t ; alpha: (int*arrows) Lib.IntMap.t}
+    type inf_path =
+      {beta : (int*arrows*arrows*arrows) list Lib.IntMap.t ;
+       alpha: (int*arrows) Lib.IntMap.t}
 
     let print_inf_path ip =
       Lib.IntMap.iter
@@ -402,7 +411,11 @@ module Make (Node:Node.NodeType) =
                   Printf.printf
                     "Compared {%s}\n"
 		    (String.concat ","
-		       (List.map (fun (x,y) -> Term.sprintf [Term.yellow] "%d|->%d" x y) (Lib.Int2Set.elements compared))
+		       (List.map
+                          (fun (x,y) ->
+                            Term.sprintf [Term.yellow] "%d|->%d" x y
+                          ) (Lib.Int2Set.elements compared)
+                       )
 		    ) ;
                   flush stdout
                 end
@@ -455,7 +468,9 @@ module Make (Node:Node.NodeType) =
         let unify_meet ((newp,root_to_newp,newp_to_i,newp_to_w) as nw) old_infs alpha =
           List.fold_left
             (fun (is_found,alpha,infs) old ->
-              let ((oldp,root_to_oldp,oldp_to_i,oldp_to_w) as old) = alias_inf old alpha in
+              let ((oldp,root_to_oldp,oldp_to_i,oldp_to_w) as old) =
+                alias_inf old alpha
+              in
               if is_found then (is_found,alpha,old::infs)
               else
                 if newp = oldp then (true,alpha,old::infs)
@@ -463,12 +478,14 @@ module Make (Node:Node.NodeType) =
                   if oldp_to_i@@root_to_oldp === newp_to_i@@root_to_newp then
                     begin
                       match Cat.aliasing oldp_to_i newp_to_i with
-                        None -> (is_found, alpha, old::infs) (*commutes but different midpoints*)
+                         (*commutes but different midpoints*)
+                        None -> (is_found, alpha, old::infs)
                       | Some old_to_new ->
                          if safe () then
                            assert (Cat.is_iso old_to_new) ;
                          if newp > oldp then
-                           (true,add_alias newp oldp (Cat.invert old_to_new) alpha,old::infs)
+                           (true,add_alias newp oldp (Cat.invert old_to_new) alpha,
+                            old::infs)
                          else
                            (true, add_alias oldp newp old_to_new alpha, nw::infs)
                     end

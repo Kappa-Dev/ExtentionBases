@@ -3,4 +3,5 @@ add square
 add osquare
 add dsquare
 add house
+add triangle
 build (empty,one)
