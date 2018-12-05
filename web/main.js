@@ -135,14 +135,19 @@ let init = (cyd_basis,cyd_graphs) => {
     transform: (node,position) => { return {x: position.x, y: node.cy().height()-position.y} }
   };
   let conflict_data = dagre_data;
+  p2.next('outers');
 
   // Subsets of the full graph
   let outers = cy_basis.filter('[outer][^conflict]');
   let conflicts = cy_basis.filter('[outer][conflict]');
+  p2.next('inners');
   let inners = _.object(_.map(cyd_graphs, ({info}) => {
-    const inner = cy_basis.filter(e => e.data().fromGraph == info.id);
-    return [info.id, inner];
+    return [info.id, cy_basis.collection()]
   }));
+  cy_basis.filter('[^outer]').forEach( e => {
+    let id = e.data().fromGraph;
+    inners[id].merge(e);
+  });
 
   p2.end();
 
