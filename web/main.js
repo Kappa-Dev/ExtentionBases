@@ -69,7 +69,9 @@ let websocket_callback = (type,content) => {
 
 
 
+    let prf = perf('full init');
     init(cyd_basis, cyd_graphs);
+    prf.end();
   } else {
     console.log("Unknown message type: "+type+". Content: "+content);
   }
@@ -87,7 +89,7 @@ cytoscape.use(require('./vendor/cytoscape-cose-bilkent'));
 let init = (cyd_basis,cyd_graphs) => {
   clear();
 
-  let p0 = perf();
+  let prf = perf('build');
   // Attach metadata to basis elements (outer) and midpoint elements (inner)
   _.each(cyd_basis.elements, g => { g.data.outer = true; });
   _.each(cyd_graphs, ({info,elements}) => {
@@ -100,10 +102,7 @@ let init = (cyd_basis,cyd_graphs) => {
     });
   });
 
-  p0.end();
-
-  let p1 = perf();
-
+  prf.next('init');
 
   // Setup full graph
 
@@ -123,9 +122,8 @@ let init = (cyd_basis,cyd_graphs) => {
     style: styles
   });
 
-  p1.end();
-  let p2 = perf();
 
+  prf.next('dagre setup');
 
 
   // Layout templates
@@ -135,12 +133,11 @@ let init = (cyd_basis,cyd_graphs) => {
     transform: (node,position) => { return {x: position.x, y: node.cy().height()-position.y} }
   };
   let conflict_data = dagre_data;
-  p2.next('outers');
 
   // Subsets of the full graph
   let outers = cy_basis.filter('[outer][^conflict]');
   let conflicts = cy_basis.filter('[outer][conflict]');
-  p2.next('inners');
+
   let inners = _.object(_.map(cyd_graphs, ({info}) => {
     return [info.id, cy_basis.collection()]
   }));
@@ -149,19 +146,19 @@ let init = (cyd_basis,cyd_graphs) => {
     inners[id].merge(e);
   });
 
-  p2.end();
 
-  let p3 = perf();
+  prf.next('dagre run');
 
 
   // Run each layout separately
   outers.layout(dagre_data).run();
-  p3.end();
-  let p4 = perf();
-  conflicts.layout(conflict_data).run();
-  p4.end();
 
-  let p5 = perf();
+
+  prf.next('conflict run');
+
+  conflicts.layout(conflict_data).run();
+
+  prf.next('adjust inner sizes');
 
   // Adapt inner_nodes size to inner graph size
   _.each(inners, (inner,id) => {
@@ -179,11 +176,10 @@ let init = (cyd_basis,cyd_graphs) => {
     });
   });
 
-  p5.end();
-
-  let p6 = perf();
+  prf.next('inner layout');
 
   let paddingPc = 0.05;
+  cy_basis.startBatch();
   _.each(inners, (inner,id) => {
     const outer = cy_basis.getElementById(id);
     const pos = outer.position();
@@ -200,9 +196,7 @@ let init = (cyd_basis,cyd_graphs) => {
       }
     }).run()
   });
-
-  p6.end();
-  let p7 = perf();
+  cy_basis.endBatch();
 
   //window.inners = inners;
 
@@ -214,9 +208,8 @@ let init = (cyd_basis,cyd_graphs) => {
     return Math.sqrt(Math.pow(sPos.x - tPos.x,2) + Math.pow(sPos.y - tPos.y,2));
   }
 
-  p7.end();
-  let p8 = perf();
 
+  prf.next('adjust inner labels');
 
   //window.edgeLength = edgeLength;
 
@@ -233,7 +226,6 @@ let init = (cyd_basis,cyd_graphs) => {
     let initOffset = 5;
     let initMainFont = 14;
     let callbacks = [];
-    let px = perf('x');
     _.each(inners, (inner,id) => {
       //console.log("ID ", id);
       let nodes = inner.filter(e => !e.data().source);
@@ -264,18 +256,13 @@ let init = (cyd_basis,cyd_graphs) => {
           });
         });
       });
-     px.end();
     cy_basis.startBatch();
-    let py = perf('cb');
     _.each(callbacks, f => { f(); })
-    py.end();
     cy_basis.endBatch();
   }
   adjust();
 
-  p8.end();
-  let p9 = perf();
-
+  prf.next('finish');
 
   // show conflicts or not
   if (getConflict() === null || getConflict() === "true") {
@@ -335,7 +322,7 @@ let init = (cyd_basis,cyd_graphs) => {
     updateActives();
   });
 
-  p9.end();
+  prf.end();
 
 };
 
