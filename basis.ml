@@ -369,6 +369,41 @@ module Make (Node:Node.NodeType) =
 
     exception Iso_found of (int * Cat.arrows) Lib.IntMap.t
 
+    let merge j i j_to_i ext_base =
+      let pi = find i ext_base in
+      let pj = find j ext_base in
+      let ext_base = (*removing steps k |-> j and adding k |-> i if needed*)
+        Lib.IntSet.fold
+          (fun k ext_base ->
+           let pk = find k ext_base in
+           let ext_base =
+             if not (Lib.IntMap.mem i pk.next) then
+               let k_to_j = Lib.IntMap.find j pk.next in
+               add_step k i (j_to_i @@ k_to_j) ext_base
+             else
+               ext_base
+           in
+           remove_step k j ext_base
+          ) pj.prev ext_base
+      in
+      let ext_base =
+        Lib.IntMap.fold
+          (fun k j_to_k ext_base ->
+            let ext_base =
+              if Lib.IntMap.mem k pi.next then ext_base
+              else
+                add_step i k (j_to_k @@ (Cat.invert j_to_i)) ext_base
+            in
+            remove_step j k ext_base
+          ) pj.next ext_base
+      in
+      {points = Lib.IntMap.remove j ext_base.points ;
+       max_elements = Lib.IntSet.remove j ext_base.max_elements ;
+       fresh = ext_base.fresh ;
+       extensions = Lib.IntMap.remove j ext_base.extensions ;
+       witnesses = Lib.IntSet.remove j ext_base.witnesses
+      }
+
     let rec progress ext_base dry_run compared inf_path queue max_step cut =
 
       (************* DEBUGING INFO ***************)
@@ -432,27 +467,27 @@ module Make (Node:Node.NodeType) =
            else
              Some (i-1)
       in
-      let add_alias i i' to_i' alpha =
+      let add_alias i i' to_i' alpha ext_base =
         if safe () then
-          begin
             assert (alias i inf_path = i) ;
-            assert (not (mem i ext_base))
-          end ;
-        let i',to_i' =
-          try
-            let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
-          with Not_found -> (i',to_i')
-        in
-        (*super inneficient*)
-        let alpha =
-          Lib.IntMap.fold
-            (fun j (j',to_j') alpha ->
-              if j'=i then Lib.IntMap.add j (i', to_i' @@ to_j') alpha
-              else
-                alpha
-            ) alpha alpha
-        in
-        Lib.IntMap.add i (i',to_i') alpha
+        if mem i ext_base then
+          (alpha,merge i i' to_i' ext_base)
+        else
+          let i',to_i' =
+            try
+              let j,to_j = Lib.IntMap.find i' alpha in (j,to_j @@ to_i')
+            with Not_found -> (i',to_i')
+          in
+          (*super inneficient*)
+          let alpha =
+            Lib.IntMap.fold
+              (fun j (j',to_j') alpha ->
+                if j'=i then Lib.IntMap.add j (i', to_i' @@ to_j') alpha
+                else
+                  alpha
+              ) alpha alpha
+          in
+          (Lib.IntMap.add i (i',to_i') alpha,ext_base)
       in
 
       let alias_inf ((p,root_to_p,p_to_i,p_to_w) as inf) alpha =
@@ -465,44 +500,45 @@ module Make (Node:Node.NodeType) =
       in
       let update_inf i inf inf_path ext_base =
         (*newp might be a hard point while oldp a temporary one*)
-        let unify_meet ((newp,root_to_newp,newp_to_i,newp_to_w) as nw) old_infs alpha =
+        let unify_meet ((newp,root_to_newp,newp_to_i,newp_to_w) as nw) old_infs alpha ext_base =
           List.fold_left
-            (fun (is_found,alpha,infs) old ->
+            (fun (is_found,alpha,infs,ext_base) old ->
               let ((oldp,root_to_oldp,oldp_to_i,oldp_to_w) as old) =
                 alias_inf old alpha
               in
-              if is_found then (is_found,alpha,old::infs)
+              if is_found then (is_found,alpha,old::infs,ext_base)
               else
-                if newp = oldp then (true,alpha,old::infs)
+                if newp = oldp then (true,alpha,old::infs,ext_base)
                 else
                   if oldp_to_i@@root_to_oldp === newp_to_i@@root_to_newp then
                     begin
                       match Cat.aliasing oldp_to_i newp_to_i with
                          (*commutes but different midpoints*)
-                        None -> (is_found, alpha, old::infs)
+                        None -> (is_found, alpha, old::infs,ext_base)
                       | Some old_to_new ->
                          if safe () then
                            assert (Cat.is_iso old_to_new) ;
                          if newp > oldp then
-                           (true,add_alias newp oldp (Cat.invert old_to_new) alpha,
-                            old::infs)
+                           let alpha,ext_base = add_alias newp oldp (Cat.invert old_to_new) alpha ext_base in
+                           (true,alpha,old::infs,ext_base)
                          else
-                           (true, add_alias oldp newp old_to_new alpha, nw::infs)
+                           let alpha,ext_base = add_alias oldp newp old_to_new alpha ext_base in
+                           (true, alpha, nw::infs,ext_base)
                     end
-                  else (*new mp is not equivalent to the told one*)
-                    (is_found,alpha,old::infs)
-            ) (false,alpha,[]) old_infs
+                  else (*new mp is not equivalent to the old one*)
+                    (is_found,alpha,old::infs,ext_base)
+            ) (false,alpha,[],ext_base) old_infs
         in
         match (try Lib.IntMap.find i inf_path.beta with Not_found -> []) with
           (*inf_list is the first comparison between i and the witness*)
-          [] -> {inf_path with beta = Lib.IntMap.add i [inf] inf_path.beta}
+          [] -> ({inf_path with beta = Lib.IntMap.add i [inf] inf_path.beta},ext_base)
         | old_inf_list ->
-           let alpha,updated_inf_list =
-             let iso_found,alpha,infs = unify_meet inf old_inf_list inf_path.alpha in
-             if iso_found then (alpha,infs)
-             else (alpha,inf::old_inf_list)
+           let alpha,updated_inf_list,ext_base =
+             let iso_found,alpha,infs,ext_base = unify_meet inf old_inf_list inf_path.alpha ext_base in
+             if iso_found then (alpha,infs,ext_base)
+             else (alpha,inf::old_inf_list,ext_base)
            in
-           {alpha=alpha ; beta=Lib.IntMap.add i updated_inf_list inf_path.beta}
+           ({alpha=alpha ; beta=Lib.IntMap.add i updated_inf_list inf_path.beta},ext_base)
       in
 
       let get_best_inf i ip =
@@ -580,7 +616,7 @@ module Make (Node:Node.NodeType) =
                                       true
                                   ) ;
                  let g_i = Cat.src i_to_w in
-                 let inf_path' =
+                 let inf_path',ext_base =
                    update_inf i
                      (i, inf_to_i @@ root_to_inf, Cat.identity g_i g_i, i_to_w)
                      inf_path
@@ -634,7 +670,7 @@ module Make (Node:Node.NodeType) =
 
                  if Cat.is_iso to_midpoint then
                    let () = if db() then print_string (green "...that is not worth adding\n") in
-                   let inf_path' =
+                   let inf_path',ext_base =
                      update_inf i (inf,root_to_inf,inf_to_i,inf_to_w) inf_path ext_base
                    in
                    let dry_run' =
@@ -652,7 +688,7 @@ module Make (Node:Node.NodeType) =
                        Term.printf [Term.cyan] "Midpoint %d: %s\n"
                          fresh_id (Graph.to_string (Cat.trg to_midpoint))
                    in
-                   let inf_path' =
+                   let inf_path',ext_base =
                      update_inf i
                        (fresh_id,to_midpoint @@ root_to_inf,to_base,to_w)
                        inf_path
