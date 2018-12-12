@@ -1,6 +1,8 @@
 module type SymT =
   sig
-    val compatible : int -> int -> int -> int -> bool
+    val compatible : (int -> int -> int -> int -> bool)
+    val rigid_bonds : bool
+    val rigid_ports : bool
     val info : string
   end
 
@@ -10,6 +12,8 @@ module Make (Symmetry:SymT) =
     let arity = 2
 
     let info = Symmetry.info
+    let has_rigid_ports = Symmetry.rigid_ports
+    let has_rigid_bonds = Symmetry.rigid_bonds
     let label u = u.label
 
     let id u = u.ag_id
@@ -20,16 +24,10 @@ module Make (Symmetry:SymT) =
     let gluable u v = (*same id, same label and different ports*)
       (id u = id v) && compatible u v
 
-    let compare u v =
-      let cmp i j =
-        if i=j then 0
-        else if i<j then -1
-        else 1
-      in
-      let c = cmp u.ag_id v.ag_id in
-      if c=0 then cmp u.port_id v.port_id
-      else c
-             (*Pervasives.compare (u.ag_id,u.port_id) (v.ag_id,v.port_id)*)
+    let compare = Pervasives.compare
+
+    let distinguishable u v =
+      id u <> id v || not (compatible u v)
 
     let create l =
       match l with
@@ -122,7 +120,7 @@ module Make (Symmetry:SymT) =
 
 
 module KappaNode =
-  Make (struct let compatible = fun l p l' p' -> l=l' && p=p' let info = "Kappa Graphs" end)
+  Make (struct let compatible = fun l p l' p' -> l=l' && p=p' let info = "Kappa Graphs" let rigid_ports = true let rigid_bonds = true end)
 
 module KappaNode01 = (*ports 0 and 1 of all agents are equivalent*)
   Make
@@ -132,8 +130,9 @@ module KappaNode01 = (*ports 0 and 1 of all agents are equivalent*)
           if p = 0 || p=1 then p'=0 || p'=1
           else p=p'
       let info = "Kappa Graphs (0~1)"
+      let rigid_ports = false let rigid_bonds = true
     end)
 
 (*all ports of the same agents are equivalent!*)
 module DegreeNode =
-  Make (struct let compatible = fun l _ l' _ -> (l=l') let info = "Port Graphs" end)
+  Make (struct let compatible = fun l _ l' _ -> (l=l') let info = "Port Graphs" let rigid_ports = false let rigid_bonds = true end)

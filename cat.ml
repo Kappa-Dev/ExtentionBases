@@ -31,7 +31,7 @@ module type Category =
 
 
     (* val share : arrows -> arrows -> (arrows * tile) list*)
-    val share : arrows -> arrows -> (arrows * arrows * arrows)
+    val share : arrows -> arrows -> (arrows * arrows * arrows) list
 
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
@@ -540,7 +540,7 @@ module Make (Node:Node.NodeType) =
     let extend_hom left right p_hom u todo =
       let () = if safe() then assert (Hom.mem u p_hom)
       in
-      let nodes_left,nodes_right =
+      let nodes_left,nodes_right,multi =
         match
           (List.filter
              (fun v -> not (Hom.mem v p_hom))
@@ -552,56 +552,81 @@ module Make (Node:Node.NodeType) =
               (Graph.bound_to u left),
             List.filter
               (fun v -> not (Hom.comem v p_hom))
-              (Graph.bound_to (Hom.find u p_hom) right)
+              (Graph.bound_to (Hom.find u p_hom) right),
+            true (*not Node.has_rigid_bonds*)
            )
         | nodes ->
            (nodes, List.filter
                      (fun v -> not (Hom.comem v p_hom))
-                     (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right)
+                     (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right),
+            true (*not Node.has_rigid_ports*)
            )
       in
       List.fold_left
-        (fun (p_hom,todo) v ->
-          List.fold_left
-            (fun (p_hom,todo) v' ->
-              try
-                let () = if db() then
-                           Printf.printf "Trying to map %s |-> %s\n" (Node.to_string v) (Node.to_string v')
-                in
-                (Hom.add v v' p_hom,v::todo)
-              with
-                Hom.Not_structure_preserving | Hom.Not_injective ->
-                                                (if db() then print_endline "Failed" ; (p_hom,todo))
-            ) (p_hom,todo) nodes_right
-        ) (p_hom,todo) nodes_left
+        (fun ext_p_hom v ->
+          if (not multi) && (ext_p_hom <> []) then ext_p_hom
+          else
+            List.fold_left
+              (fun ext_p_hom v' ->
+                try
+                  let () = if db() then
+                             Printf.printf "Trying to map %s |-> %s\n" (Node.to_string v) (Node.to_string v')
+                  in
+                  (Hom.add v v' p_hom,v::todo)::ext_p_hom
+                with
+                  Hom.Not_structure_preserving | Hom.Not_injective ->
+                                                  (if db() then print_endline "Failed" ; ext_p_hom)
+              ) ext_p_hom nodes_right
+        ) [] nodes_left
 
     let share f g =
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
-      let rec iter_extend hom_p = function
-          [] -> hom_p
+      let rec iter_extend hom_p todo acc =
+        match todo with
+          [] -> hom_p::acc
         | u::tl ->
            let () = if db() then Printf.printf "Extending node %s \n" (Node.to_string u) in
-           let hom_p,todo = extend_hom left right hom_p u tl in
-           iter_extend hom_p todo
+           match extend_hom left right hom_p u tl with
+             [] -> iter_extend hom_p tl acc
+           | ext_hom_p ->
+              List.fold_left
+                (fun ext_hom_p (hom_p,todo) ->
+                  iter_extend hom_p todo ext_hom_p
+                ) acc ext_hom_p
       in
-      let hom_p = iter_extend f_0 todo_0 in
-      let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom_p] ; partial = true} in
-
-      (*Construction guarantees that f' is the identity*)
-      assert (is_identity f') ;
-
-      if db () then Printf.printf "Returning span %s\n\n" (string_of_span (f',g')) ;
-      if safe() then assert (Graph.wf left && Graph.wf right) ;
-      let sh =
-        {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false}
+      let ext_hom_p = iter_extend f_0 todo_0 [] in
+      let l =
+        List.map
+          (fun hom_p ->
+            let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom_p] ; partial = true} in
+            (*Construction guarantees that f' is the identity*)
+            assert (is_identity f') ;
+            if db () then Printf.printf "Returning span %s\n\n" (string_of_span (f',g')) ;
+            if safe() then assert (Graph.wf left && Graph.wf right) ;
+            let sh =
+              {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false}
+            in
+            let () =
+              if safe() then assert (Graph.wf f.src);
+              if safe() then assert (Graph.wf f'.src);
+            in
+            (sh,f',g')
+          ) ext_hom_p
       in
-      let () =
-        if safe() then assert (Graph.wf f.src);
-        if safe() then assert (Graph.wf f'.src);
+      let is_sub f g = Hom.is_sub ~strict:true (List.hd f.maps) (List.hd g.maps) in
+      let rec reduce l keep =
+        match l with
+          [] -> keep
+        | ((f,_,_) as span)::tl ->
+           if List.exists (fun (h,_,_) -> is_sub f h) tl || List.exists (fun (h,_,_) -> is_sub f h) keep
+           then
+             reduce tl keep
+           else
+             reduce tl (span::keep)
       in
-      (sh,f',g')
+      reduce l []
 
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =

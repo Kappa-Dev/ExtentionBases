@@ -17,15 +17,20 @@ module Make (Node:Node.NodeType) =
     let is_equal hom hom' =
       NodeBij.is_equal (fun u v -> Node.compare u v = 0) hom.tot hom'.tot
 
-    let is_sub hom hom' =
+    let is_sub ?(strict=false) hom hom' =
       try
-	NodeBij.fold
-	  (fun u v b ->
-	    let v' = NodeBij.find u hom'.tot in
-	    if (compare v v' = 0) then b else raise Not_found
-	  ) hom.tot true
+        let dh = size hom in
+        let dh' = size hom' in
+        if (strict && (dh >= dh')) || dh > dh' then raise Exit
+        else
+	  NodeBij.fold
+	    (fun u v b ->
+	      let v' = NodeBij.find u hom'.tot in
+	      if (*Node.compare v v' = 0*) not (Node.distinguishable v v') then b
+              else raise Exit
+	    ) hom.tot true
       with
-	Not_found -> false
+	Exit -> false
 
     let empty =
       {tot = NodeBij.empty ;

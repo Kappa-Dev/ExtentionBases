@@ -5,9 +5,12 @@ module type NodeType =
     type t
     val id : t -> int
     val label: t -> int
+    val has_rigid_ports : bool
+    val has_rigid_bonds : bool
     val info : string
     val arity : int
     val compare : t -> t -> int
+    val distinguishable : t -> t -> bool
     val create : int list -> t
     val to_string : t -> string
     val to_dot : t -> ?highlight:(int option) -> int -> string
@@ -25,6 +28,8 @@ module type NodeType =
 module SimpleNode =
   (struct
       type t = int
+      let has_rigid_bonds = false
+      let has_rigid_ports = true
       let info = "Simple Graphs"
       let arity = 0
       let label u = u
@@ -33,6 +38,7 @@ module SimpleNode =
       let compatible = fun _ _ -> true
       let gluable = fun u u' -> id u = id u'
       let has_rigid_bonds = false
+      let distinguishable u v = id u <> id v
 
       let compare = Pervasives.compare
 
