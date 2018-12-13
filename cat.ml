@@ -553,13 +553,13 @@ module Make (Node:Node.NodeType) =
             List.filter
               (fun v -> not (Hom.comem v p_hom))
               (Graph.bound_to (Hom.find u p_hom) right),
-            true (*not Node.has_rigid_bonds*)
+            (not Node.has_rigid_bonds)
            )
         | nodes ->
            (nodes, List.filter
                      (fun v -> not (Hom.comem v p_hom))
                      (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right),
-            true (*not Node.has_rigid_ports*)
+            (not Node.has_rigid_ports)
            )
       in
       List.fold_left
