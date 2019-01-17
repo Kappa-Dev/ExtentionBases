@@ -537,18 +537,19 @@ module Make (Node:Node.NodeType) =
       if safe() then assert (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 
-    let extend_hom left right p_hom u todo =
+    let extend_hom left right p_hom u todo visited =
       let () = if safe() then assert (Hom.mem u p_hom)
       in
+      let visited = NodeSet.add u visited in
       let nodes_left,nodes_right,multi =
         match
           (List.filter
-             (fun v -> not (Hom.mem v p_hom))
+             (fun v -> not (NodeSet.mem v visited))
              (Graph.nodes_of_id (Node.id u) left))
         with
           [] ->
            (List.filter
-              (fun v -> not (Hom.mem v p_hom))
+              (fun v -> not (NodeSet.mem v visited))
               (Graph.bound_to u left),
             List.filter
               (fun v -> not (Hom.comem v p_hom))
@@ -562,41 +563,50 @@ module Make (Node:Node.NodeType) =
             (not Node.has_rigid_ports)
            )
       in
+      let () =
+        if db() then
+          Printf.printf "possible extensions are nodes {%s}\n"
+            (String.concat "," (List.map Node.to_string nodes_left))
+      in
       List.fold_left
-        (fun ext_p_hom v ->
-          if (not multi) && (ext_p_hom <> []) then ext_p_hom
-          else
+        (fun (ext_p_hom,visited) v ->
+          let ext_p_hom' =
             List.fold_left
               (fun ext_p_hom v' ->
-                try
-                  let () = if db() then
-                             Printf.printf "Trying to map %s |-> %s\n" (Node.to_string v) (Node.to_string v')
-                  in
-                  (Hom.add v v' p_hom,v::todo)::ext_p_hom
-                with
-                  Hom.Not_structure_preserving | Hom.Not_injective ->
-                                                  (if db() then print_endline "Failed" ; ext_p_hom)
+                if (not multi) && (ext_p_hom <> []) then ext_p_hom
+                else
+                  try
+                    let () = if db() then
+                               Printf.printf "Mapping %s |-> %s\n" (Node.to_string v) (Node.to_string v')
+                    in
+                    (Hom.add v v' p_hom,v::todo)::ext_p_hom
+                  with
+                    Hom.Not_structure_preserving | Hom.Not_injective ->
+                                                    (if db() then print_endline "Failed" ; ext_p_hom)
               ) ext_p_hom nodes_right
-        ) [] nodes_left
+          in
+          (ext_p_hom',NodeSet.add v visited)
+        ) ([],visited) nodes_left
 
     let share f g =
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
-      let rec iter_extend hom_p todo acc =
+      let visited = NodeSet.empty in
+      let rec iter_extend hom_p todo acc visited =
         match todo with
-          [] -> hom_p::acc
+          [] -> (hom_p::acc,visited)
         | u::tl ->
            let () = if db() then Printf.printf "Extending node %s \n" (Node.to_string u) in
-           match extend_hom left right hom_p u tl with
-             [] -> iter_extend hom_p tl acc
-           | ext_hom_p ->
+           match extend_hom left right hom_p u tl visited with
+             ([],visited) -> iter_extend hom_p tl acc visited
+           | ext_hom_p,visited ->
               List.fold_left
-                (fun ext_hom_p (hom_p,todo) ->
-                  iter_extend hom_p todo ext_hom_p
-                ) acc ext_hom_p
+                (fun (ext_hom_p,visited) (hom_p,todo) ->
+                  iter_extend hom_p todo ext_hom_p visited
+                ) (acc,visited) ext_hom_p
       in
-      let ext_hom_p = iter_extend f_0 todo_0 [] in
+      let ext_hom_p,_ = iter_extend f_0 todo_0 [] visited in
       let l =
         List.map
           (fun hom_p ->
@@ -626,7 +636,7 @@ module Make (Node:Node.NodeType) =
            else
              reduce tl (span::keep)
       in
-      reduce l []
+      (reduce l [])
 
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =

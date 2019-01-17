@@ -1,7 +1,6 @@
 add one
-add square
-add osquare
-add dsquare
-add house
-add triangle
 build (empty,one)
+add square
+add house
+debug
+add triangle
