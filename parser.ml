@@ -5,6 +5,7 @@ let legal_output = ["positive" ; "negative"]
 
 type command =
   | Sharing of int
+  | SelfAdjust
   | Mode of string
   | Add of string
   | Add_named of (int list * int list) list * string
@@ -73,6 +74,7 @@ let nodes = list_parser int_list_tuple
 let add = string "add" *> ws *> name >>| fun name_result -> Add name_result
 
 let sharing = string "sharing" *> ws *> pos_number >>| fun i -> Sharing i
+let self = string "adjust" *> ws >>| fun () -> SelfAdjust
 
 let blank = ws *> return Blank
 
@@ -97,6 +99,7 @@ let reset = string "reset" *> ws *> return Reset
 let line = choice
              (List.map global [mode legal_modes;
                                sharing ;
+                               self ;
                                add;
                                debug ; safe ;
                                add_named;

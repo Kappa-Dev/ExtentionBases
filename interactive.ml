@@ -71,10 +71,11 @@ module Make (Node:Node.NodeType) =
     type t = {model : Model.t ;
               show_positive : bool ;
               min_sharing : int ;
+              self_adjust : bool ;
               eb : (EB.t * EB.t) option ;
               rule : (string * string) option
              }
-    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None ; min_sharing = 1}
+    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None ; min_sharing = 1 ; self_adjust = false}
 
     let output env =
       if db() then flush stdout ;
@@ -127,6 +128,7 @@ module Make (Node:Node.NodeType) =
            | Some basis -> basis
          in
          Term.printf [Term.Bold; Term.blue] "Building positive extension base...\n" ;
+         let min_sharing f = max env.min_sharing ((Cat.size f) / 4) in
          let _,pos_ext_base =
            try
              List.fold_left
@@ -144,7 +146,10 @@ module Make (Node:Node.NodeType) =
                           (Lib.Dict.to_name id_obs env.model.Model.dict)
                           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout
                       end;
-                    (cpt+1,EB.insert ~max_step:max_step env.min_sharing to_w from_o id_obs ext_base)
+                    if env.self_adjust then
+                      (cpt+1,EB.insert ~max_step:max_step (min_sharing to_w) to_w from_o id_obs ext_base)
+                    else
+                      (cpt+1,EB.insert ~max_step:max_step env.min_sharing to_w from_o id_obs ext_base)
                ) (1,eb_pos) pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
          in
@@ -168,6 +173,7 @@ module Make (Node:Node.NodeType) =
 
     let rec process_command env = function
       | Parser.Sharing i -> {env with min_sharing = i}
+      | Parser.SelfAdjust -> {env with self_adjust = true}
       | Parser.Mode s ->
          log "Changing mode. Current model has been erased.";
          raise (Change_shape s)
