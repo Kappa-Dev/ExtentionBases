@@ -292,7 +292,6 @@ module Make (Node:Node.NodeType) =
         if db() then
           Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w))
       in
-(*      let (inf_to_sh,sh_to_base,sh_to_w) as sharing = Cat.share inf_to_i inf_to_w in*)
       List.map
         (fun ((inf_to_sh,sh_to_base,sh_to_w) as sharing) ->
           let iso_to_w = Cat.is_iso sh_to_w in
@@ -408,7 +407,7 @@ module Make (Node:Node.NodeType) =
        witnesses = Lib.IntSet.remove j ext_base.witnesses
       }
 
-    let rec progress ext_base dry_run compared inf_path queue max_step cut =
+    let rec progress min_sharing ext_base dry_run compared inf_path queue max_step cut =
 
       (************* DEBUGING INFO ***************)
       let () =
@@ -674,7 +673,7 @@ module Make (Node:Node.NodeType) =
                      (*3. if sharing span has no sup add i ..#.. w to dry_run*)
                      (*4. mark i as visited *)
 
-                     if Cat.is_iso to_midpoint then
+                     if (Cat.size to_midpoint < min_sharing) || (Cat.is_iso to_midpoint) then
                        let () = if db() then print_string (green "...that is not worth adding\n") in
                        let inf_path',ext_base =
                          update_inf i (inf,root_to_inf,inf_to_i,inf_to_w) inf_path ext_base
@@ -750,10 +749,10 @@ module Make (Node:Node.NodeType) =
                 ) (dry_run,compared,inf_path,queue,max_step,cut) comparisons
             ) (dry_run,compared,inf_path,queue,max_step,cut) (get_best_inf k inf_path)
         in
-        progress ext_base dry_run' compared' inf_path' queue' max_step' cut'
+        progress min_sharing ext_base dry_run' compared' inf_path' queue' max_step' cut'
 
 
-    let insert ~max_step ext_w obs_emb obs_id ext_base =
+    let insert ~max_step min_sharing ext_w obs_emb obs_id ext_base =
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       try
@@ -766,7 +765,7 @@ module Make (Node:Node.NodeType) =
         let compared_0 = Lib.Int2Set.empty in
         let dry_run_0 = [] in
         let inf_path,dry_run,cut =
-          progress ext_base dry_run_0 compared_0 inf_path_0 queue_0 max_step (Lib.IntSet.singleton 0)
+          progress min_sharing ext_base dry_run_0 compared_0 inf_path_0 queue_0 max_step (Lib.IntSet.singleton 0)
         in
         let () = if db() then print_inf_path inf_path in
         (* 1. Adding witness point *)

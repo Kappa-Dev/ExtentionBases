@@ -70,10 +70,11 @@ module Make (Node:Node.NodeType) =
 
     type t = {model : Model.t ;
               show_positive : bool ;
+              min_sharing : int ;
               eb : (EB.t * EB.t) option ;
               rule : (string * string) option
              }
-    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None}
+    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None ; min_sharing = 1}
 
     let output env =
       if db() then flush stdout ;
@@ -143,7 +144,7 @@ module Make (Node:Node.NodeType) =
                           (Lib.Dict.to_name id_obs env.model.Model.dict)
                           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout
                       end;
-                    (cpt+1,EB.insert ~max_step:max_step to_w from_o id_obs ext_base)
+                    (cpt+1,EB.insert ~max_step:max_step env.min_sharing to_w from_o id_obs ext_base)
                ) (1,eb_pos) pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
          in
@@ -159,13 +160,14 @@ module Make (Node:Node.NodeType) =
                     Printf.printf "Inserting witness of observable '%s': %s\n"
                       (Lib.Dict.to_name id_obs env.model.Model.dict)
                       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                  EB.insert ~max_step:max_step to_w from_o id_obs ext_base
+                  EB.insert ~max_step:max_step env.min_sharing to_w from_o id_obs ext_base
              ) eb_neg nw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
          in
          {env with eb = Some (pos_ext_base,neg_ext_base)}
 
     let rec process_command env = function
+      | Parser.Sharing i -> {env with min_sharing = i}
       | Parser.Mode s ->
          log "Changing mode. Current model has been erased.";
          raise (Change_shape s)
@@ -256,7 +258,8 @@ module Make (Node:Node.NodeType) =
         let prompt () =
           let db_str = if db() then "db" else "" in
           let safe_str = if safe() then "!" else "" in
-          Printf.sprintf "(%s)%s%s> " Node.info db_str safe_str
+          let shr_str = if env.min_sharing = 1 then "" else Printf.sprintf "[%d]" env.min_sharing in
+          Printf.sprintf "(%s)%s%s%s> " Node.info db_str safe_str shr_str
         in
         (match (LNoise.linenoise (prompt ())) with
          | None ->
