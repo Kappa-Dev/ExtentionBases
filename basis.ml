@@ -407,7 +407,10 @@ module Make (Node:Node.NodeType) =
        witnesses = Lib.IntSet.remove j ext_base.witnesses
       }
 
-    let rec progress min_sharing ext_base dry_run compared inf_path queue max_step cut =
+    type param = {max_step : int option ; min_sharing : int ; tree_shape : bool}
+    let def_param = {max_step = None ; min_sharing = 1 ; tree_shape = false}
+
+    let rec progress param ext_base dry_run compared inf_path queue step cut max_elements =
 
       (************* DEBUGING INFO ***************)
       let () =
@@ -463,12 +466,13 @@ module Make (Node:Node.NodeType) =
       let subst i j set =
         Lib.IntSet.add i (Lib.IntSet.remove j set)
       in
-      let dec_step ext_base = function
-          None -> None
+      let inc_step ext_base s =
+        match param.max_step with
+          None -> s+1
         | Some i ->
-           if i=1 then raise (Invariant_failure (red "Max iteration reached", ext_base))
-           else
-             Some (i-1)
+           let n = s+1 in
+           if n < i then n
+           else raise (Invariant_failure ("Max step reached",ext_base))
       in
       let add_alias i i' to_i' alpha ext_base =
         if safe () then
@@ -548,7 +552,7 @@ module Make (Node:Node.NodeType) =
         List.map (fun inf -> alias_inf inf ip.alpha) (Lib.IntMap.find i ip.beta)
       in
 
-      if QueueList.is_empty queue then (inf_path,dry_run,cut)
+      if QueueList.is_empty queue then (inf_path,dry_run,cut,max_elements)
       else
         let k,step_ki,i =
           let k,step_ki,i = QueueList.pop queue in
@@ -569,11 +573,11 @@ module Make (Node:Node.NodeType) =
             ) pi.prev true
         in
 
-        let dry_run',compared',inf_path',queue',max_step',cut'=
+        let dry_run',compared',inf_path',queue',step',cut',max_elements'=
 
           (*folding over the list of best infs of k and w*)
           List.fold_left
-            (fun (dry_run,compared,inf_path,queue,max_step,cut) (inf,root_to_inf,inf_to_k,inf_to_w) ->
+            (fun (dry_run,compared,inf_path,queue,step,cut,max_elements) (inf,root_to_inf,inf_to_k,inf_to_w) ->
               let () = if safe() then assert (alias inf inf_path = inf) in
               let inf_to_i = step_ki @@ inf_to_k in
               let () = if db() then (
@@ -581,7 +585,7 @@ module Make (Node:Node.NodeType) =
                          flush stdout )
               in
               let comparisons = compare inf_to_i inf_to_w in
-              List.fold_left (fun (dry_run,compared,inf_path,queue,max_step,cut) cmp ->
+              List.fold_left (fun (dry_run,compared,inf_path,queue,step,cut,max_elements) cmp ->
 
                   match cmp with
                   (************************** Case inf_to_w factors inf_to_i ********************************)
@@ -598,7 +602,14 @@ module Make (Node:Node.NodeType) =
                        )::dry_run)
                      in
                      let compared' = Lib.Int2Set.add (k,i) compared in
-                     (dry_run',compared',inf_path,queue,dec_step ext_base max_step, cut)
+                     let queue' =
+                       if param.tree_shape then
+                         let () = if db() then Printf.printf "Droping queue because TreeShape option is enabled!\n"
+                         in
+                         QueueList.create ()
+                       else queue
+                     in
+                     (dry_run',compared',inf_path,queue',inc_step ext_base step, cut, max_elements)
 
                   (************************** Case inf_to_i factors inf_to_w *******************)
                   (*1. best_inf,_ = (root_to_i,id_i,i,i_to_w) +!> best_inf (i) *)
@@ -619,6 +630,7 @@ module Make (Node:Node.NodeType) =
                                         else
                                           true
                                       ) ;
+                     let queue = if param.tree_shape then QueueList.create () else queue in
                      let g_i = Cat.src i_to_w in
                      let inf_path',ext_base =
                        update_inf i
@@ -637,7 +649,8 @@ module Make (Node:Node.NodeType) =
                      in
                      let compared' = Lib.Int2Set.add (k,i) compared
                      in
-                     (dry_run, compared' , inf_path' ,queue', dec_step ext_base max_step, subst i inf cut)
+                     let max_elements' = if Lib.IntMap.is_empty pi.next then Lib.IntSet.add i max_elements else max_elements in
+                     (dry_run, compared' , inf_path' ,queue', inc_step ext_base step, subst i inf cut, max_elements')
 
                   (************************** Case inf_to_w =~= inf_to_i *************************)
                   (*NB drop dry_run*)
@@ -647,15 +660,6 @@ module Make (Node:Node.NodeType) =
 
                   (************** Case both inf_to_w and inf_to_i have a common factor ***********)
                   | Incomp sh_info ->
-                     let queue' =
-                       if not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
-                         queue
-                       else
-                         Lib.IntMap.fold
-                           (fun j step_ij cont ->
-                             QueueList.add_lp (i, step_ij, j) cont
-                           ) (find i ext_base).next queue
-                     in
                      let to_midpoint,to_base,to_w = sh_info in
                      let () = if safe() then assert (Cat.wf to_midpoint) in
                      let has_sup = true in
@@ -666,25 +670,37 @@ module Make (Node:Node.NodeType) =
                                               "I found 1 midpoint(s) {%s}!\n" (string_of_sharings [sh_info])
                                        )
 			            );
-
+                     let pi = find i ext_base in
+                     let queue' =
+                       if param.tree_shape || not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
+                         queue
+                       else
+                         Lib.IntMap.fold
+                           (fun j step_ij cont ->
+                             QueueList.add_lp (i, step_ij, j) cont
+                           ) pi.next queue
+                     in
+                     let max_elements' = if param.tree_shape || Lib.IntMap.is_empty pi.next then Lib.IntSet.add i max_elements else max_elements in
 	             (*No better comparison with w exists*)
                      (*1. best_inf,_ = (root_to_inf,inf_to_i,inf,inf_to_w) +!> best_inf (i)*)
                      (*2. add i |-> succ i to next_layer if i not visited*)
                      (*3. if sharing span has no sup add i ..#.. w to dry_run*)
                      (*4. mark i as visited *)
 
-                     if (Cat.size to_midpoint < min_sharing) || (Cat.is_iso to_midpoint) then
+                     if (Cat.size to_midpoint < param.min_sharing) || (Cat.is_iso to_midpoint) then
                        let () = if db() then print_string (green "...that is not worth adding\n") in
                        let inf_path',ext_base =
                          update_inf i (inf,root_to_inf,inf_to_i,inf_to_w) inf_path ext_base
                        in
                        let dry_run' =
                          if not has_sup then
-                           (fun w ext_base inf_path -> add_conflict_alpha i w ext_base inf_path)::dry_run
+                           (fun w ext_base inf_path ->
+                             let ext_base = add_step_alpha inf w inf_to_w ext_base inf_path in
+                             add_conflict_alpha i w ext_base inf_path)::dry_run
                          else
                            dry_run
 	               in
-                       (dry_run',compared',inf_path',queue',dec_step ext_base max_step, cut)
+                       (dry_run',compared',inf_path',queue',inc_step ext_base step,cut,max_elements')
                      else
                        (*Not a trivial midpoint*)
                        let fresh_id = get_fresh ext_base in (*side effect*)
@@ -744,15 +760,13 @@ module Make (Node:Node.NodeType) =
 		           if has_sup then ext_base else add_conflict i w ext_base
                          )::dry_run
                        in
-	               (dry_run',compared',inf_path',queue',dec_step ext_base max_step,
-                        subst fresh_id inf cut)
-                ) (dry_run,compared,inf_path,queue,max_step,cut) comparisons
-            ) (dry_run,compared,inf_path,queue,max_step,cut) (get_best_inf k inf_path)
+	               (dry_run',compared',inf_path',queue',inc_step ext_base step, subst fresh_id inf cut,max_elements')
+                ) (dry_run,compared,inf_path,queue,step,cut,max_elements) comparisons
+            ) (dry_run,compared,inf_path,queue,step,cut,max_elements) (get_best_inf k inf_path)
         in
-        progress min_sharing ext_base dry_run' compared' inf_path' queue' max_step' cut'
+        progress param ext_base dry_run' compared' inf_path' queue' step' cut' max_elements'
 
-
-    let insert ~max_step min_sharing ext_w obs_emb obs_id ext_base =
+    let insert param ext_w obs_emb obs_id ext_base =
       let p0 = find 0 ext_base in
       let id_0 = Cat.identity p0.value p0.value in
       try
@@ -764,8 +778,8 @@ module Make (Node:Node.NodeType) =
         in
         let compared_0 = Lib.Int2Set.empty in
         let dry_run_0 = [] in
-        let inf_path,dry_run,cut =
-          progress min_sharing ext_base dry_run_0 compared_0 inf_path_0 queue_0 max_step (Lib.IntSet.singleton 0)
+        let inf_path,dry_run,cut,max_elements =
+          progress param ext_base dry_run_0 compared_0 inf_path_0 queue_0 0 (Lib.IntSet.singleton 0) (Lib.IntSet.singleton 0)
         in
         let () = if db() then print_inf_path inf_path in
         (* 1. Adding witness point *)
@@ -798,7 +812,7 @@ module Make (Node:Node.NodeType) =
           Lib.IntSet.fold
           (fun i inf_list ->
               try (Lib.IntMap.find i inf_path.beta)@inf_list with Not_found -> inf_list
-          ) ext_base.max_elements []
+          ) max_elements []
         in
 
         let () =

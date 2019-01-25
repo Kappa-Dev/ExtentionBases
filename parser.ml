@@ -19,6 +19,7 @@ type command =
   | Exit
   | Reset
   | Blank
+  | TreeShape
 
 let ws = skip_while (function ' ' -> true | _ -> false)
 let ws1 = take_while1 (function ' ' -> true | _ -> false)
@@ -73,8 +74,12 @@ let nodes = list_parser int_list_tuple
 
 let add = string "add" *> ws *> name >>| fun name_result -> Add name_result
 
+
 let sharing = string "sharing" *> ws *> pos_number >>| fun i -> Sharing i
 let self = string "adjust" *> ws >>| fun () -> SelfAdjust
+let tree = string "treelike" *> ws >>| fun () -> TreeShape
+let set = string "set" *> ws *> choice [sharing ; tree ; self]
+
 
 let blank = ws *> return Blank
 
@@ -98,8 +103,7 @@ let reset = string "reset" *> ws *> return Reset
 
 let line = choice
              (List.map global [mode legal_modes;
-                               sharing ;
-                               self ;
+                               set ;
                                add;
                                debug ; safe ;
                                add_named;

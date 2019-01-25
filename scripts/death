@@ -1,5 +1,4 @@
 load scripts/big
-sharing 4
-adjust
+set adjust
 build (empty,pat_1)
 

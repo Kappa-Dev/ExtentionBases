@@ -70,12 +70,21 @@ module Make (Node:Node.NodeType) =
 
     type t = {model : Model.t ;
               show_positive : bool ;
+              max_step : int option ;
               min_sharing : int ;
               self_adjust : bool ;
+              tree_shape : bool ;
               eb : (EB.t * EB.t) option ;
               rule : (string * string) option
              }
-    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None ; min_sharing = 1 ; self_adjust = false}
+    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None ; max_step = None ; min_sharing = 1 ; self_adjust = false ; tree_shape = false}
+
+    let string_of_env env =
+      Printf.sprintf
+        "show_positive: %b\nmax_step: %s\nmin_sharing: %d\nself_adjust: %b\ntreeshape: %b\n"
+        env.show_positive
+        (match env.max_step with None -> "None" | Some i -> string_of_int i)
+        env.min_sharing env.self_adjust env.tree_shape
 
     let output env =
       if db() then flush stdout ;
@@ -90,8 +99,10 @@ module Make (Node:Node.NodeType) =
            (EB.to_dot_content eb) ;
          close_out d
 
-    let build_base ?obs_name max_step env =
-      Printexc.record_backtrace true ;
+    let build_base ?obs_name env =
+      let params = {EB.max_step = env.max_step ; EB.min_sharing = env.min_sharing ; EB.tree_shape = env.tree_shape}
+      in
+      let () = if db() then Printexc.record_backtrace true in
       match env.rule with
         None -> env
       | Some (l,r) ->
@@ -147,9 +158,9 @@ module Make (Node:Node.NodeType) =
                           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout
                       end;
                     if env.self_adjust then
-                      (cpt+1,EB.insert ~max_step:max_step (min_sharing to_w) to_w from_o id_obs ext_base)
+                      (cpt+1,EB.insert {params with EB.min_sharing = (min_sharing to_w)} to_w from_o id_obs ext_base)
                     else
-                      (cpt+1,EB.insert ~max_step:max_step env.min_sharing to_w from_o id_obs ext_base)
+                      (cpt+1,EB.insert params to_w from_o id_obs ext_base)
                ) (1,eb_pos) pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
          in
@@ -165,7 +176,7 @@ module Make (Node:Node.NodeType) =
                     Printf.printf "Inserting witness of observable '%s': %s\n"
                       (Lib.Dict.to_name id_obs env.model.Model.dict)
                       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
-                  EB.insert ~max_step:max_step env.min_sharing to_w from_o id_obs ext_base
+                  EB.insert params to_w from_o id_obs ext_base
              ) eb_neg nw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
          in
@@ -192,11 +203,14 @@ module Make (Node:Node.NodeType) =
          log (String.concat "\n" (proj_left (Model.list env.model))) ;
          log ("Rules:\n") ;
          log (String.concat "\n" (proj_right (Model.list env.model))) ;
+         log ("Parameters:\n") ;
+         log ((string_of_env env)^"\n") ;
          env
+      | Parser.TreeShape -> {env with tree_shape = true}
       | Parser.Build (l,r,mx) ->
          log (Printf.sprintf "Generating extension basis for rule %s -> %s" l r);
-         let env = {env with rule = Some (l,r) ; eb = None} in
-         let env = build_base mx env in
+         let env = {env with rule = Some (l,r) ; eb = None ; max_step = mx} in
+         let env = build_base env in
          output env ;
          env
       | Parser.Add v ->
@@ -206,7 +220,7 @@ module Make (Node:Node.NodeType) =
            match env.eb with
              None -> {env with model = model}
            | Some _ ->
-              let env = build_base ~obs_name:v None {env with model = model}
+              let env = build_base ~obs_name:v {env with model = model}
               in output env ; env
          else
            begin
@@ -218,7 +232,7 @@ module Make (Node:Node.NodeType) =
          let edges = Node.tn lst in
          let graph = draw edges Graph.empty in
          let env = {env with model = Model.add_obs v graph env.model} in
-         let env = build_base ~obs_name:v None env in
+         let env = build_base ~obs_name:v env in
          output env ;
          env
       | Parser.Exit -> log "exiting" ; exit 0
