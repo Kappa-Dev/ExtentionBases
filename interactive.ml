@@ -72,19 +72,28 @@ module Make (Node:Node.NodeType) =
               show_positive : bool ;
               max_step : int option ;
               min_sharing : int ;
-              self_adjust : bool ;
+              self_adjust : int option ;
               tree_shape : bool ;
               eb : (EB.t * EB.t) option ;
+              sparse : bool ;
               rule : (string * string) option
              }
-    let empty = {model = Model.empty ; show_positive = true ; eb = None; rule = None ; max_step = None ; min_sharing = 1 ; self_adjust = false ; tree_shape = false}
+    let empty =
+      {model = Model.empty ;
+       show_positive = true ;
+       eb = None; rule = None ;
+       max_step = None ;
+       min_sharing = 1 ;
+       self_adjust = None ;
+       tree_shape = false ;
+       sparse = false}
 
     let string_of_env env =
       Printf.sprintf
-        "show_positive: %b\nmax_step: %s\nmin_sharing: %d\nself_adjust: %b\ntreeshape: %b\n"
+        "show_positive: %b\nmax_step: %s\nmin_sharing: %d\nself_adjust: %s\ntree_shape: %b\nsparse: %b\n"
         env.show_positive
         (match env.max_step with None -> "None" | Some i -> string_of_int i)
-        env.min_sharing env.self_adjust env.tree_shape
+        env.min_sharing (match env.self_adjust with None -> "None" | Some i -> string_of_int i) env.tree_shape env.sparse
 
     let output env =
       if db() then flush stdout ;
@@ -100,7 +109,7 @@ module Make (Node:Node.NodeType) =
          close_out d
 
     let build_base ?obs_name env =
-      let params = {EB.max_step = env.max_step ; EB.min_sharing = env.min_sharing ; EB.tree_shape = env.tree_shape}
+      let params = {EB.max_step = env.max_step ; EB.min_sharing = env.min_sharing ; EB.tree_shape = env.tree_shape ; EB.sparse = env.sparse}
       in
       let () = if db() then Printexc.record_backtrace true in
       match env.rule with
@@ -139,7 +148,9 @@ module Make (Node:Node.NodeType) =
            | Some basis -> basis
          in
          Term.printf [Term.Bold; Term.blue] "Building positive extension base...\n" ;
-         let min_sharing f = max env.min_sharing ((Cat.size f) / 4) in
+         let min_sharing f = match env.self_adjust with
+             None -> env.min_sharing
+            | Some i -> max env.min_sharing ((Cat.size f) / i) in
          let _,pos_ext_base =
            try
              List.fold_left
@@ -157,10 +168,7 @@ module Make (Node:Node.NodeType) =
                           (Lib.Dict.to_name id_obs env.model.Model.dict)
                           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout
                       end;
-                    if env.self_adjust then
-                      (cpt+1,EB.insert {params with EB.min_sharing = (min_sharing to_w)} to_w from_o id_obs ext_base)
-                    else
-                      (cpt+1,EB.insert params to_w from_o id_obs ext_base)
+                    (cpt+1,EB.insert {params with EB.min_sharing = (min_sharing to_w)} to_w from_o id_obs ext_base)
                ) (1,eb_pos) pw
            with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
          in
@@ -183,8 +191,21 @@ module Make (Node:Node.NodeType) =
          {env with eb = Some (pos_ext_base,neg_ext_base)}
 
     let rec process_command env = function
-      | Parser.Sharing i -> {env with min_sharing = i}
-      | Parser.SelfAdjust -> {env with self_adjust = true}
+      | Parser.Help -> log "set [sharing <int> | adjust <int> | sparse | treelike | complete | step <int>]" ; env
+      | Parser.BaseShape t ->
+         begin
+           match t with
+             Parser.Complete -> {env with tree_shape = false ; sparse = false}
+           | Parser.Tree -> {env with tree_shape = true ; sparse = false}
+           | Parser.Sparse -> {env with tree_shape = false ; sparse = true}
+         end
+      | Parser.Sharing t ->
+         begin
+           match t with
+             Parser.MinShare i -> {env with min_sharing = i}
+           | Parser.Adjust i -> {env with self_adjust = Some i}
+         end
+      | Parser.MaxStep m -> {env with max_step = if m>=0 then Some m else None}
       | Parser.Mode s ->
          log "Changing mode. Current model has been erased.";
          raise (Change_shape s)
@@ -206,10 +227,9 @@ module Make (Node:Node.NodeType) =
          log ("Parameters:\n") ;
          log ((string_of_env env)^"\n") ;
          env
-      | Parser.TreeShape -> {env with tree_shape = true}
-      | Parser.Build (l,r,mx) ->
+      | Parser.Build (l,r) ->
          log (Printf.sprintf "Generating extension basis for rule %s -> %s" l r);
-         let env = {env with rule = Some (l,r) ; eb = None ; max_step = mx} in
+         let env = {env with rule = Some (l,r) ; eb = None} in
          let env = build_base env in
          output env ;
          env

@@ -407,8 +407,8 @@ module Make (Node:Node.NodeType) =
        witnesses = Lib.IntSet.remove j ext_base.witnesses
       }
 
-    type param = {max_step : int option ; min_sharing : int ; tree_shape : bool}
-    let def_param = {max_step = None ; min_sharing = 1 ; tree_shape = false}
+    type param = {max_step : int option ; min_sharing : int ; tree_shape : bool ; sparse : bool}
+    let def_param = {max_step = None ; min_sharing = 1 ; tree_shape = false ; sparse = false}
 
     let rec progress param ext_base dry_run compared inf_path queue step cut max_elements =
 
@@ -630,7 +630,7 @@ module Make (Node:Node.NodeType) =
                                         else
                                           true
                                       ) ;
-                     (*let queue = if param.tree_shape then QueueList.create () else queue in*)
+                     let queue = if param.tree_shape then QueueList.create () else queue in
                      let g_i = Cat.src i_to_w in
                      let inf_path',ext_base =
                        update_inf i
@@ -672,7 +672,7 @@ module Make (Node:Node.NodeType) =
 			            );
                      let pi = find i ext_base in
                      let queue' =
-                       if param.tree_shape || not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
+                       if param.tree_shape || param.sparse || not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
                          queue
                        else
                          Lib.IntMap.fold
@@ -680,7 +680,10 @@ module Make (Node:Node.NodeType) =
                              QueueList.add_lp (i, step_ij, j) cont
                            ) pi.next queue
                      in
-                     let max_elements' = if param.tree_shape || Lib.IntMap.is_empty pi.next then Lib.IntSet.add i max_elements else max_elements in
+                     let max_elements' =
+                       if param.tree_shape || param.sparse || Lib.IntMap.is_empty pi.next
+                       then Lib.IntSet.add i max_elements else max_elements
+                     in
 	             (*No better comparison with w exists*)
                      (*1. best_inf,_ = (root_to_inf,inf_to_i,inf,inf_to_w) +!> best_inf (i)*)
                      (*2. add i |-> succ i to next_layer if i not visited*)
