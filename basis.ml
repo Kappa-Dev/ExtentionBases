@@ -630,7 +630,7 @@ module Make (Node:Node.NodeType) =
                                         else
                                           true
                                       ) ;
-                     let queue = if param.tree_shape then QueueList.create () else queue in
+                     (*let queue = if param.tree_shape then QueueList.create () else queue in*)
                      let g_i = Cat.src i_to_w in
                      let inf_path',ext_base =
                        update_inf i
