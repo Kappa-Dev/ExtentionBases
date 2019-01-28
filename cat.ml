@@ -31,7 +31,8 @@ module type Category =
 
 
     (* val share : arrows -> arrows -> (arrows * tile) list*)
-    val share : arrows -> arrows -> (arrows * arrows * arrows) list
+    val share : arrows -> arrows -> (arrows * arrows * arrows * bool
+) list
 
     val is_iso : arrows -> bool
     val is_identity : arrows -> bool
@@ -537,11 +538,13 @@ module Make (Node:Node.NodeType) =
       if safe() then assert (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 
-    let extend_hom left right p_hom u todo visited =
+    let extend_hom left right p_hom u todo visited conflict =
       let () = if safe() then assert (Hom.mem u p_hom)
       in
       let visited = NodeSet.add u visited in
-      let nodes_left,nodes_right,multi =
+      let bondExtension = 0 in
+      let portExtension = 1 in
+      let nodes_left,nodes_right,rigid,ext_type =
         match
           (List.filter
              (fun v -> not (NodeSet.mem v visited))
@@ -554,13 +557,13 @@ module Make (Node:Node.NodeType) =
             List.filter
               (fun v -> not (Hom.comem v p_hom))
               (Graph.bound_to (Hom.find u p_hom) right),
-            (not Node.has_rigid_bonds)
+            Node.has_rigid_bonds, bondExtension
            )
         | nodes ->
            (nodes, List.filter
                      (fun v -> not (Hom.comem v p_hom))
                      (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right),
-            (not Node.has_rigid_ports)
+            Node.has_rigid_ports , portExtension
            )
       in
       let () =
@@ -569,75 +572,77 @@ module Make (Node:Node.NodeType) =
             (String.concat "," (List.map Node.to_string nodes_left))
       in
       List.fold_left
-        (fun (ext_p_hom,visited) v ->
-          let ext_p_hom' =
+        (fun (ext_p_hom,visited,conflict) v ->
+          let ext_p_hom',found =
             List.fold_left
-              (fun ext_p_hom v' ->
-                if (not multi) && (ext_p_hom <> []) then ext_p_hom
+              (fun (ext_p_hom,found) v' ->
+                if rigid && ext_p_hom <> [] (*use boolean flag [found] here to be exhaustive*)
+                then (ext_p_hom,found) (*in case of rigidity only one match for v is required*)
                 else
                   try
                     let () = if db() then
                                Printf.printf "Mapping %s |-> %s\n" (Node.to_string v) (Node.to_string v')
                     in
-                    (Hom.add v v' p_hom,v::todo)::ext_p_hom
+                    ((Hom.add v v' p_hom,v::todo)::ext_p_hom,true)
                   with
                     Hom.Not_structure_preserving | Hom.Not_injective ->
-                                                    (if db() then print_endline "Failed" ; ext_p_hom)
-              ) ext_p_hom nodes_right
+                                                    (if db() then print_endline "Failed" ; (ext_p_hom,found))
+              ) (ext_p_hom,false) nodes_right
           in
-          (ext_p_hom',NodeSet.add v visited)
-        ) ([],visited) nodes_left
+          let conflict' = conflict || (ext_type = bondExtension && not found) in
+          (ext_p_hom',NodeSet.add v visited,conflict')
+        ) ([],visited,conflict) nodes_left
 
     let share f g =
       let left,right = f.trg,g.trg in
       let f_0 = hom_of_arrows (g @@ invert f) in
       let todo_0 = Hom.domain f_0 in
       let visited = NodeSet.empty in
-      let rec iter_extend hom_p todo acc visited =
+      let rec iter_extend hom_p todo acc visited conflict =
         match todo with
-          [] -> (hom_p::acc,visited)
+          [] -> (hom_p::acc,visited,conflict)
         | u::tl ->
            let () = if db() then Printf.printf "Extending node %s \n" (Node.to_string u) in
-           match extend_hom left right hom_p u tl visited with
-             ([],visited) -> iter_extend hom_p tl acc visited
-           | ext_hom_p,visited ->
+           match extend_hom left right hom_p u tl visited conflict with
+             ([],visited,conflict') -> iter_extend hom_p tl acc visited conflict'
+           | ext_hom_p,visited,conflict' ->
               List.fold_left
-                (fun (ext_hom_p,visited) (hom_p,todo) ->
-                  iter_extend hom_p todo ext_hom_p visited
-                ) (acc,visited) ext_hom_p
+                (fun (ext_hom_p,visited,conflict) (hom_p,todo) ->
+                  iter_extend hom_p todo ext_hom_p visited conflict
+                ) (acc,visited,conflict) ext_hom_p
       in
-      let ext_hom_p,_ = iter_extend f_0 todo_0 [] visited in
+      let ext_hom_p,_,conflict = iter_extend f_0 todo_0 [] visited false in
       let l =
         List.map
-          (fun hom_p ->
-            let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom_p] ; partial = true} in
-            (*Construction guarantees that f' is the identity*)
-            assert (is_identity f') ;
-            if db () then Printf.printf "Returning span %s\n\n" (string_of_span (f',g')) ;
-            if safe() then assert (Graph.wf left && Graph.wf right) ;
-            let sh =
-              {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false}
-            in
-            let () =
-              if safe() then assert (Graph.wf f.src);
-              if safe() then assert (Graph.wf f'.src);
-            in
-            (sh,f',g')
-          ) ext_hom_p
+        (fun hom_p ->
+          let (f',g') = span_of_partial {src=left ; trg = right ; maps = [hom_p] ; partial = true} in
+          (*Construction guarantees that f' is the identity*)
+          assert (is_identity f') ;
+          if db () then Printf.printf "Returning span %s\n\n" (string_of_span (f',g')) ;
+          if safe() then assert (Graph.wf left && Graph.wf right) ;
+          let sh =
+            {src = f.src ; trg = f'.src ; maps = [hom_of_arrows f] ; partial = false}
+          in
+          let () =
+            if safe() then assert (Graph.wf f.src);
+            if safe() then assert (Graph.wf f'.src);
+          in
+          (sh,f',g',conflict)
+        ) ext_hom_p
       in
       let is_sub f g = Hom.is_sub ~strict:true (List.hd f.maps) (List.hd g.maps) in
       let rec reduce l keep =
         match l with
           [] -> keep
-        | ((f,_,_) as span)::tl ->
-           if List.exists (fun (h,_,_) -> is_sub f h) tl || List.exists (fun (h,_,_) -> is_sub f h) keep
+        | ((f,_,_,_) as span)::tl ->
+           if List.exists (fun (h,_,_,_) -> is_sub f h) tl || List.exists (fun (h,_,_,_) -> is_sub f h) keep
            then
              reduce tl keep
            else
              reduce tl (span::keep)
       in
-      (reduce l [])
-
+      reduce l []
+ 
     (** [h |> obs] [h] may create/destroy an instance of obs*)
     let (|>) h obs =
       try

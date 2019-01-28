@@ -285,7 +285,7 @@ module Make (Node:Node.NodeType) =
       Iso of Cat.arrows
     | Below of Cat.arrows
     | Above of Cat.arrows
-    | Incomp of (Cat.arrows * Cat.arrows * Cat.arrows) (*inf_to_sh,sh_to_base,sh_to_w*)
+    | Incomp of (Cat.arrows * Cat.arrows * Cat.arrows * bool) (*inf_to_sh,sh_to_base,sh_to_w*)
 
     let compare inf_to_i inf_to_w =
       let () =
@@ -293,7 +293,7 @@ module Make (Node:Node.NodeType) =
           Printf.printf "\t Sharing %s\n"  (Cat.string_of_span (inf_to_i,inf_to_w))
       in
       List.map
-        (fun ((inf_to_sh,sh_to_base,sh_to_w) as sharing) ->
+        (fun ((inf_to_sh,sh_to_base,sh_to_w,conflict) as sharing) ->
           let iso_to_w = Cat.is_iso sh_to_w in
           let iso_to_base = Cat.is_iso sh_to_base in
           if iso_to_w then
@@ -310,14 +310,17 @@ module Make (Node:Node.NodeType) =
                       assert false
                     end
               in
-              Iso (sh_to_base @@ (Cat.invert sh_to_w))
+              ((*assert (not conflict);*)
+              Iso (sh_to_base @@ (Cat.invert sh_to_w)))
             else
-              Below (sh_to_base @@ (Cat.invert sh_to_w))
+              ((*assert (not conflict);*)
+              Below (sh_to_base @@ (Cat.invert sh_to_w)))
           else
             if not iso_to_base then
               Incomp sharing
             else
-              Above (sh_to_w @@ (Cat.invert sh_to_base))
+              ((*assert (not conflict) ;*)
+               Above (sh_to_w @@ (Cat.invert sh_to_base)))
         ) (Cat.share inf_to_i inf_to_w)
 
 
@@ -368,7 +371,7 @@ module Make (Node:Node.NodeType) =
       add_conflict (alias i inf_path) (alias j inf_path) ext_base
 
     let string_of_sharings sharings =
-      String.concat "," (List.map (fun (to_midpoint,_,_) -> Graph.to_string (Cat.trg to_midpoint)) sharings)
+      String.concat "," (List.map (fun (to_midpoint,_,_,_) -> Graph.to_string (Cat.trg to_midpoint)) sharings)
 
     exception Iso_found of (int * Cat.arrows) Lib.IntMap.t
 
@@ -660,9 +663,8 @@ module Make (Node:Node.NodeType) =
 
                   (************** Case both inf_to_w and inf_to_i have a common factor ***********)
                   | Incomp sh_info ->
-                     let to_midpoint,to_base,to_w = sh_info in
+                     let to_midpoint,to_base,to_w,conflict = sh_info in
                      let () = if safe() then assert (Cat.wf to_midpoint) in
-                     let has_sup = true in
                      let compared' = Lib.Int2Set.add (k,i) compared
                      in
                      if db() then print_string
@@ -696,7 +698,7 @@ module Make (Node:Node.NodeType) =
                          update_inf i (inf,root_to_inf,inf_to_i,inf_to_w) inf_path ext_base
                        in
                        let dry_run' =
-                         if not has_sup then
+                         if conflict then
                            (fun w ext_base inf_path ->
                              let ext_base = add_step_alpha inf w inf_to_w ext_base inf_path in
                              add_conflict_alpha i w ext_base inf_path)::dry_run
@@ -760,7 +762,7 @@ module Make (Node:Node.NodeType) =
                              (in this case verify that inf is not already below the alias*)
                            let ext_base = add_step inf_id mp_id inf_to_mp ext_base
                            in
-		           if has_sup then ext_base else add_conflict i w ext_base
+		           if conflict then ext_base else add_conflict i w ext_base
                          )::dry_run
                        in
 	               (dry_run',compared',inf_path',queue',inc_step ext_base step, subst fresh_id inf cut,max_elements')

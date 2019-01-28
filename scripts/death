@@ -1,4 +1,3 @@
 load scripts/big
-set adjust
 build (empty,pat_1)
 
