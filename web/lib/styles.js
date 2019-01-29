@@ -172,7 +172,7 @@ module.exports = [ // the stylesheet for the graph
     }
   },
   {
-    selector: 'edge[outer].activeCC, edge[outer].activeCCLong',
+    selector: 'edge[outer][^conflict].activeCC, edge[outer][^conflict].activeCCLong',
     style: {
       'visibility': 'visible',
       opacity: 0.8,
@@ -180,7 +180,7 @@ module.exports = [ // the stylesheet for the graph
     }
   },
   {
-    selector: 'edge[outer].activeCC',
+    selector: 'edge[outer][^conflict].activeCC',
     style: {
       'visibility': 'visible',
       opacity: 1,
