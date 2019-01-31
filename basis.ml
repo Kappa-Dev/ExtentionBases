@@ -642,7 +642,7 @@ module Make (Node:Node.NodeType) =
                          ext_base
                      in
                      let queue' =
-                       if not is_complete then (*if not complete, the step i |--> x should not be pushed on the queue*)
+                       if not is_complete then (*i.e not adding the step i |--> x if some predecessors of i are still in the queue*)
                          queue
                        else
                          Lib.IntMap.fold
