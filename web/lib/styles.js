@@ -7,10 +7,14 @@ const outer = {
   edge: {
     conflict: {
       line: {
-        idle: '#A0A0A0',
-        hover: '#505050',
-        active: '#808080',
-        activeLong: '#404040',
+        //idle: '#A0A0A0',
+        //hover: '#505050',
+        //active: '#808080',
+        //activeLong: '#404040',
+        idle: '#b5342d',
+        hover: '#b5342d',
+        active: '#b5342d',
+        activeLong: '#b5342d'
       }
     },
     line: {
@@ -129,9 +133,14 @@ module.exports = [ // the stylesheet for the graph
       'target-arrow-color': outer.edge.arrow.idle,
       'target-arrow-shape': 'triangle',
       'curve-style': 'unbundled-bezier'
-    }
+    },
   },
-
+  {
+    selector: 'edge[outer][conflict]',
+    style: {
+      'target-arrow-shape': 'none'
+    },
+  },
   {
     selector: "edge[outer][conflict]",
     style: {
@@ -172,7 +181,7 @@ module.exports = [ // the stylesheet for the graph
     }
   },
   {
-    selector: 'edge[outer].activeCC, edge[outer].activeCCLong',
+    selector: 'edge[outer][^conflict].activeCC, edge[outer][^conflict].activeCCLong',
     style: {
       'visibility': 'visible',
       opacity: 0.8,
@@ -180,7 +189,7 @@ module.exports = [ // the stylesheet for the graph
     }
   },
   {
-    selector: 'edge[outer].activeCC',
+    selector: 'edge[outer][^conflict].activeCC',
     style: {
       'visibility': 'visible',
       opacity: 1,
