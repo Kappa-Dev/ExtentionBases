@@ -325,6 +325,7 @@ module Make (Node:Node.NodeType) =
 
 
     exception Found_iso of Cat.arrows * int
+    exception Found_below of int * Cat.arrows * int * Cat.arrows
 
     type inf_path =
       {beta : (int*arrows*arrows*arrows) list Lib.IntMap.t ;
@@ -372,8 +373,6 @@ module Make (Node:Node.NodeType) =
 
     let string_of_sharings sharings =
       String.concat "," (List.map (fun (to_midpoint,_,_,_) -> Graph.to_string (Cat.trg to_midpoint)) sharings)
-
-    exception Iso_found of (int * Cat.arrows) Lib.IntMap.t
 
     let merge j i j_to_i ext_base =
       let pi = find i ext_base in
@@ -482,9 +481,7 @@ module Make (Node:Node.NodeType) =
             assert (alias i inf_path = i) ;
         if mem i ext_base then
           let () =
-            if mem i' ext_base then
-              (Term.printf [Term.red] "Invariant violation detected: points %d and %d are isomorphic and both in the extension base\n" i i' ;
-               assert false)
+            assert ((param.tree_shape && param.sparse) || not (mem i' ext_base))
           in
           (alpha,merge i i' to_i' ext_base)
         else
@@ -603,6 +600,8 @@ module Make (Node:Node.NodeType) =
                   (*NB no todo list to update here*)
                   | Below w_to_i -> (* w --w_to_i--> i *)
                      let () = if db() then print_string (blue ("below "^(string_of_int i)^"\n")) in
+                     raise (Found_below (inf,inf_to_w,i,w_to_i))
+                     (*
                      let dry_run' =
 	               ((fun w ext_base inf_path ->
                          let ext_base = add_step_alpha inf w inf_to_w ext_base inf_path in
@@ -618,7 +617,7 @@ module Make (Node:Node.NodeType) =
                        else queue
                      in
                      (dry_run',compared',inf_path,queue',inc_step ext_base step, cut, max_elements)
-
+                      *)
                   (************************** Case inf_to_i factors inf_to_w *******************)
                   (*1. best_inf,_ = (root_to_i,id_i,i,i_to_w) +!> best_inf (i) *)
                   (*NB: no new alias here. no dry_run to add*)
@@ -843,6 +842,17 @@ module Make (Node:Node.NodeType) =
         ext_base
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
+      | Found_below (inf,inf_to_w,i,w_to_i) ->
+         let w = get_fresh ext_base in
+         let _ =
+           if db() then
+             begin
+               print_string (blue (Printf.sprintf "Inserting witness with id %d\n" w)) ;
+             end
+         in
+         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
+         let ext_base = add_obs w obs_emb obs_id ext_base in
+         add_step w i w_to_i (add_step inf w inf_to_w ext_base)
 
 
     let of_sharings tiles_l =

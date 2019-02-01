@@ -538,61 +538,6 @@ module Make (Node:Node.NodeType) =
       if safe() then assert (not (is_partial inf_to_right)) ;
       (inf_to_left,inf_to_right)
 
-    let extend_hom left right p_hom u todo visited conflict =
-      let () = if safe() then assert (Hom.mem u p_hom)
-      in
-      let visited = NodeSet.add u visited in
-      let bondExtension = 0 in
-      let portExtension = 1 in
-      let nodes_left,nodes_right,rigid,ext_type =
-        match
-          (List.filter
-             (fun v -> not (NodeSet.mem v visited))
-             (Graph.nodes_of_id (Node.id u) left))
-        with
-          [] ->
-           (List.filter
-              (fun v -> not (NodeSet.mem v visited))
-              (Graph.bound_to u left),
-            List.filter
-              (fun v -> not (Hom.comem v p_hom))
-              (Graph.bound_to (Hom.find u p_hom) right),
-            false, bondExtension
-           )
-        | nodes ->
-           (nodes, List.filter
-                     (fun v -> not (Hom.comem v p_hom))
-                     (Graph.nodes_of_id (Node.id (Hom.find u p_hom)) right),
-            Node.has_rigid_ports , portExtension
-           )
-      in
-      let () =
-        if db() then
-          Printf.printf "possible extensions are nodes {%s}\n"
-            (String.concat "," (List.map Node.to_string nodes_left))
-      in
-      List.fold_left
-        (fun (ext_p_hom,visited,conflict) v ->
-          let ext_p_hom',found =
-            List.fold_left
-              (fun (ext_p_hom,found) v' ->
-                if rigid && ext_p_hom <> []
-                then (ext_p_hom,found) (*in case of rigidity only one match for v is required*)
-                else
-                  try
-                    let () = if db() then
-                               Printf.printf "Mapping %s |-> %s\n" (Node.to_string v) (Node.to_string v')
-                    in
-                    ((Hom.add v v' p_hom,v::todo)::ext_p_hom,true)
-                  with
-                    Hom.Not_structure_preserving | Hom.Not_injective ->
-                                                    (if db() then print_endline "Failed" ; (ext_p_hom,found))
-              ) (ext_p_hom,false) nodes_right
-          in
-          let conflict' = conflict || (ext_type = bondExtension && not found) in
-          (ext_p_hom',NodeSet.add v visited,conflict')
-        ) ([],visited,conflict) nodes_left
-
 
     let share f g =
       let left,right = f.trg,g.trg in
@@ -611,18 +556,32 @@ module Make (Node:Node.NodeType) =
            if Hom.mem u hom_p then iter_extend hom_p tl conflict
            else
              let () = if db() then Printf.printf "Extending node %s \n" (Node.to_string u) in
-             let candidates = Graph.nodes_of_id (Hom.find_sub (Node.id u) hom_p) right in
+             let candidates =
+               Graph.nodes_of_id (Hom.find_sub (Node.id u) hom_p) right
+             in
              match (List.filter (fun v -> Node.compatible u v) candidates) with
                [] -> iter_extend hom_p tl conflict
              | [v] ->
                 begin
                   try
-                    let hom_p' = Hom.add u v hom_p in
-                    let todo' = (Graph.nodes_of_id (Node.id u) left)@tl
+                    let u' = List.hd (Graph.bound_to u left) in
+                    let v' = List.hd (Graph.bound_to v right) in
+                    let () = if db() then
+                               Term.printf [] "Trying (%s,%s0 |-> (%s,%s) \n"
+                                 (Node.to_string u) (Node.to_string u') (Node.to_string v) (Node.to_string v')
+                    in
+                    let hom_p' = Hom.add u v (Hom.add u' v' hom_p) in
+                    let () = if db() then Term.printf [Term.green] "Success!\n" in
+                    let todo' =
+                      List.fold_left
+                        (fun cont v -> if Hom.mem v hom_p' then cont else v::cont
+                        ) tl (Graph.nodes_of_id (Node.id u') left)
                     in
                     iter_extend hom_p' todo' conflict
                   with
-                    Hom.Not_injective | Hom.Not_structure_preserving -> iter_extend hom_p tl true
+                    Hom.Not_injective | Hom.Not_structure_preserving ->
+                                         let () = if db() then Term.printf [Term.red] "Failed!\n"
+                                         in iter_extend hom_p tl true
                 end
              | _ -> failwith "rigidity violation"
       in
