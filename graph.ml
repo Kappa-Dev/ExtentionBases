@@ -36,6 +36,7 @@ module type GraphType =
     val is_equal : t -> t -> bool
     val wf : t -> bool
     val is_connex : t -> bool
+    val is_sub : t -> t -> bool
     val compatible : node -> t -> bool
 
     (**Operators*)
@@ -144,6 +145,9 @@ module Make (Node:Node.NodeType) =
       List.mem v bu
 
     let has_node u g = NodeSet.mem u g.nodes
+
+    let is_sub g h =
+      fold_edges (fun u v cont -> (has_edge u v h) && cont) g true
 
     let add_node u g =
       if has_node u g then g

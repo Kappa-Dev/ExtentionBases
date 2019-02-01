@@ -481,6 +481,11 @@ module Make (Node:Node.NodeType) =
         if safe () then
             assert (alias i inf_path = i) ;
         if mem i ext_base then
+          let () =
+            if mem i' ext_base then
+              (Term.printf [Term.red] "Invariant violation detected: points %d and %d are isomorphic and both in the extension base\n" i i' ;
+               assert false)
+          in
           (alpha,merge i i' to_i' ext_base)
         else
           let i',to_i' =
@@ -526,7 +531,7 @@ module Make (Node:Node.NodeType) =
                          (*commutes but different midpoints*)
                         None -> (is_found, alpha, old::infs,ext_base)
                       | Some old_to_new ->
-                         if safe () then
+                         if db () then
                            assert (Cat.is_iso old_to_new) ;
                          if newp > oldp then
                            let alpha,ext_base = add_alias newp oldp (Cat.invert old_to_new) alpha ext_base in
