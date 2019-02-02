@@ -481,7 +481,7 @@ module Make (Node:Node.NodeType) =
             assert (alias i inf_path = i) ;
         if mem i ext_base then
           let () =
-            assert ((param.tree_shape && param.sparse) || not (mem i' ext_base))
+            assert (param.tree_shape || param.sparse || param.min_sharing > 1)
           in
           (alpha,merge i i' to_i' ext_base)
         else
