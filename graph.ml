@@ -57,9 +57,11 @@ module Make (Node:Node.NodeType) =
 
     exception Incoherent
 
-    module NodeSet = Set.Make(struct type t = Node.t let compare = Node.compare end)
-    module NodeMap = Map.Make(struct type t = Node.t let compare = Node.compare end)
+    module NodeSet = Set.Make (Node)
+    module NodeMap = Map.Make (Node)
     module Hom = Homomorphism.Make (Node)
+    type nodeSet = NodeSet.t
+
     type hom = Hom.t
     type node = Node.t
     type t =

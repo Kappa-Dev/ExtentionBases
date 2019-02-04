@@ -21,7 +21,7 @@ module Make (Content:Lib.OrderedType) =
         I s -> I s
       | B (m,m') -> B (m',m)
 
-    let identity clist = I (List.fold_left (fun set c -> CSet.add c set) CSet.empty clist)
+    let identity clist = I (List.fold_left (fun set u -> CSet.add u set) CSet.empty clist)
 
     let is_equal f bij bij' =
       match (bij,bij') with
