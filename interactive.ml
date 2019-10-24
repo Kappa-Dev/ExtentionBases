@@ -78,6 +78,7 @@ module Make (Node:Node.NodeType) =
               sparse : bool ;
               rule : (string * string) option
              }
+             
     let empty =
       {model = Model.empty ;
        show_positive = true ;
@@ -151,12 +152,12 @@ module Make (Node:Node.NodeType) =
          let min_sharing f = match env.self_adjust with
              None -> env.min_sharing
             | Some i -> max env.min_sharing ((Cat.size f) / i) in
-         let _,pos_ext_base =
+         let _,(pos_ext_base,opt) =
            try
              List.fold_left
-               (fun (cpt,ext_base) (id_obs,tile) ->
+               (fun (cpt,(ext_base,opt)) (id_obs,tile) ->
                  Term.printf [Term.yellow] "%d/%d" cpt n; flush stdout ;
-                 ANSITerminal.move_bol () ;
+                 Term.move_bol () ;
 
                  match Cat.upper_bound tile with
                    None -> failwith "no witness"
@@ -169,14 +170,14 @@ module Make (Node:Node.NodeType) =
                           (Cat.string_of_cospan (to_w,from_o)) ; flush stdout
                       end;
                     (cpt+1,EB.insert {params with EB.min_sharing = (min_sharing to_w)} to_w from_o id_obs ext_base)
-               ) (1,eb_pos) pw
-           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,ext_base)
+               ) (1,(eb_pos,None)) pw
+           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (0,(ext_base,None))
          in
          print_newline () ;
-         let neg_ext_base =
+         let neg_ext_base,opt =
            try
            List.fold_left
-             (fun ext_base (id_obs,tile) ->
+             (fun (ext_base,opt) (id_obs,tile) ->
                match Cat.upper_bound tile with
                  None -> failwith "no witness"
                | Some (to_w,from_o) ->
@@ -185,8 +186,8 @@ module Make (Node:Node.NodeType) =
                       (Lib.Dict.to_name id_obs env.model.Model.dict)
                       (Cat.string_of_cospan (to_w,from_o)) ; flush stdout ;
                   EB.insert params to_w from_o id_obs ext_base
-             ) eb_neg nw
-           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; ext_base
+             ) (eb_neg,None) nw
+           with EB.Invariant_failure (str,ext_base) -> print_endline (red str) ; (ext_base,None)
          in
          {env with eb = Some (pos_ext_base,neg_ext_base)}
 

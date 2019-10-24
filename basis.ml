@@ -10,14 +10,12 @@ module Make (Node:Node.NodeType) =
     let (=~=) = Cat.(=~=)
     let (++) = Lib.IntSet.union
 
-    type arrows = Cat.arrows
-    type obj = Cat.obj
     open Lib.Util
 
     type point = {value : Graph.t ;
                   next : Cat.arrows Lib.IntMap.t ;
                   prev : Lib.IntSet.t ;
-                  obs : (Cat.arrows * int) list ;
+                  obs : (Cat.arrows*int) option ;
                   conflict : Lib.IntSet.t ;
                  }
 
@@ -36,7 +34,7 @@ module Make (Node:Node.NodeType) =
       {value = g ;
        next = Lib.IntMap.empty ;
        prev = Lib.IntSet.empty ;
-       obs = [] ;
+       obs = None ;
        conflict = Lib.IntSet.empty ;
       }
 
@@ -65,15 +63,12 @@ module Make (Node:Node.NodeType) =
           (fun i p dot_string ->
             let str =
               match p.obs with
-                [] -> Printf.sprintf "%d [label =\"%d\" , shape = none] ;" i i
-              | ol ->
+                None -> Printf.sprintf "%d [label =\"%d\" , shape = none] ;" i i
+              | Some (_,obs_id) ->
                  Printf.sprintf
-                   "%d [label=\"%d [obs: %s]\" , shape = \"%s\"];" i
+                   "%d [label=\"%d [obs: %d]\" , shape = \"%s\"];" i
                    i
-                   (String.concat ","
-                      (List.map (fun (_,x) ->
-                           Lib.Dict.to_name x dict
-                         ) ol))
+                   obs_id
                    (if Lib.IntMap.is_empty p.next then "rectangle" else "oval")
             in
             let str2 =
@@ -105,8 +100,8 @@ module Make (Node:Node.NodeType) =
        witnesses =
          begin
            match p.obs with
-             [] -> ext_base.witnesses
-           | _ -> Lib.IntSet.add i ext_base.witnesses
+             None -> ext_base.witnesses
+           | Some _ -> Lib.IntSet.add i ext_base.witnesses
          end ;
        extensions = Lib.IntMap.add i ext_p ext_base.extensions ;
        max_elements = Lib.IntSet.add i ext_base.max_elements ;
@@ -204,12 +199,15 @@ module Make (Node:Node.NodeType) =
 
     let add_obs i ext obs_id ext_base =
       let pi = find i ext_base in
-      let pi =
+      let pi,subst_opt =
         match pi.obs with
-          [] -> {pi with obs = [ext,obs_id]}
-        | obs_ids -> {pi with obs = (ext,obs_id)::obs_ids}
+          None -> 
+            (* This pre exisiting point is the first witness*)
+          ({pi with obs = Some (ext,obs_id)},None)
+          (*point is already associated with an observable*)
+        | Some (ext_ref,obs_ref) -> (pi,Some (((Cat.invert ext_ref) @@ ext),obs_ref)) (*returns (obs_ref -> new_obs, obs_ref)*)
       in
-      replace i pi ext_base
+      (replace i pi ext_base,subst_opt)
 
     let remove_step i j ext_base =
       let pi =
@@ -328,8 +326,8 @@ module Make (Node:Node.NodeType) =
     exception Found_below of int * Cat.arrows * int * Cat.arrows
 
     type inf_path =
-      {beta : (int*arrows*arrows*arrows) list Lib.IntMap.t ;
-       alpha: (int*arrows) Lib.IntMap.t}
+      {beta : (int*Cat.arrows*Cat.arrows*Cat.arrows) list Lib.IntMap.t ;
+       alpha: (int*Cat.arrows) Lib.IntMap.t}
 
     let print_inf_path ip =
       Lib.IntMap.iter
@@ -413,7 +411,6 @@ module Make (Node:Node.NodeType) =
     let def_param = {max_step = None ; min_sharing = 1 ; tree_shape = false ; sparse = false}
 
     let rec progress param ext_base dry_run compared inf_path queue step cut max_elements =
-
       (************* DEBUGING INFO ***************)
       let () =
         if safe () then
@@ -788,6 +785,7 @@ module Make (Node:Node.NodeType) =
         let compared_0 = Lib.Int2Set.empty in
         let dry_run_0 = [] in
         let inf_path,dry_run,cut,max_elements =
+          (* May raise Found_iso or Found_below, otherwise returns a dry_run to insert new midpoints*)
           progress param ext_base dry_run_0 compared_0 inf_path_0 queue_0 0 (Lib.IntSet.singleton 0) (Lib.IntSet.singleton 0)
         in
         let () = if db() then print_inf_path inf_path in
@@ -803,7 +801,8 @@ module Make (Node:Node.NodeType) =
             end
         in
         let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
-        let ext_base = add_obs w obs_emb obs_id ext_base in
+        let ext_base,opt = add_obs w obs_emb obs_id ext_base in
+        let () = assert (opt=None) in
 
         (* 2. Executing dry run, i.e inserting midpoints *)
         let ext_base =
@@ -839,7 +838,7 @@ module Make (Node:Node.NodeType) =
                 add_step_alpha inf w inf_to_w ext_base inf_path
             ) ext_base (List.rev inf_list)
         in
-        ext_base
+        (ext_base,opt)
       with
         Found_iso (iso_w_i,i) -> add_obs i (iso_w_i @@ obs_emb) obs_id ext_base
       | Found_below (inf,inf_to_w,i,w_to_i) ->
@@ -851,8 +850,9 @@ module Make (Node:Node.NodeType) =
              end
          in
          let ext_base = add w (point (Cat.trg ext_w)) ext_w ext_base in
-         let ext_base = add_obs w obs_emb obs_id ext_base in
-         add_step w i w_to_i (add_step inf w inf_to_w ext_base)
+         let ext_base = add_step w i w_to_i (add_step inf w inf_to_w ext_base) in 
+         add_obs w obs_emb obs_id ext_base
+         
 
 
     let of_sharings tiles_l =
@@ -908,16 +908,6 @@ module Make (Node:Node.NodeType) =
             in
             eb
 
-(*
-    let reduce ext_base =
-      let size_of g = Graph.size_node g, Graph.size_edge g in
-      let dmap =
-        Lib.IntMap.fold
-        (fun k to_k dmap ->
-          let l = try Lib.Int2Map.find (size_of (Cat.trg to_k)) dmap with Not_found -> [] in
-          List.fold_left (fun dmap (k',to_k') -> if to_k =~= to_k' then (dmap,)) dmap l
-        )
- *)
 
     let to_dot_corresp ext_base =
       let str_list,_ =
@@ -926,7 +916,7 @@ module Make (Node:Node.NodeType) =
             let f = find_extension i ext_base in
             let _G = List.hd ((Cat.src f) --> f) in
             match p.obs with
-              [] -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
+              None -> let str,name,fresh = Graph.to_dot_cluster ~sub:_G p.value i fresh in
                     (str::str_list,fresh)
             | _ -> (str_list,fresh)
           ) ext_base.points ([],0)
