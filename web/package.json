@@ -9,7 +9,7 @@
     "chokidar": "^1.7.0",
     "cytoscape": "^3.2.7",
     "cytoscape-cose-bilkent": "^4.0.0",
-    "express": "^4.17.3",
+    "express": "^4.22.0",
     "expressjs": "^1.0.1",
     "ws": "^3.3.2"
   }
