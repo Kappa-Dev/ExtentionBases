@@ -6,7 +6,7 @@
   "author": "Jean Krivine <jean.krivine@irif.fr>",
   "license": "MIT",
   "dependencies": {
-    "chokidar": "^2.1.0",
+    "chokidar": "^3.1.0",
     "cytoscape": "^3.2.7",
     "cytoscape-cose-bilkent": "^4.0.0",
     "express": "^4.22.0",
